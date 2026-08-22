@@ -16,7 +16,13 @@ export {
   AuthDetectionError,
   AuthDetector,
   DOUYIN_CHAT_URL,
+  DouyinChatPage,
+  DouyinChatPageError,
   type AuthDetectionResult,
   type AuthDetectorOptions,
   type AuthStatus,
+  type ChatReadinessResult,
+  type ConversationSummary,
+  type DouyinChatErrorCode,
+  type DouyinChatPageOptions,
 } from './douyin/index.js';

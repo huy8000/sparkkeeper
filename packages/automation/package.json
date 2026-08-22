@@ -13,6 +13,7 @@
   "scripts": {
     "auth:smoke": "tsx scripts/auth-smoke.ts",
     "browser:smoke": "tsx scripts/browser-smoke.ts",
+    "chat:smoke": "tsx scripts/chat-smoke.ts",
     "build": "tsc -p tsconfig.json",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
