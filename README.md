@@ -12,7 +12,7 @@ SparkKeeper 是一套面向固定 Linux 服务器的自托管抖音火花维护�
 
 ## 当前开发阶段
 
-Project Foundation、**MVP Task M1：Persistent Browser Session**、**MVP Task M2：Authentication Detection** 和 **MVP Task M3：Douyin Chat Adapter** 均已完成。
+Project Foundation、**MVP Task M1：Persistent Browser Session**、**MVP Task M2：Authentication Detection**、**MVP Task M3：Douyin Chat Adapter** 和 **MVP Task M4：Single Contact Resolver** 均已完成。
 
 `packages/automation` 现在提供基于 Playwright Chromium 的持久化浏览器会话基础：
 
@@ -38,6 +38,15 @@ M3 在认证结果为 `READY` 后提供隔离的 Douyin Chat 页面适配能力�
 - 明确区分认证不可用、Chat 未 ready、列表缺失、页面关闭和浏览器异常。
 
 M3 不选择或点击目标联系人，不读取聊天正文，也不输入或发送消息。
+
+M4 在 Chat Adapter 之上提供单目标联系人解析：
+
+- 仅对运行时配置的 `displayName` 做 `trim()` 后的精确匹配，不做包含、模糊或猜测匹配；
+- 明确区分唯一找到、未找到和同名歧义，只有唯一找到才允许打开会话；
+- 对虚拟会话列表执行有最大次数、总时长和无进展终止条件的有限滚动；
+- 打开后通过当前会话 Header 再次精确验证内存中的目标身份。
+
+M4 不读取聊天正文，不定位消息输入区，也不输入或发送任何消息。
 
 ## 技术栈
 
@@ -164,10 +173,26 @@ BROWSER_HEADLESS=false pnpm --filter @sparkkeeper/automation chat:smoke
 
 `AUTH_EXPIRED` 或 `UNKNOWN` 会阻止列表解析，必须先由用户本人在 headed 模式恢复登录。
 
+### Single Contact Resolver Smoke Test
+
+使用运行时环境变量提供单个目标，再执行联系人定位、打开和 Header 验证：
+
+```bash
+MVP_TARGET_DISPLAY_NAME="Test User" pnpm --filter @sparkkeeper/automation contact:smoke
+```
+
+目标只在当前进程内使用。成功输出仅包含认证、Chat、解析、验证状态及滚动次数，不输出联系人名称、标识或聊天正文。需要观察浏览器窗口时：
+
+```bash
+MVP_TARGET_DISPLAY_NAME="Test User" BROWSER_HEADLESS=false pnpm --filter @sparkkeeper/automation contact:smoke
+```
+
+目标为空、未找到或存在多个精确同名候选时，Smoke 会安全停止，不会默认选择任何会话。
+
 ## Roadmap
 
 - **Phase 0 — Project Foundation（已完成）**：建立 Monorepo、应用与 packages 骨架及统一工程命令。
-- **MVP（M1/M2/M3 已完成，M4 尚未开始）**：逐步验证持久化浏览器会话、登录状态、Chat 页面适配、单联系人定位、单条消息发送与结果验证链路。
+- **MVP（M1/M2/M3/M4 已完成，M5 尚未开始）**：已验证持久化浏览器会话、登录状态、Chat 页面适配和单联系人定位；单条消息发送与结果验证仍待后续阶段完成。
 - **V1**：增加本地数据持久化、多联系人、每日调度、幂等、重试和可观测性。
 - **V2**：增加正式 API、管理后台、实时状态、失败通知和完整自托管部署体验。
 
