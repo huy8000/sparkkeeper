@@ -12,7 +12,7 @@ SparkKeeper 是一套面向固定 Linux 服务器的自托管抖音火花维护�
 
 ## 当前开发阶段
 
-Project Foundation、**MVP Task M1：Persistent Browser Session** 和 **MVP Task M2：Authentication Detection** 已完成。当前进入 **MVP Task M3：Douyin Chat Adapter**。
+Project Foundation、**MVP Task M1：Persistent Browser Session**、**MVP Task M2：Authentication Detection** 和 **MVP Task M3：Douyin Chat Adapter** 均已完成。
 
 `packages/automation` 现在提供基于 Playwright Chromium 的持久化浏览器会话基础：
 
@@ -167,7 +167,7 @@ BROWSER_HEADLESS=false pnpm --filter @sparkkeeper/automation chat:smoke
 ## Roadmap
 
 - **Phase 0 — Project Foundation（已完成）**：建立 Monorepo、应用与 packages 骨架及统一工程命令。
-- **MVP（M1/M2 已完成，当前处于 M3）**：逐步验证持久化浏览器会话、登录状态、Chat 页面适配、单联系人定位、单条消息发送与结果验证链路。
+- **MVP（M1/M2/M3 已完成，M4 尚未开始）**：逐步验证持久化浏览器会话、登录状态、Chat 页面适配、单联系人定位、单条消息发送与结果验证链路。
 - **V1**：增加本地数据持久化、多联系人、每日调度、幂等、重试和可观测性。
 - **V2**：增加正式 API、管理后台、实时状态、失败通知和完整自托管部署体验。
 
