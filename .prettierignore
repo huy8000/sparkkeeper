@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+docs/
+pnpm-lock.yaml
+LICENSE
+data/
+logs/
+screenshots/
+playwright-report/
+test-results/
