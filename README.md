@@ -12,7 +12,7 @@ SparkKeeper 是一套面向固定 Linux 服务器的自托管抖音火花维护�
 
 ## 当前开发阶段
 
-当前已进入 **MVP Task M1：Persistent Browser Session**。
+Project Foundation 和 **MVP Task M1：Persistent Browser Session** 已完成。当前进入 **MVP Task M2：Authentication Detection**。
 
 `packages/automation` 现在提供基于 Playwright Chromium 的持久化浏览器会话基础：
 
@@ -22,7 +22,13 @@ SparkKeeper 是一套面向固定 Linux 服务器的自托管抖音火花维护�
 - 正常关闭或浏览器意外关闭后会清理内部运行状态；
 - 默认 Profile 路径为 `<DATA_DIR>/browser-profile`，也可由 `BROWSER_PROFILE_DIR` 显式覆盖。
 
-本阶段不访问 Douyin，也不包含登录检测、联系人、消息、调度或后续版本能力。
+`packages/automation` 现在还提供 Douyin Chat 认证状态检测：
+
+- `READY`：存在明确、相互支持的登录后聊天页面证据；
+- `AUTH_EXPIRED`：存在明确的登录、扫码或重新认证证据；
+- `UNKNOWN`：证据不足、冲突、页面异常或超时，按安全失败处理。
+
+M2 只负责检测，不会自动登录、读取联系人或操作聊天消息。
 
 ## 技术栈
 
@@ -83,7 +89,7 @@ pnpm test
 pnpm build
 ```
 
-`pnpm test` 会运行 Browser Session 配置和生命周期单元测试。
+`pnpm test` 会运行 Browser Session 配置/生命周期测试，以及使用受控页面的 AuthDetector 三态测试。
 
 如需创建本地配置：
 
@@ -115,10 +121,28 @@ BROWSER_HEADLESS=false pnpm --filter @sparkkeeper/automation browser:smoke
 
 可通过 `DATA_DIR`、`BROWSER_PROFILE_DIR` 和 `APP_TIMEZONE` 调整 Profile 根目录、Profile 目录和浏览器时区。Browser Profile 属于本地运行时数据，不应提交或复制进镜像。
 
+### Authentication Detection Smoke Test
+
+使用 M1 的固定 Profile 打开 Douyin Chat 并检测当前认证状态：
+
+```bash
+pnpm --filter @sparkkeeper/automation auth:smoke
+```
+
+命令会输出 `Auth status` 和简洁原因。结果为 `AUTH_EXPIRED` 或 `UNKNOWN` 时，会在 `<DATA_DIR>/screenshots/` 保存本地诊断截图；该目录不会进入 Git。
+
+如需人工登录并验证真实 `READY`，使用 headed 模式运行同一命令：
+
+```bash
+BROWSER_HEADLESS=false pnpm --filter @sparkkeeper/automation auth:smoke
+```
+
+在浏览器中由用户本人完成登录后，再次运行 Auth Smoke。SparkKeeper 不会自动填写凭据、处理验证码或绕过平台验证。
+
 ## Roadmap
 
 - **Phase 0 — Project Foundation（已完成）**：建立 Monorepo、应用与 packages 骨架及统一工程命令。
-- **MVP（当前处于 M1）**：逐步验证持久化浏览器会话、登录状态、单联系人定位、单条消息发送与结果验证链路。
+- **MVP（M1 已完成，当前处于 M2）**：逐步验证持久化浏览器会话、登录状态、单联系人定位、单条消息发送与结果验证链路。
 - **V1**：增加本地数据持久化、多联系人、每日调度、幂等、重试和可观测性。
 - **V2**：增加正式 API、管理后台、实时状态、失败通知和完整自托管部署体验。
 

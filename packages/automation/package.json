@@ -11,6 +11,7 @@
     }
   },
   "scripts": {
+    "auth:smoke": "tsx scripts/auth-smoke.ts",
     "browser:smoke": "tsx scripts/browser-smoke.ts",
     "build": "tsc -p tsconfig.json",
     "test": "tsx --test test/*.test.ts",
