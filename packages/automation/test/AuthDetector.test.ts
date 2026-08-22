@@ -25,6 +25,20 @@ const READY_FIXTURE = `<!doctype html>
   </body>
 </html>`;
 
+const READY_WITHOUT_SELECTED_CONVERSATION_FIXTURE = `<!doctype html>
+<html lang="zh-CN">
+  <body>
+    <div class="componentsLeftPanelwrapper">
+      <div class="conversationConversationListwrapper">
+        <div data-e2e="conversation-item">Controlled conversation</div>
+      </div>
+    </div>
+    <div class="RightPanelEmptywrapper componentsRightPanelwrapper">
+      Select a controlled conversation
+    </div>
+  </body>
+</html>`;
+
 const AUTH_EXPIRED_FIXTURE = `<!doctype html>
 <html lang="zh-CN">
   <body>
@@ -65,6 +79,16 @@ test('returns READY only with chat-shell and composer evidence', async () => {
   const result = await new AuthDetector({ timeoutMs: 100 }).detect(page);
 
   assert.equal(result.status, 'READY');
+  assert.match(result.reason, /two independent positive signals/i);
+});
+
+test('returns READY for an authenticated chat workspace before a conversation is selected', async () => {
+  await loadFixture(READY_WITHOUT_SELECTED_CONVERSATION_FIXTURE);
+
+  const result = await new AuthDetector({ timeoutMs: 100 }).detect(page);
+
+  assert.equal(result.status, 'READY');
+  assert.match(result.reason, /chat workspace/i);
   assert.match(result.reason, /two independent positive signals/i);
 });
 

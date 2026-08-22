@@ -7,7 +7,7 @@ import {
   AUTH_SUPPORT_SELECTORS,
   READY_CHAT_SHELL_SELECTORS,
   READY_CHAT_SHELL_TEXTS,
-  READY_COMPOSER_SELECTORS,
+  READY_CHAT_WORKSPACE_SELECTORS,
   REAUTHENTICATION_TEXTS,
   type AuthCssSignal,
 } from './selectors.js';
@@ -20,7 +20,7 @@ const MAX_SIGNAL_MATCHES_TO_INSPECT = 10;
 interface AuthEvidenceSnapshot {
   readonly url: string;
   readonly readyShell: readonly string[];
-  readonly readyComposer: readonly string[];
+  readonly readyWorkspace: readonly string[];
   readonly authMode: readonly string[];
   readonly authSupport: readonly string[];
   readonly reauthentication: readonly string[];
@@ -122,7 +122,7 @@ export class AuthDetector {
     const [
       readyShellSelectors,
       readyShellTexts,
-      readyComposer,
+      readyWorkspace,
       authMode,
       authSupport,
       reauthentication,
@@ -132,7 +132,7 @@ export class AuthDetector {
     ] = await Promise.all([
       collectVisibleCssSignals(page, READY_CHAT_SHELL_SELECTORS),
       collectVisibleExactTexts(page, READY_CHAT_SHELL_TEXTS),
-      collectVisibleCssSignals(page, READY_COMPOSER_SELECTORS),
+      collectVisibleCssSignals(page, READY_CHAT_WORKSPACE_SELECTORS),
       collectVisibleExactTexts(page, AUTH_MODE_TEXTS),
       collectVisibleCssSignals(page, AUTH_SUPPORT_SELECTORS),
       collectVisibleExactTexts(page, REAUTHENTICATION_TEXTS),
@@ -144,7 +144,7 @@ export class AuthDetector {
     return {
       url: page.url(),
       readyShell: [...readyShellSelectors, ...readyShellTexts],
-      readyComposer,
+      readyWorkspace,
       authMode,
       authSupport,
       reauthentication,
@@ -155,7 +155,7 @@ export class AuthDetector {
 }
 
 function classifyEvidence(snapshot: AuthEvidenceSnapshot): AuthDetectionResult | undefined {
-  const hasReadyEvidence = snapshot.readyShell.length > 0 && snapshot.readyComposer.length > 0;
+  const hasReadyEvidence = snapshot.readyShell.length > 0 && snapshot.readyWorkspace.length > 0;
   const hasCombinedLoginEvidence = snapshot.authMode.length > 0 && snapshot.authSupport.length > 0;
   const hasExpiredEvidence =
     hasCombinedLoginEvidence ||
@@ -192,7 +192,7 @@ function classifyEvidence(snapshot: AuthEvidenceSnapshot): AuthDetectionResult |
 
     return {
       status: 'READY',
-      reason: `Visible authenticated chat shell (${snapshot.readyShell.join(', ')}) and message composer (${snapshot.readyComposer.join(', ')}) provide two independent positive signals on the Douyin Chat URL.`,
+      reason: `Visible authenticated chat shell (${snapshot.readyShell.join(', ')}) and chat workspace (${snapshot.readyWorkspace.join(', ')}) provide two independent positive signals on the Douyin Chat URL.`,
     };
   }
 
@@ -300,7 +300,7 @@ function buildInsufficientEvidenceReason(
 
   const partialSignals = [
     ...snapshot.readyShell,
-    ...snapshot.readyComposer,
+    ...snapshot.readyWorkspace,
     ...snapshot.authMode,
     ...snapshot.authSupport,
   ];

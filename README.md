@@ -12,7 +12,7 @@ SparkKeeper 是一套面向固定 Linux 服务器的自托管抖音火花维护�
 
 ## 当前开发阶段
 
-Project Foundation 和 **MVP Task M1：Persistent Browser Session** 已完成。当前进入 **MVP Task M2：Authentication Detection**。
+Project Foundation、**MVP Task M1：Persistent Browser Session** 和 **MVP Task M2：Authentication Detection** 已完成。当前进入 **MVP Task M3：Douyin Chat Adapter**。
 
 `packages/automation` 现在提供基于 Playwright Chromium 的持久化浏览器会话基础：
 
@@ -28,7 +28,16 @@ Project Foundation 和 **MVP Task M1：Persistent Browser Session** 已完成。
 - `AUTH_EXPIRED`：存在明确的登录、扫码或重新认证证据；
 - `UNKNOWN`：证据不足、冲突、页面异常或超时，按安全失败处理。
 
-M2 只负责检测，不会自动登录、读取联系人或操作聊天消息。
+M2 只负责检测，不会自动登录或操作聊天消息。
+
+M3 在认证结果为 `READY` 后提供隔离的 Douyin Chat 页面适配能力：
+
+- 打开 `https://www.douyin.com/chat` 并执行认证门禁；
+- 通过 Chat shell、会话列表区域和消息区域的正向证据判断页面 ready；
+- 解析当前已经加载的会话候选，仅返回页面能够可靠提供的基础字段；
+- 明确区分认证不可用、Chat 未 ready、列表缺失、页面关闭和浏览器异常。
+
+M3 不选择或点击目标联系人，不读取聊天正文，也不输入或发送消息。
 
 ## 技术栈
 
@@ -89,7 +98,7 @@ pnpm test
 pnpm build
 ```
 
-`pnpm test` 会运行 Browser Session 配置/生命周期测试，以及使用受控页面的 AuthDetector 三态测试。
+`pnpm test` 会运行 Browser Session 配置/生命周期测试，以及使用受控页面的 AuthDetector 三态和 Douyin Chat Adapter 契约测试。
 
 如需创建本地配置：
 
@@ -139,10 +148,26 @@ BROWSER_HEADLESS=false pnpm --filter @sparkkeeper/automation auth:smoke
 
 在浏览器中由用户本人完成登录后，再次运行 Auth Smoke。SparkKeeper 不会自动填写凭据、处理验证码或绕过平台验证。
 
+### Douyin Chat Adapter Smoke Test
+
+使用已经登录的固定 Profile 打开 Douyin Chat，完成认证、页面 readiness、会话列表检测和当前已加载候选解析：
+
+```bash
+pnpm --filter @sparkkeeper/automation chat:smoke
+```
+
+成功时只输出认证/Chat 状态、列表检测结果和候选数量，不输出联系人名称、标识或聊天内容。需要观察浏览器窗口时可使用：
+
+```bash
+BROWSER_HEADLESS=false pnpm --filter @sparkkeeper/automation chat:smoke
+```
+
+`AUTH_EXPIRED` 或 `UNKNOWN` 会阻止列表解析，必须先由用户本人在 headed 模式恢复登录。
+
 ## Roadmap
 
 - **Phase 0 — Project Foundation（已完成）**：建立 Monorepo、应用与 packages 骨架及统一工程命令。
-- **MVP（M1 已完成，当前处于 M2）**：逐步验证持久化浏览器会话、登录状态、单联系人定位、单条消息发送与结果验证链路。
+- **MVP（M1/M2 已完成，当前处于 M3）**：逐步验证持久化浏览器会话、登录状态、Chat 页面适配、单联系人定位、单条消息发送与结果验证链路。
 - **V1**：增加本地数据持久化、多联系人、每日调度、幂等、重试和可观测性。
 - **V2**：增加正式 API、管理后台、实时状态、失败通知和完整自托管部署体验。
 

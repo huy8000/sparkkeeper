@@ -14,11 +14,20 @@ export const READY_CHAT_SHELL_SELECTORS: readonly AuthCssSignal[] = [
   },
   { selector: '[data-e2e="chat-list"]', label: 'chat list data-e2e' },
   { selector: '[data-testid="conversation-list"]', label: 'conversation list test id' },
+  { selector: '[data-e2e="conversation-item"]', label: 'conversation item data-e2e' },
+  {
+    selector: '[class~="conversationConversationListwrapper"]',
+    label: 'conversation list semantic class',
+  },
 ];
 
 export const READY_CHAT_SHELL_TEXTS = ['消息', '私信'] as const;
 
-export const READY_COMPOSER_SELECTORS: readonly AuthCssSignal[] = [
+export const READY_CHAT_WORKSPACE_SELECTORS: readonly AuthCssSignal[] = [
+  {
+    selector: '[class~="componentsRightPanelwrapper"]',
+    label: 'chat right-panel semantic class',
+  },
   {
     selector: '[contenteditable="true"][role="textbox"][aria-label*="消息"]',
     label: 'accessible message composer',
@@ -66,4 +75,35 @@ export const ABNORMAL_PAGE_TEXTS = [
   '页面出错',
   '无法访问此网站',
   '请检查您的网络连接',
+] as const;
+
+export const CHAT_SHELL_SELECTORS: readonly AuthCssSignal[] = [
+  { selector: '[data-testid="chat-shell"]', label: 'chat shell test id' },
+  { selector: '[class~="imContainer"]', label: 'Douyin IM shell semantic class' },
+];
+
+export const CONVERSATION_LIST_SELECTORS: readonly AuthCssSignal[] = [
+  { selector: '[aria-label*="会话列表"]', label: 'conversation list aria-label' },
+  { selector: '[aria-label*="聊天列表"]', label: 'chat list aria-label' },
+  { selector: '[data-e2e="chat-list"]', label: 'chat list data-e2e' },
+  { selector: '[data-testid="conversation-list"]', label: 'conversation list test id' },
+  {
+    selector: '[class~="conversationConversationListwrapper"]',
+    label: 'conversation list semantic class',
+  },
+];
+
+export const MESSAGE_REGION_SELECTORS: readonly AuthCssSignal[] = [
+  { selector: '[data-testid="message-region"]', label: 'message region test id' },
+  {
+    selector: '[class~="componentsRightPanelwrapper"]',
+    label: 'chat right-panel semantic class',
+  },
+];
+
+export const CONVERSATION_ITEM_SELECTOR = '[data-e2e="conversation-item"]';
+
+export const CONVERSATION_TITLE_SELECTORS = [
+  '[data-testid="conversation-title"]',
+  '[class~="conversationConversationItemtitle"]',
 ] as const;
