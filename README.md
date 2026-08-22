@@ -12,7 +12,7 @@ SparkKeeper 是一套面向固定 Linux 服务器的自托管抖音火花维护�
 
 ## 当前开发阶段
 
-Project Foundation、**MVP Task M1：Persistent Browser Session**、**MVP Task M2：Authentication Detection**、**MVP Task M3：Douyin Chat Adapter** 和 **MVP Task M4：Single Contact Resolver** 均已完成。
+Project Foundation 以及 **MVP Task M1–M5** 均已完成，当前状态为 **MVP Core Flow Complete**。
 
 `packages/automation` 现在提供基于 Playwright Chromium 的持久化浏览器会话基础：
 
@@ -47,6 +47,17 @@ M4 在 Chat Adapter 之上提供单目标联系人解析：
 - 打开后通过当前会话 Header 再次精确验证内存中的目标身份。
 
 M4 不读取聊天正文，不定位消息输入区，也不输入或发送任何消息。
+
+M5 在已验证的单联系人会话中提供一次性 Send and Verify：
+
+- 真正输入前再次精确验证当前会话 Header；
+- 定位可见、可编辑的 Composer，并验证其可观察纯文本与运行时消息完全一致；
+- 发送前记录 outbound Bubble 总数、同文本数量和仅存在于当前 DOM 的 baseline；
+- 通过显式 Send 控件触发至多一次发送动作，不使用自动 Retry；
+- 只有 baseline 后新增的同文本 outbound Bubble 才能判定成功；
+- 发送后的页面关闭、结构丢失或验证超时均安全返回 `DELIVERY_UNKNOWN`，绝不自动重发。
+
+M5 不读取或记录历史聊天正文；历史 Bubble 只在页面内进行结构计数和等值判断。
 
 ## 技术栈
 
@@ -107,7 +118,7 @@ pnpm test
 pnpm build
 ```
 
-`pnpm test` 会运行 Browser Session 配置/生命周期测试，以及使用受控页面的 AuthDetector 三态和 Douyin Chat Adapter 契约测试。
+`pnpm test` 会运行 Browser Session 配置/生命周期测试，以及使用受控页面的 AuthDetector、Chat Adapter、Contact Resolver 和 MessageSender 契约测试。
 
 如需创建本地配置：
 
@@ -189,10 +200,25 @@ MVP_TARGET_DISPLAY_NAME="Test User" BROWSER_HEADLESS=false pnpm --filter @sparkk
 
 目标为空、未找到或存在多个精确同名候选时，Smoke 会安全停止，不会默认选择任何会话。
 
+### Send and Verify Smoke Test
+
+`send:smoke` 会产生一次真实消息发送动作，因此目标、消息和授权必须全部通过当前进程环境显式提供。以下安全示例保留关闭授权，不会发送：
+
+```bash
+MVP_TARGET_DISPLAY_NAME="Test User" \
+MVP_TEST_MESSAGE="Hello from SparkKeeper" \
+MVP_ALLOW_REAL_SEND=false \
+pnpm --filter @sparkkeeper/automation send:smoke
+```
+
+只有在调用者明确将运行时发送授权开启后，命令才会执行 Composer 输入、单次 Send UI 动作和新增 outbound Bubble 验证。成功输出只包含认证、Chat、联系人、输入、发送动作和交付验证状态，不输出联系人或消息内容。
+
+发送动作一旦尝试，后续只观察验证结果；`VERIFY_FAILED` 或 `DELIVERY_UNKNOWN` 都不会触发第二次发送。正式幂等、Retry 和 SendRecord 属于后续 V1。
+
 ## Roadmap
 
 - **Phase 0 — Project Foundation（已完成）**：建立 Monorepo、应用与 packages 骨架及统一工程命令。
-- **MVP（M1/M2/M3/M4 已完成，M5 尚未开始）**：已验证持久化浏览器会话、登录状态、Chat 页面适配和单联系人定位；单条消息发送与结果验证仍待后续阶段完成。
+- **MVP Core Flow Complete（M1–M5 已完成）**：已验证持久浏览器、认证、Chat 适配、单联系人定位、一次发送及新增 outbound Bubble 验证链路。
 - **V1**：增加本地数据持久化、多联系人、每日调度、幂等、重试和可观测性。
 - **V2**：增加正式 API、管理后台、实时状态、失败通知和完整自托管部署体验。
 

@@ -10,6 +10,14 @@ export {
   TARGET_DISPLAY_NAME_ENV,
   type ContactTargetEnvironment,
 } from './contactConfig.js';
+export { MessageSender, MessageSenderError, type MessageSenderOptions } from './MessageSender.js';
+export {
+  ALLOW_REAL_SEND_ENV,
+  resolveMessageSendRuntimeConfig,
+  TEST_MESSAGE_ENV,
+  type MessageSendEnvironment,
+  type MessageSendRuntimeConfig,
+} from './messageConfig.js';
 export {
   DouyinChatPage,
   DouyinChatPageError,
@@ -27,6 +35,13 @@ export type {
   ConversationOpenResult,
   ConversationSummary,
   DouyinChatErrorCode,
+  DeliveryVerificationStatus,
+  MessageInputStatus,
+  MessageSendActionStatus,
+  MessageSendRequest,
+  MessageSendResult,
+  MessageSendStatus,
+  MessageSenderErrorCode,
   ResolvedContact,
   TargetContactIdentity,
 } from './types.js';

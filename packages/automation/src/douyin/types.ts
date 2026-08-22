@@ -56,6 +56,31 @@ export interface ConversationOpenResult {
   readonly status: 'VERIFIED';
 }
 
+export type MessageSendStatus =
+  'SUCCESS' | 'INPUT_FAILED' | 'SEND_ACTION_FAILED' | 'VERIFY_FAILED' | 'DELIVERY_UNKNOWN';
+
+export type MessageInputStatus = 'VERIFIED' | 'FAILED' | 'NOT_ATTEMPTED';
+export type MessageSendActionStatus = 'TRIGGERED' | 'NOT_TRIGGERED' | 'UNKNOWN';
+export type DeliveryVerificationStatus = 'SUCCESS' | 'FAILED' | 'UNKNOWN' | 'NOT_ATTEMPTED';
+
+export interface MessageSendRequest {
+  readonly target: TargetContactIdentity;
+  readonly message: string;
+  readonly allowRealSend: boolean;
+}
+
+export interface MessageSendResult {
+  readonly status: MessageSendStatus;
+  readonly input: MessageInputStatus;
+  readonly sendAction: MessageSendActionStatus;
+  readonly delivery: DeliveryVerificationStatus;
+  readonly sendAttemptCount: 0 | 1;
+  readonly reason: string;
+}
+
+export type MessageSenderErrorCode =
+  'SEND_NOT_AUTHORIZED' | 'MESSAGE_INVALID' | 'SEND_ALREADY_ATTEMPTED';
+
 export interface ChatReadinessResult {
   readonly status: 'READY';
   readonly reason: string;
