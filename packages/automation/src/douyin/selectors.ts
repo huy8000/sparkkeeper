@@ -112,3 +112,30 @@ export const CONVERSATION_HEADER_TITLE_SELECTORS = [
   '[data-testid="conversation-header-title"]',
   '[class~="RightPanelHeadertitle"]',
 ] as const;
+
+export const MESSAGE_COMPOSER_SELECTORS = [
+  '[data-testid="message-composer"][contenteditable="true"]',
+  '[data-e2e="msg-input"] [contenteditable="true"][data-slate-editor]',
+  '[data-e2e="msg-input"] [contenteditable="true"]',
+] as const;
+
+export const MESSAGE_SEND_ACTION_SELECTORS = [
+  '[data-testid="send-message"]',
+  '[class~="e2e-send-msg-btn"]',
+] as const;
+
+export const MESSAGE_LIST_SELECTORS = [
+  '[data-testid="message-list"]',
+  '[class~="messageMessageListlist"]',
+] as const;
+
+export const OUTBOUND_MESSAGE_SELECTORS = [
+  '[data-testid="outbound-message"]',
+  '[class~="messageMessageBoxisFromMe"]',
+] as const;
+
+export const MESSAGE_BUBBLE_TEXT_SELECTORS = [
+  '[data-testid="message-text"]',
+  '[data-e2e="msg-item-content"] [class~="TextMessageTextpureText"]',
+  '[class~="TextMessageTextpureText"]',
+] as const;
