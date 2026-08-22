@@ -14,7 +14,7 @@
     "build": "pnpm -r --if-present build",
     "lint": "eslint . --max-warnings=0 && prettier --check .",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "node --test",
+    "test": "pnpm -r --if-present test",
     "format": "prettier --write ."
   },
   "devDependencies": {

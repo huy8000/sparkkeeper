@@ -12,9 +12,17 @@ SparkKeeper 是一套面向固定 Linux 服务器的自托管抖音火花维护�
 
 ## 当前开发阶段
 
-当前处于 **Phase 0：Project Foundation**。
+当前已进入 **MVP Task M1：Persistent Browser Session**。
 
-本阶段只提供可运行、可构建、可检查的 TypeScript Monorepo 工程骨架。浏览器自动化、数据库模型、调度、正式 API、后台业务页面和通知能力均尚未实现。
+`packages/automation` 现在提供基于 Playwright Chromium 的持久化浏览器会话基础：
+
+- 使用固定 `userDataDir` 调用 `chromium.launchPersistentContext()`；
+- 支持 headed/headless、时区、`zh-CN` locale 和 `1440x900` viewport；
+- 提供 `BrowserSession.start()`、`close()`、`isRunning()` 以及 Context/Page 访问；
+- 正常关闭或浏览器意外关闭后会清理内部运行状态；
+- 默认 Profile 路径为 `<DATA_DIR>/browser-profile`，也可由 `BROWSER_PROFILE_DIR` 显式覆盖。
+
+本阶段不访问 Douyin，也不包含登录检测、联系人、消息、调度或后续版本能力。
 
 ## 技术栈
 
@@ -35,7 +43,7 @@ sparkkeeper/
 │   ├── server/          # Node.js 服务启动骨架
 │   └── admin-web/       # Vue 3 管理端基础应用
 ├── packages/
-│   ├── automation/      # 后续浏览器自动化能力
+│   ├── automation/      # Persistent Browser Session
 │   ├── database/        # 后续数据访问能力
 │   ├── shared/          # 跨应用共享类型与定义
 │   └── notifier/        # 后续通知抽象
@@ -75,7 +83,7 @@ pnpm test
 pnpm build
 ```
 
-当前尚无实际测试用例，`pnpm test` 会运行 Node.js 测试运行器并明确报告零测试状态。
+`pnpm test` 会运行 Browser Session 配置和生命周期单元测试。
 
 如需创建本地配置：
 
@@ -83,10 +91,34 @@ pnpm build
 cp .env.example .env
 ```
 
+### Persistent Profile Smoke Test
+
+首次运行前安装 Playwright Chromium：
+
+```bash
+pnpm --filter @sparkkeeper/automation exec playwright install chromium
+```
+
+执行 Smoke Test：
+
+```bash
+pnpm --filter @sparkkeeper/automation browser:smoke
+```
+
+该命令只访问进程内启动的本机测试页面。它会使用同一个 Profile 连续启动两次 Chromium：第一次写入非敏感的 `localStorage` 测试状态并正常关闭，第二次读取该状态；成功时输出 `Persistent profile verified`。
+
+默认使用 headless 模式。需要显示浏览器窗口时：
+
+```bash
+BROWSER_HEADLESS=false pnpm --filter @sparkkeeper/automation browser:smoke
+```
+
+可通过 `DATA_DIR`、`BROWSER_PROFILE_DIR` 和 `APP_TIMEZONE` 调整 Profile 根目录、Profile 目录和浏览器时区。Browser Profile 属于本地运行时数据，不应提交或复制进镜像。
+
 ## Roadmap
 
-- **Phase 0 — Project Foundation（当前）**：建立 Monorepo、应用与 packages 骨架及统一工程命令。
-- **MVP**：验证持久化浏览器会话、登录状态、单联系人定位、单条消息发送与结果验证链路。
+- **Phase 0 — Project Foundation（已完成）**：建立 Monorepo、应用与 packages 骨架及统一工程命令。
+- **MVP（当前处于 M1）**：逐步验证持久化浏览器会话、登录状态、单联系人定位、单条消息发送与结果验证链路。
 - **V1**：增加本地数据持久化、多联系人、每日调度、幂等、重试和可观测性。
 - **V2**：增加正式 API、管理后台、实时状态、失败通知和完整自托管部署体验。
 
