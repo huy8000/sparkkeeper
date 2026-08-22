@@ -12,3 +12,11 @@ export {
   type BrowserSessionEnvironment,
   type BrowserViewport,
 } from './browser/config.js';
+export {
+  AuthDetectionError,
+  AuthDetector,
+  DOUYIN_CHAT_URL,
+  type AuthDetectionResult,
+  type AuthDetectorOptions,
+  type AuthStatus,
+} from './douyin/index.js';
