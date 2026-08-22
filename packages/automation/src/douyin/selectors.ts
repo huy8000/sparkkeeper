@@ -107,3 +107,8 @@ export const CONVERSATION_TITLE_SELECTORS = [
   '[data-testid="conversation-title"]',
   '[class~="conversationConversationItemtitle"]',
 ] as const;
+
+export const CONVERSATION_HEADER_TITLE_SELECTORS = [
+  '[data-testid="conversation-header-title"]',
+  '[class~="RightPanelHeadertitle"]',
+] as const;

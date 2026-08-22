@@ -3,6 +3,7 @@ import type { Locator, Page } from 'playwright';
 import { AuthDetectionError, AuthDetector } from './AuthDetector.js';
 import {
   CHAT_SHELL_SELECTORS,
+  CONVERSATION_HEADER_TITLE_SELECTORS,
   CONVERSATION_ITEM_SELECTOR,
   CONVERSATION_LIST_SELECTORS,
   CONVERSATION_TITLE_SELECTORS,
@@ -13,8 +14,12 @@ import {
 import type {
   AuthDetectionResult,
   ChatReadinessResult,
+  ConversationCandidate,
+  ConversationListScrollResult,
+  ConversationOpenResult,
   ConversationSummary,
   DouyinChatErrorCode,
+  ResolvedContact,
 } from './types.js';
 
 const DEFAULT_NAVIGATION_TIMEOUT_MS = 30_000;
@@ -246,6 +251,164 @@ export class DouyinChatPage {
     return conversations;
   }
 
+  public async getConversationCandidates(): Promise<ConversationCandidate[]> {
+    const { items } = await this.getConversationElements();
+    const itemCount = await items.count();
+    const candidates: ConversationCandidate[] = [];
+
+    for (let index = 0; index < itemCount; index += 1) {
+      const item = items.nth(index);
+      const summary = await parseConversationItem(item, index);
+      candidates.push({
+        ...summary,
+        listIndex: await parseConversationListIndex(item, index),
+      });
+    }
+
+    return candidates;
+  }
+
+  public async resetConversationList(): Promise<void> {
+    const { conversationList } = await this.getConversationElements();
+    try {
+      await conversationList.evaluate((element) => {
+        element.scrollTop = 0;
+      });
+      await this.page.waitForTimeout(this.pollIntervalMs);
+    } catch (cause) {
+      if (this.page.isClosed() || isClosedTargetError(cause)) {
+        throw this.createPageClosedError('resetting the conversation list', cause);
+      }
+      throw new DouyinChatPageError(
+        'BROWSER_ERROR',
+        'The conversation list could not be reset for bounded contact resolution.',
+        { cause },
+      );
+    }
+  }
+
+  public async scrollConversationList(): Promise<ConversationListScrollResult> {
+    const { conversationList } = await this.getConversationElements();
+    try {
+      const before = await readScrollState(conversationList);
+      if (before.atEnd) {
+        return { moved: false, atEnd: true };
+      }
+
+      await conversationList.evaluate((element) => {
+        const step = Math.max(1, Math.floor(element.clientHeight * 0.8));
+        element.scrollTop = Math.min(element.scrollTop + step, element.scrollHeight);
+      });
+      await this.page.waitForTimeout(this.pollIntervalMs);
+      const after = await readScrollState(conversationList);
+      return {
+        moved: after.scrollTop > before.scrollTop,
+        atEnd: after.atEnd,
+      };
+    } catch (cause) {
+      if (this.page.isClosed() || isClosedTargetError(cause)) {
+        throw this.createPageClosedError('scrolling the conversation list', cause);
+      }
+      throw new DouyinChatPageError(
+        'BROWSER_ERROR',
+        'The conversation list could not be scrolled during bounded contact resolution.',
+        { cause },
+      );
+    }
+  }
+
+  public async openConversation(contact: ResolvedContact): Promise<ConversationOpenResult> {
+    const { items } = await this.getConversationElements();
+    const matches: Locator[] = [];
+    const itemCount = await items.count();
+
+    for (let index = 0; index < itemCount; index += 1) {
+      const item = items.nth(index);
+      const [summary, listIndex] = await Promise.all([
+        parseConversationItem(item, index),
+        parseConversationListIndex(item, index),
+      ]);
+      if (
+        listIndex === contact.listIndex &&
+        summary.displayName.trim() === contact.identity.displayName.trim()
+      ) {
+        matches.push(item);
+      }
+    }
+
+    if (matches.length !== 1) {
+      throw new DouyinChatPageError(
+        'CONVERSATION_OPEN_FAILED',
+        'The resolved conversation is no longer uniquely available in the current list view.',
+      );
+    }
+
+    try {
+      await matches[0]?.click();
+    } catch (cause) {
+      if (this.page.isClosed() || isClosedTargetError(cause)) {
+        throw this.createPageClosedError('opening the resolved conversation', cause);
+      }
+      throw new DouyinChatPageError(
+        'CONVERSATION_OPEN_FAILED',
+        'The uniquely resolved conversation could not be opened.',
+        { cause },
+      );
+    }
+
+    const deadline = Date.now() + this.readinessTimeoutMs;
+    while (true) {
+      this.assertPageAvailable();
+      const headerTitles = await collectVisibleTexts(
+        this.page,
+        CONVERSATION_HEADER_TITLE_SELECTORS,
+      );
+      if (headerTitles.some((title) => title.trim() === contact.identity.displayName.trim())) {
+        return { status: 'VERIFIED' };
+      }
+
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        break;
+      }
+      try {
+        await this.page.waitForTimeout(Math.min(this.pollIntervalMs, remainingMs));
+      } catch (cause) {
+        throw this.createPageClosedError('verifying the opened conversation', cause);
+      }
+    }
+
+    throw new DouyinChatPageError(
+      'CONVERSATION_VERIFICATION_FAILED',
+      'The opened conversation header did not match the resolved in-memory identity.',
+    );
+  }
+
+  private async getConversationElements(): Promise<{
+    conversationList: Locator;
+    items: Locator;
+  }> {
+    await this.waitUntilReady();
+    const conversationList = await findFirstVisible(this.page, CONVERSATION_LIST_SELECTORS);
+    if (conversationList === undefined) {
+      throw new DouyinChatPageError(
+        'CONVERSATION_LIST_NOT_FOUND',
+        'Douyin Chat readiness passed, but the conversation-list container is no longer available.',
+      );
+    }
+
+    const items = conversationList.locator(CONVERSATION_ITEM_SELECTOR);
+    const itemCount = await items.count();
+    if (itemCount === 0 && !(await isStructurallyEmpty(conversationList))) {
+      throw new DouyinChatPageError(
+        'CONVERSATION_LIST_NOT_FOUND',
+        'The conversation-list container has content but no recognized conversation items; the item selector may have changed.',
+      );
+    }
+
+    return { conversationList, items };
+  }
+
   private async collectReadinessEvidence(): Promise<ChatEvidenceSnapshot> {
     const [shell, conversationList, messageRegion] = await Promise.all([
       collectVisibleSignals(this.page, CHAT_SHELL_SELECTORS),
@@ -301,6 +464,21 @@ async function findFirstVisible(
   return undefined;
 }
 
+async function collectVisibleTexts(page: Page, selectors: readonly string[]): Promise<string[]> {
+  const texts: string[] = [];
+  for (const selector of selectors) {
+    const locator = page.locator(selector);
+    const count = Math.min(await locator.count(), MAX_VISIBLE_MATCHES_TO_INSPECT);
+    for (let index = 0; index < count; index += 1) {
+      const candidate = locator.nth(index);
+      if (await candidate.isVisible()) {
+        texts.push(await candidate.innerText());
+      }
+    }
+  }
+  return texts;
+}
+
 async function isStructurallyEmpty(container: Locator): Promise<boolean> {
   return container.evaluate(
     (element) => element.children.length === 0 && (element.textContent ?? '').trim() === '',
@@ -336,6 +514,30 @@ async function parseConversationItem(item: Locator, index: number): Promise<Conv
     'CONVERSATION_ITEM_PARSE_FAILED',
     `Conversation item ${index + 1} has no recognized display-name element; the title selector may have changed.`,
   );
+}
+
+async function parseConversationListIndex(item: Locator, index: number): Promise<number> {
+  const rawListIndex = await item.evaluate(
+    (element) => element.closest('[data-index]')?.getAttribute('data-index') ?? null,
+  );
+  const listIndex = rawListIndex === null ? Number.NaN : Number(rawListIndex);
+  if (!Number.isInteger(listIndex) || listIndex < 0) {
+    throw new DouyinChatPageError(
+      'CONVERSATION_ITEM_PARSE_FAILED',
+      `Conversation item ${index + 1} has no valid virtual-list index.`,
+    );
+  }
+  return listIndex;
+}
+
+async function readScrollState(container: Locator): Promise<{
+  scrollTop: number;
+  atEnd: boolean;
+}> {
+  return container.evaluate((element) => ({
+    scrollTop: element.scrollTop,
+    atEnd: element.scrollTop + element.clientHeight >= element.scrollHeight - 1,
+  }));
 }
 
 function buildNotReadyMessage(
