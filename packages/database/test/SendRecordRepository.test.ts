@@ -495,7 +495,7 @@ test('SendRecord persists after close, reopen, and repeated migrate', (context) 
 
   const reopened = createDatabase({ databasePath: fixture.databasePath });
   context.after(() => reopened.close());
-  assert.equal(reopened.migrate().appliedMigrationCount, 6);
+  assert.equal(reopened.migrate().appliedMigrationCount, 7);
   const persisted = new SendRecordRepository(reopened).findById(prepared.id);
   assert.equal(persisted?.status, 'SUCCESS');
   assert.equal(persisted?.messageText, 'Message A');

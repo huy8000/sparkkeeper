@@ -18,3 +18,4 @@ export {
   type SendRecordRow,
 } from './sendRecords.js';
 export { schedules, type NewScheduleRow, type ScheduleRow } from './schedules.js';
+export { systemEvents, type NewSystemEventRow, type SystemEventRow } from './systemEvents.js';

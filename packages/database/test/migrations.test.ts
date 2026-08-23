@@ -19,6 +19,8 @@ import {
   sendRecords,
   ScheduleRepository,
   schedules,
+  SystemEventRepository,
+  systemEvents,
   type DatabaseClient,
 } from '../src/index.js';
 import {
@@ -28,22 +30,24 @@ import {
   createV1ThreeDatabase,
   createV1FourDatabase,
   createV1FiveDatabase,
+  createV1SixDatabase,
 } from './testDatabase.js';
 
-test('fresh database migration creates all V1-6 tables and six journal entries', (context) => {
+test('fresh database migration creates all V1-7 tables and seven journal entries', (context) => {
   const { client } = createTemporaryDatabase(context, { migrate: false });
 
   const result = client.migrate();
   const inspection = client.inspect();
 
   assert.deepEqual(result, {
-    appliedMigrationCount: 6,
+    appliedMigrationCount: 7,
     accountsSchemaVerified: true,
     dailyRunsSchemaVerified: true,
     friendsSchemaVerified: true,
     messageTemplatesSchemaVerified: true,
     sendRecordsSchemaVerified: true,
     schedulesSchemaVerified: true,
+    systemEventsSchemaVerified: true,
   });
   assert.deepEqual(inspection.tables, [
     '__drizzle_migrations',
@@ -53,14 +57,16 @@ test('fresh database migration creates all V1-6 tables and six journal entries',
     'message_templates',
     'schedules',
     'send_records',
+    'system_events',
   ]);
-  assert.equal(inspection.appliedMigrationCount, 6);
+  assert.equal(inspection.appliedMigrationCount, 7);
   assert.equal(inspection.accountsSchemaCompatible, true);
   assert.equal(inspection.dailyRunsSchemaCompatible, true);
   assert.equal(inspection.friendsSchemaCompatible, true);
   assert.equal(inspection.messageTemplatesSchemaCompatible, true);
   assert.equal(inspection.sendRecordsSchemaCompatible, true);
   assert.equal(inspection.schedulesSchemaCompatible, true);
+  assert.equal(inspection.systemEventsSchemaCompatible, true);
 });
 
 test('running migrations twice is safe and does not duplicate the journal entry', (context) => {
@@ -69,8 +75,8 @@ test('running migrations twice is safe and does not duplicate the journal entry'
   client.migrate();
   const second = client.migrate();
 
-  assert.equal(second.appliedMigrationCount, 6);
-  assert.equal(client.inspect().appliedMigrationCount, 6);
+  assert.equal(second.appliedMigrationCount, 7);
+  assert.equal(client.inspect().appliedMigrationCount, 7);
 });
 
 test('migration state remains correct after close and reopen', (context) => {
@@ -82,13 +88,14 @@ test('migration state remains correct after close and reopen', (context) => {
   context.after(() => reopened.close());
   const result = reopened.migrate();
 
-  assert.equal(result.appliedMigrationCount, 6);
+  assert.equal(result.appliedMigrationCount, 7);
   assert.equal(reopened.inspect().accountsSchemaCompatible, true);
   assert.equal(reopened.inspect().dailyRunsSchemaCompatible, true);
   assert.equal(reopened.inspect().friendsSchemaCompatible, true);
   assert.equal(reopened.inspect().messageTemplatesSchemaCompatible, true);
   assert.equal(reopened.inspect().sendRecordsSchemaCompatible, true);
   assert.equal(reopened.inspect().schedulesSchemaCompatible, true);
+  assert.equal(reopened.inspect().systemEventsSchemaCompatible, true);
   reopened.close();
 });
 
@@ -215,7 +222,30 @@ test('migrated SQLite columns align with the Drizzle schedules definition', (con
   ]);
 });
 
-test('existing V1-1 database upgrades through V1-6 without losing account data', (context) => {
+test('migrated SQLite columns align with the Drizzle system_events definition', (context) => {
+  const { client } = createTemporaryDatabase(context);
+  const drizzleColumnNames = Object.values(getTableColumns(systemEvents)).map(
+    (column) => column.name,
+  );
+  const sqliteColumnNames = client.inspect().systemEventColumns.map((column) => column.name);
+  assert.deepEqual(sqliteColumnNames, drizzleColumnNames);
+  assert.deepEqual(sqliteColumnNames, [
+    'id',
+    'event_type',
+    'level',
+    'run_id',
+    'account_id',
+    'friend_id',
+    'attempt',
+    'error_code',
+    'message',
+    'screenshot_path',
+    'trace_path',
+    'created_at',
+  ]);
+});
+
+test('existing V1-1 database upgrades through V1-7 without losing account data', (context) => {
   const temporary = createV1OneDatabase(context);
   const { client } = temporary;
   const accountsRepository = new AccountRepository(client);
@@ -233,8 +263,8 @@ test('existing V1-1 database upgrades through V1-6 without losing account data',
     displayName: 'Upgrade Test User',
   });
 
-  assert.equal(migration.appliedMigrationCount, 6);
-  assert.equal(client.inspect().appliedMigrationCount, 6);
+  assert.equal(migration.appliedMigrationCount, 7);
+  assert.equal(client.inspect().appliedMigrationCount, 7);
   assert.equal(accountsRepository.findById(account.id)?.name, 'Upgrade Test Account');
   assert.equal(friend.accountId, account.id);
 
@@ -243,7 +273,7 @@ test('existing V1-1 database upgrades through V1-6 without losing account data',
   context.after(() => reopened.close());
   const repeated = reopened.migrate();
 
-  assert.equal(repeated.appliedMigrationCount, 6);
+  assert.equal(repeated.appliedMigrationCount, 7);
   assert.equal(new AccountRepository(reopened).findById(account.id)?.name, 'Upgrade Test Account');
   assert.equal(
     new FriendRepository(reopened).findById(friend.id)?.displayName,
@@ -252,7 +282,7 @@ test('existing V1-1 database upgrades through V1-6 without losing account data',
   reopened.close();
 });
 
-test('existing V1-2 database upgrades through V1-6 and preserves Account/Friend data', (context) => {
+test('existing V1-2 database upgrades through V1-7 and preserves Account/Friend data', (context) => {
   const temporary = createV1TwoDatabase(context);
   const { client } = temporary;
   const accountsRepository = new AccountRepository(client);
@@ -275,8 +305,8 @@ test('existing V1-2 database upgrades through V1-6 and preserves Account/Friend 
     messages: ['Hello'],
   });
 
-  assert.equal(migration.appliedMigrationCount, 6);
-  assert.equal(client.inspect().appliedMigrationCount, 6);
+  assert.equal(migration.appliedMigrationCount, 7);
+  assert.equal(client.inspect().appliedMigrationCount, 7);
   assert.equal(accountsRepository.findById(account.id)?.name, 'V1-2 Test Account');
   assert.equal(friendsRepository.findById(alice.id)?.displayName, 'Alice');
   assert.equal(friendsRepository.findById(bob.id)?.displayName, 'Bob');
@@ -287,14 +317,14 @@ test('existing V1-2 database upgrades through V1-6 and preserves Account/Friend 
   context.after(() => reopened.close());
   const repeated = reopened.migrate();
 
-  assert.equal(repeated.appliedMigrationCount, 6);
+  assert.equal(repeated.appliedMigrationCount, 7);
   assert.equal(new AccountRepository(reopened).findById(account.id)?.name, 'V1-2 Test Account');
   assert.equal(new FriendRepository(reopened).listByAccountId(account.id).length, 2);
   assert.equal(new MessageTemplateRepository(reopened).findById(template.id)?.messages[0], 'Hello');
   reopened.close();
 });
 
-test('existing V1-3 database upgrades through V1-6 and preserves Account/Friend/Template data', (context) => {
+test('existing V1-3 database upgrades through V1-7 and preserves Account/Friend/Template data', (context) => {
   const temporary = createV1ThreeDatabase(context);
   const { client } = temporary;
   const accountsRepository = new AccountRepository(client);
@@ -333,8 +363,8 @@ test('existing V1-3 database upgrades through V1-6 and preserves Account/Friend/
     now,
   });
 
-  assert.equal(migration.appliedMigrationCount, 6);
-  assert.equal(client.inspect().appliedMigrationCount, 6);
+  assert.equal(migration.appliedMigrationCount, 7);
+  assert.equal(client.inspect().appliedMigrationCount, 7);
   assert.equal(accountsRepository.findById(account.id)?.name, 'V1-3 Test Account');
   assert.equal(new FriendRepository(client).findById(friend.id)?.displayName, 'Alice');
   assert.equal(
@@ -348,7 +378,7 @@ test('existing V1-3 database upgrades through V1-6 and preserves Account/Friend/
   context.after(() => reopened.close());
   const repeated = reopened.migrate();
 
-  assert.equal(repeated.appliedMigrationCount, 6);
+  assert.equal(repeated.appliedMigrationCount, 7);
   assert.equal(new AccountRepository(reopened).findById(account.id)?.name, 'V1-3 Test Account');
   assert.equal(new FriendRepository(reopened).findById(friend.id)?.displayName, 'Alice');
   assert.equal(
@@ -363,7 +393,7 @@ test('existing V1-3 database upgrades through V1-6 and preserves Account/Friend/
   reopened.close();
 });
 
-test('existing V1-4 database upgrades through V1-6 and preserves all idempotency data', (context) => {
+test('existing V1-4 database upgrades through V1-7 and preserves all idempotency data', (context) => {
   const temporary = createV1FourDatabase(context);
   const { client } = temporary;
   const now = new Date('2026-08-23T00:00:00.000Z');
@@ -412,7 +442,7 @@ test('existing V1-4 database upgrades through V1-6 and preserves all idempotency
   assert.equal(client.inspect().appliedMigrationCount, 4);
   assert.equal(client.inspect().schedulesSchemaCompatible, false);
 
-  assert.equal(client.migrate().appliedMigrationCount, 6);
+  assert.equal(client.migrate().appliedMigrationCount, 7);
   const schedule = new ScheduleRepository(client).create({
     accountId: account.id,
     startTime: '09:00',
@@ -429,7 +459,7 @@ test('existing V1-4 database upgrades through V1-6 and preserves all idempotency
   client.close();
   const reopened = createDatabase({ databasePath: temporary.databasePath });
   context.after(() => reopened.close());
-  assert.equal(reopened.migrate().appliedMigrationCount, 6);
+  assert.equal(reopened.migrate().appliedMigrationCount, 7);
   assert.equal(new ScheduleRepository(reopened).findById(schedule.id)?.startTime, '09:00');
   assert.equal(new SendRecordRepository(reopened).findById(legacyRecordId)?.messageText, 'Hello');
   reopened.close();
@@ -504,7 +534,7 @@ test('existing V1-5 database upgrades all legacy SendRecord states with conserva
   assert.equal(client.inspect().sendRecordsSchemaCompatible, false);
   assert.equal(client.inspect().schedulesSchemaCompatible, false);
 
-  assert.equal(client.migrate().appliedMigrationCount, 6);
+  assert.equal(client.migrate().appliedMigrationCount, 7);
   const repository = new SendRecordRepository(client);
   const records = Array.from({ length: 5 }, (_, index) =>
     repository.findById(`record-v1-5-${index}`),
@@ -559,8 +589,93 @@ test('existing V1-5 database upgrades all legacy SendRecord states with conserva
     structure.close();
   }
 
-  assert.equal(client.migrate().appliedMigrationCount, 6);
+  assert.equal(client.migrate().appliedMigrationCount, 7);
   assert.equal(repository.findById('record-v1-5-4')?.messageText, 'Message A');
+});
+
+test('existing V1-6 database upgrades to V1-7 and preserves all business states', (context) => {
+  const temporary = createV1SixDatabase(context);
+  const { client } = temporary;
+  const now = new Date('2026-08-23T10:00:00.000Z');
+  const businessDate = parseBusinessDate('2026-08-23');
+  const accountsRepository = new AccountRepository(client);
+  const friendsRepository = new FriendRepository(client);
+  const templatesRepository = new MessageTemplateRepository(client);
+  const runsRepository = new DailyRunRepository(client);
+  const recordsRepository = new SendRecordRepository(client);
+  const account = accountsRepository.create({ name: 'V1-6 Test Account', loginStatus: 'READY' });
+  const template = templatesRepository.create({
+    name: 'V1-6 Test Template',
+    providerType: 'STATIC',
+    messages: ['Message A'],
+  });
+  const schedule = new ScheduleRepository(client).create({
+    accountId: account.id,
+    startTime: '09:00',
+    endTime: '11:00',
+    timezone: 'Asia/Shanghai',
+    now,
+  });
+  const run = runsRepository.createOrGet({ accountId: account.id, businessDate, now });
+  runsRepository.claimForExecution(run.id, now);
+  const friendsForStatus = ['SUCCESS', 'FAILED', 'RETRY_WAIT', 'DELIVERY_UNKNOWN'].map((status) =>
+    friendsRepository.create({ accountId: account.id, displayName: `Test User ${status}` }),
+  );
+  const records = friendsForStatus.map(
+    (friend) =>
+      recordsRepository.prepare({
+        dailyRunId: run.id,
+        friendId: friend.id,
+        businessDate,
+        messageTemplateId: template.id,
+        messageText: 'Message A',
+        now,
+      }).record,
+  );
+  for (const record of records) recordsRepository.claimInitialAttempt(record.id, now, 3);
+  recordsRepository.markSendActionStarted(records[0]!.id, now);
+  recordsRepository.markSuccess(records[0]!.id, now);
+  recordsRepository.markFinalFailed(records[1]!.id, now, 'CONTACT_NOT_FOUND');
+  recordsRepository.scheduleRetry(records[2]!.id, {
+    failureCode: 'NETWORK_TRANSIENT',
+    maxAttempts: 3,
+    nextRetryAt: new Date('2026-08-23T10:01:00.000Z'),
+    now,
+    externalActionConfirmedAbsent: true,
+  });
+  recordsRepository.markSendActionStarted(records[3]!.id, now);
+  recordsRepository.markDeliveryUnknown(records[3]!.id, now);
+
+  assert.equal(client.inspect().appliedMigrationCount, 6);
+  assert.equal(client.inspect().systemEventsSchemaCompatible, false);
+  assert.equal(client.migrate().appliedMigrationCount, 7);
+
+  const event = new SystemEventRepository(client).create({
+    eventType: 'DELIVERY_UNKNOWN',
+    level: 'ERROR',
+    accountId: account.id,
+    runId: run.id,
+    friendId: friendsForStatus[3]!.id,
+    attempt: 1,
+    errorCode: 'DELIVERY_UNKNOWN',
+    message: 'Delivery result is uncertain',
+    now,
+  });
+  assert.equal(accountsRepository.findById(account.id)?.name, 'V1-6 Test Account');
+  assert.equal(friendsRepository.listByAccountId(account.id).length, 4);
+  assert.equal(templatesRepository.findById(template.id)?.messages[0], 'Message A');
+  assert.equal(new ScheduleRepository(client).findById(schedule.id)?.maxAttempts, 3);
+  assert.equal(runsRepository.findById(run.id)?.status, 'RUNNING');
+  assert.deepEqual(
+    records.map((record) => recordsRepository.findById(record.id)?.status),
+    ['SUCCESS', 'FAILED', 'RETRY_WAIT', 'DELIVERY_UNKNOWN'],
+  );
+  assert.equal(new SystemEventRepository(client).findById(event.id)?.runId, run.id);
+  assert.equal(client.migrate().appliedMigrationCount, 7);
+  assert.equal(
+    new SystemEventRepository(client).findById(event.id)?.message,
+    'Delivery result is uncertain',
+  );
 });
 
 test('migration failure includes explicit migration context', (context) => {

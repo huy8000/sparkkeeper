@@ -12,7 +12,7 @@ SparkKeeper 是一套面向固定 Linux 服务器的自托管抖音火花维护�
 
 ## 当前开发阶段
 
-Project Foundation 以及 **MVP Task M1–M5** 均已完成，当前状态为 **MVP Core Flow Complete**。V1 已完成 **V1-1 Database Foundation**、**V1-2 Friend Identity**、**V1-3 Message Engine**、**V1-4 Daily Run & Idempotency**、**V1-5 Scheduler** 和 **V1-6 Retry & Failure State**；V1-7 Observability 尚未开始。
+Project Foundation 以及 **MVP Task M1–M5** 均已完成，当前状态为 **MVP Core Flow Complete**。V1 的 **V1-1 Database Foundation**、**V1-2 Friend Identity**、**V1-3 Message Engine**、**V1-4 Daily Run & Idempotency**、**V1-5 Scheduler**、**V1-6 Retry & Failure State** 和 **V1-7 Observability** 功能开发均已完成。V1 尚未发布；最终 Release Gate 和连续受控验证期仍需单独完成。
 
 `packages/automation` 现在提供基于 Playwright Chromium 的持久化浏览器会话基础：
 
@@ -66,6 +66,7 @@ M5 不读取或记录历史聊天正文；历史 Bubble 只在页面内进行结
 - pnpm workspace
 - SQLite（WAL）
 - Drizzle ORM + versioned migrations
+- Pino structured logging
 - Vue 3
 - Vite
 - ESLint
@@ -110,7 +111,7 @@ pnpm install
 pnpm dev
 ```
 
-管理端默认地址为 `http://localhost:5173`。当前服务端只输出启动状态，不监听业务端口。
+管理端默认地址为 `http://localhost:5173`。当前服务端承载 Scheduler、Task Runner 和本地运行证据链，尚未实现 V2 业务 API，也不监听业务端口。
 
 工程检查：
 
@@ -237,7 +238,7 @@ pnpm --filter @sparkkeeper/automation send:smoke
 - `busy_timeout = 5000`；
 - `synchronous = FULL`，适合当前低写入量并保留更强的掉电耐久性。
 
-首个 migration 只创建最小 `accounts` 表。V1-2 至 V1-6 分别通过更高版本 migration 增加 Account 1:N `friends`、`message_templates`、`daily_runs`/`send_records`、每个 Account 唯一的 `schedules`，以及持久化 retry/failure state；这些变化都不会回改已经执行的 migration。Account 保存内部 UUID、显示名称、启用状态、登录状态元数据和 UTC 毫秒时间戳；Friend 保存联系人身份元数据和当前精确绑定键。它们都不保存 Cookie、Token、密码、二维码、Browser Profile 或其他登录凭据。
+首个 migration 只创建最小 `accounts` 表。V1-2 至 V1-7 分别通过更高版本 migration 增加 Account 1:N `friends`、`message_templates`、`daily_runs`/`send_records`、每个 Account 唯一的 `schedules`、持久化 retry/failure state 和 `system_events`；这些变化都不会回改已经执行的 migration。Account 保存内部 UUID、显示名称、启用状态、登录状态元数据和 UTC 毫秒时间戳；Friend 保存联系人身份元数据和当前精确绑定键。它们都不保存 Cookie、Token、密码、二维码、Browser Profile 或其他登录凭据。
 
 在默认路径或指定的 `DATA_DIR` 上执行 migration：
 
@@ -245,7 +246,7 @@ pnpm --filter @sparkkeeper/automation send:smoke
 pnpm --filter @sparkkeeper/database db:migrate
 ```
 
-检查当前数据库的 PRAGMA、migration 数量以及 accounts/friends/message_templates/daily_runs/send_records/schedules schema：
+检查当前数据库的 PRAGMA、migration 数量以及 accounts/friends/message_templates/daily_runs/send_records/schedules/system_events schema：
 
 ```bash
 pnpm --filter @sparkkeeper/database db:check
@@ -333,6 +334,24 @@ pnpm --filter @sparkkeeper/server retry:smoke
 
 该 Smoke 验证固定间隔、到期 claim、最大三次 Attempt、交付不确定性保护、数据库重开和两种 crash recovery；不启动 Browser、不访问网络，也不输出消息正文。
 
+### Runtime Observability
+
+V1-7 在 `apps/server/src/observability` 建立本地运行证据链：Pino 同时输出 JSON 到 stdout 和按 UTC 日期切分的 `<LOG_DIR>/sparkkeeper-YYYY-MM-DD.log`；默认 `LOG_LEVEL=info`、日志保留 14 天。Runtime logging API 只接受受控 eventType、内部 account/run/friend ID、Attempt、BusinessDate、errorCode 和计数摘要，并由 Pino redact 提供第二层保护。日志不会输出 Friend displayName、matchKey、消息正文、Cookie、Token、Authorization、Browser Profile 内容或默认原始 Error stack。
+
+重要诊断事实由 concrete `SystemEventRepository` 写入 `system_events`，普通过程日志不会复制进数据库。SystemEvent 只保存安全固定摘要和本地相对证据路径；Account、DailyRun、Friend 外键删除时使用 `SET NULL` 保留历史事件。`listRecent` 默认 100 条、最大 500 条，避免无界读取。
+
+失败截图保存在 `<DATA_DIR>/screenshots/<businessDate>/<runId>/`，可选 Trace 保存在 `<DATA_DIR>/traces/<businessDate>/<runId>/`。文件名只包含受控事件类型和内部 ID，不包含昵称或消息；路径组件和最终 root boundary 都经过校验。`TRACE_MODE` 支持 `off`、`on-failure`、`always`，生产默认 `off`。截图默认保留 14 天，Trace 默认保留 7 天；RetentionManager 只清理这两个明确 evidence root，不触碰 Browser Profile 或 SQLite。
+
+执行完全离线的 Observability Smoke：
+
+```bash
+pnpm --filter @sparkkeeper/server observability:smoke
+```
+
+该 Smoke 使用临时 SQLite、虚构 Account/Friend、临时日志目录和受控本地 Playwright 页面，真实生成 Screenshot 与 Trace，并验证 structured logging、敏感值 0 命中、SystemEvent、相对路径、重开/重复 migration 和 retention。它不访问 Douyin、不读取真实 Browser Profile，也不发送消息。
+
+Logger、SystemEvent、Screenshot、Trace 或 Retention 失败均为观察失败：不会增加 Send Attempt，不会改变 SUCCESS，不会把 DELIVERY_UNKNOWN 变为可重试状态。V1 功能开发已完成，但尚未通过 V1 Release Gate 或连续受控验证期，也尚未发布 `v1.0.0`。
+
 ## Roadmap
 
 - **Phase 0 — Project Foundation（已完成）**：建立 Monorepo、应用与 packages 骨架及统一工程命令。
@@ -343,7 +362,8 @@ pnpm --filter @sparkkeeper/server retry:smoke
 - **V1-4 Daily Run & Idempotency（已完成）**：BusinessDate、DailyRun/SendRecord、数据库唯一约束、消息快照、原子 claim 与离线持久化验证。
 - **V1-5 Scheduler（已完成）**：Schedule 持久化、同日时区窗口、进程内轮询、防重入、DailyTaskRunner 恢复边界与离线验证。
 - **V1-6 Retry & Failure State（已完成）**：有界固定间隔重试、持久化 Attempt/等待状态、原子到期 claim、执行窗口约束和外部发送不确定性保护。
-- **V1-7 Observability（尚未完成）**：后续增加受控日志、SystemEvent 与诊断生命周期。
+- **V1-7 Observability（已完成）**：Pino 结构化日志、隐私 allowlist/redaction、SystemEvent、失败截图、可选 Trace、日志轮转和 evidence retention。
+- **V1 Release Gate（尚未完成）**：连续受控验证、无重复发送和可定位失败原因的正式验收；尚未创建 `v1.0.0`。
 - **V2**：增加正式 API、管理后台、实时状态、失败通知和完整自托管部署体验。
 
 各阶段必须通过验收后再进入下一阶段，避免提前引入尚未被真实需求验证的复杂度。

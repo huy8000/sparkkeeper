@@ -50,12 +50,14 @@ export interface DatabaseInspection {
   readonly messageTemplateColumns: readonly DatabaseColumnState[];
   readonly sendRecordColumns: readonly DatabaseColumnState[];
   readonly scheduleColumns: readonly DatabaseColumnState[];
+  readonly systemEventColumns: readonly DatabaseColumnState[];
   readonly accountsSchemaCompatible: boolean;
   readonly dailyRunsSchemaCompatible: boolean;
   readonly friendsSchemaCompatible: boolean;
   readonly messageTemplatesSchemaCompatible: boolean;
   readonly sendRecordsSchemaCompatible: boolean;
   readonly schedulesSchemaCompatible: boolean;
+  readonly systemEventsSchemaCompatible: boolean;
 }
 
 export interface DatabaseMigrationResult {
@@ -66,6 +68,7 @@ export interface DatabaseMigrationResult {
   readonly messageTemplatesSchemaVerified: true;
   readonly sendRecordsSchemaVerified: true;
   readonly schedulesSchemaVerified: true;
+  readonly systemEventsSchemaVerified: true;
 }
 
 interface SqliteCountRow {
@@ -161,6 +164,21 @@ const EXPECTED_SCHEDULE_COLUMNS: readonly DatabaseColumnState[] = [
   { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
 ];
 
+const EXPECTED_SYSTEM_EVENT_COLUMNS: readonly DatabaseColumnState[] = [
+  { name: 'id', type: 'TEXT', notNull: true, primaryKey: true },
+  { name: 'event_type', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'level', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'run_id', type: 'TEXT', notNull: false, primaryKey: false },
+  { name: 'account_id', type: 'TEXT', notNull: false, primaryKey: false },
+  { name: 'friend_id', type: 'TEXT', notNull: false, primaryKey: false },
+  { name: 'attempt', type: 'INTEGER', notNull: false, primaryKey: false },
+  { name: 'error_code', type: 'TEXT', notNull: false, primaryKey: false },
+  { name: 'message', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'screenshot_path', type: 'TEXT', notNull: false, primaryKey: false },
+  { name: 'trace_path', type: 'TEXT', notNull: false, primaryKey: false },
+  { name: 'created_at', type: 'INTEGER', notNull: true, primaryKey: false },
+];
+
 export class DatabaseClient {
   readonly databasePath: string;
   readonly orm: BetterSQLite3Database<typeof schema>;
@@ -195,7 +213,8 @@ export class DatabaseClient {
       !inspection.friendsSchemaCompatible ||
       !inspection.messageTemplatesSchemaCompatible ||
       !inspection.sendRecordsSchemaCompatible ||
-      !inspection.schedulesSchemaCompatible
+      !inspection.schedulesSchemaCompatible ||
+      !inspection.systemEventsSchemaCompatible
     ) {
       throw new DatabaseSchemaError(
         'Database migrations completed, but the database tables are incompatible with the Drizzle schema.',
@@ -210,6 +229,7 @@ export class DatabaseClient {
       messageTemplatesSchemaVerified: true,
       sendRecordsSchemaVerified: true,
       schedulesSchemaVerified: true,
+      systemEventsSchemaVerified: true,
     };
   }
 
@@ -232,6 +252,9 @@ export class DatabaseClient {
       ? this.readSendRecordColumns()
       : [];
     const scheduleColumns = tableNames.includes('schedules') ? this.readScheduleColumns() : [];
+    const systemEventColumns = tableNames.includes('system_events')
+      ? this.readSystemEventColumns()
+      : [];
 
     return {
       databasePath: this.databasePath,
@@ -246,12 +269,14 @@ export class DatabaseClient {
       messageTemplateColumns,
       sendRecordColumns,
       scheduleColumns,
+      systemEventColumns,
       accountsSchemaCompatible: accountColumnsMatch(accountColumns),
       dailyRunsSchemaCompatible: dailyRunColumnsMatch(dailyRunColumns),
       friendsSchemaCompatible: friendColumnsMatch(friendColumns),
       messageTemplatesSchemaCompatible: messageTemplateColumnsMatch(messageTemplateColumns),
       sendRecordsSchemaCompatible: sendRecordColumnsMatch(sendRecordColumns),
       schedulesSchemaCompatible: scheduleColumnsMatch(scheduleColumns),
+      systemEventsSchemaCompatible: systemEventColumnsMatch(systemEventColumns),
     };
   }
 
@@ -333,6 +358,16 @@ export class DatabaseClient {
 
   private readScheduleColumns(): DatabaseColumnState[] {
     const rows = this.sqlite.pragma('table_info(schedules)') as SqliteTableInfoRow[];
+    return rows.map((row) => ({
+      name: row.name,
+      type: row.type.toUpperCase(),
+      notNull: row.notnull === 1,
+      primaryKey: row.pk === 1,
+    }));
+  }
+
+  private readSystemEventColumns(): DatabaseColumnState[] {
+    const rows = this.sqlite.pragma('table_info(system_events)') as SqliteTableInfoRow[];
     return rows.map((row) => ({
       name: row.name,
       type: row.type.toUpperCase(),
@@ -429,6 +464,10 @@ function sendRecordColumnsMatch(actual: readonly DatabaseColumnState[]): boolean
 
 function scheduleColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
   return columnsMatch(actual, EXPECTED_SCHEDULE_COLUMNS);
+}
+
+function systemEventColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
+  return columnsMatch(actual, EXPECTED_SYSTEM_EVENT_COLUMNS);
 }
 
 function columnsMatch(

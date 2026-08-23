@@ -73,7 +73,7 @@ const databasePath = path.join(directory, 'sparkkeeper.db');
 let client: DatabaseClient = createDatabase({ databasePath });
 
 try {
-  assert.equal(client.migrate().appliedMigrationCount, 6);
+  assert.equal(client.migrate().appliedMigrationCount, 7);
 
   const alice = createScenario(client, 'Test Account A', 'Alice', {
     openResults: [failedOpen('NETWORK_TRANSIENT'), { status: 'VERIFIED' }],
@@ -130,7 +130,7 @@ try {
   const crash = createCrashScenario(client);
   client.close();
   client = createDatabase({ databasePath });
-  assert.equal(client.migrate().appliedMigrationCount, 6);
+  assert.equal(client.migrate().appliedMigrationCount, 7);
   assert.equal(findRecord(client, alice.friendId).status, 'SUCCESS');
   assert.equal(findRecord(client, bob.friendId).status, 'FAILED');
   assert.equal(findRecord(client, charlie.friendId).status, 'DELIVERY_UNKNOWN');
