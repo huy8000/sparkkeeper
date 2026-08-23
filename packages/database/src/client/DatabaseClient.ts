@@ -45,12 +45,15 @@ export interface DatabaseInspection {
   readonly tables: readonly string[];
   readonly appliedMigrationCount: number;
   readonly accountColumns: readonly DatabaseColumnState[];
+  readonly friendColumns: readonly DatabaseColumnState[];
   readonly accountsSchemaCompatible: boolean;
+  readonly friendsSchemaCompatible: boolean;
 }
 
 export interface DatabaseMigrationResult {
   readonly appliedMigrationCount: number;
   readonly accountsSchemaVerified: true;
+  readonly friendsSchemaVerified: true;
 }
 
 interface SqliteCountRow {
@@ -74,6 +77,21 @@ const EXPECTED_ACCOUNT_COLUMNS: readonly DatabaseColumnState[] = [
   { name: 'enabled', type: 'INTEGER', notNull: true, primaryKey: false },
   { name: 'login_status', type: 'TEXT', notNull: true, primaryKey: false },
   { name: 'last_login_at', type: 'INTEGER', notNull: false, primaryKey: false },
+  { name: 'created_at', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
+];
+
+const EXPECTED_FRIEND_COLUMNS: readonly DatabaseColumnState[] = [
+  { name: 'id', type: 'TEXT', notNull: true, primaryKey: true },
+  { name: 'account_id', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'display_name', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'remark_name', type: 'TEXT', notNull: false, primaryKey: false },
+  { name: 'short_id', type: 'TEXT', notNull: false, primaryKey: false },
+  { name: 'unique_id', type: 'TEXT', notNull: false, primaryKey: false },
+  { name: 'sec_uid', type: 'TEXT', notNull: false, primaryKey: false },
+  { name: 'match_field', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'match_key', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'enabled', type: 'INTEGER', notNull: true, primaryKey: false },
   { name: 'created_at', type: 'INTEGER', notNull: true, primaryKey: false },
   { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
 ];
@@ -106,15 +124,16 @@ export class DatabaseClient {
     }
 
     const inspection = this.inspect();
-    if (!inspection.accountsSchemaCompatible) {
+    if (!inspection.accountsSchemaCompatible || !inspection.friendsSchemaCompatible) {
       throw new DatabaseSchemaError(
-        'Database migrations completed, but the accounts table is incompatible with the Drizzle schema.',
+        'Database migrations completed, but the database tables are incompatible with the Drizzle schema.',
       );
     }
 
     return {
       appliedMigrationCount: inspection.appliedMigrationCount,
       accountsSchemaVerified: true,
+      friendsSchemaVerified: true,
     };
   }
 
@@ -128,6 +147,7 @@ export class DatabaseClient {
       .all() as SqliteNameRow[];
     const tableNames = tables.map(({ name }) => name);
     const accountColumns = tableNames.includes('accounts') ? this.readAccountColumns() : [];
+    const friendColumns = tableNames.includes('friends') ? this.readFriendColumns() : [];
 
     return {
       databasePath: this.databasePath,
@@ -137,7 +157,9 @@ export class DatabaseClient {
         ? this.readMigrationCount()
         : 0,
       accountColumns,
+      friendColumns,
       accountsSchemaCompatible: accountColumnsMatch(accountColumns),
+      friendsSchemaCompatible: friendColumnsMatch(friendColumns),
     };
   }
 
@@ -169,6 +191,16 @@ export class DatabaseClient {
 
   private readAccountColumns(): DatabaseColumnState[] {
     const rows = this.sqlite.pragma('table_info(accounts)') as SqliteTableInfoRow[];
+    return rows.map((row) => ({
+      name: row.name,
+      type: row.type.toUpperCase(),
+      notNull: row.notnull === 1,
+      primaryKey: row.pk === 1,
+    }));
+  }
+
+  private readFriendColumns(): DatabaseColumnState[] {
+    const rows = this.sqlite.pragma('table_info(friends)') as SqliteTableInfoRow[];
     return rows.map((row) => ({
       name: row.name,
       type: row.type.toUpperCase(),
@@ -244,10 +276,21 @@ function readPragmaState(sqlite: BetterSqlite3.Database): DatabasePragmaState {
 }
 
 function accountColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
+  return columnsMatch(actual, EXPECTED_ACCOUNT_COLUMNS);
+}
+
+function friendColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
+  return columnsMatch(actual, EXPECTED_FRIEND_COLUMNS);
+}
+
+function columnsMatch(
+  actual: readonly DatabaseColumnState[],
+  expectedColumns: readonly DatabaseColumnState[],
+): boolean {
   return (
-    actual.length === EXPECTED_ACCOUNT_COLUMNS.length &&
+    actual.length === expectedColumns.length &&
     actual.every((column, index) => {
-      const expected = EXPECTED_ACCOUNT_COLUMNS[index];
+      const expected = expectedColumns[index];
       return (
         expected !== undefined &&
         column.name === expected.name &&

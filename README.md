@@ -12,7 +12,7 @@ SparkKeeper 是一套面向固定 Linux 服务器的自托管抖音火花维护�
 
 ## 当前开发阶段
 
-Project Foundation 以及 **MVP Task M1–M5** 均已完成，当前状态为 **MVP Core Flow Complete**。V1 已完成 **V1-1 Database Foundation**，V1-2 及后续任务尚未开始。
+Project Foundation 以及 **MVP Task M1–M5** 均已完成，当前状态为 **MVP Core Flow Complete**。V1 已完成 **V1-1 Database Foundation** 和 **V1-2 Friend Identity**；V1-3 及后续任务尚未开始。
 
 `packages/automation` 现在提供基于 Playwright Chromium 的持久化浏览器会话基础：
 
@@ -81,7 +81,7 @@ sparkkeeper/
 │   └── admin-web/       # Vue 3 管理端基础应用
 ├── packages/
 │   ├── automation/      # Persistent Browser Session
-│   ├── database/        # SQLite、Drizzle migration 与 AccountRepository
+│   ├── database/        # SQLite、Drizzle migration、Account/Friend Repository
 │   ├── shared/          # 跨应用共享类型与定义
 │   └── notifier/        # 后续通知抽象
 ├── docs/                # 产品、技术与架构设计文档
@@ -236,7 +236,7 @@ pnpm --filter @sparkkeeper/automation send:smoke
 - `busy_timeout = 5000`；
 - `synchronous = FULL`，适合当前低写入量并保留更强的掉电耐久性。
 
-首个 migration 只创建最小 `accounts` 表。它保存账号的内部 UUID、显示名称、启用状态、登录状态元数据和 UTC 毫秒时间戳，不保存 Cookie、Token、密码、二维码、Browser Profile 或其他登录凭据。
+首个 migration 只创建最小 `accounts` 表。V1-2 通过新的更高版本 migration 增加 Account 1:N `friends`，不会回改已经执行的 migration。Account 保存内部 UUID、显示名称、启用状态、登录状态元数据和 UTC 毫秒时间戳；Friend 保存联系人身份元数据和当前精确绑定键。两者都不保存 Cookie、Token、密码、二维码、Browser Profile 或其他登录凭据。
 
 在默认路径或指定的 `DATA_DIR` 上执行 migration：
 
@@ -244,7 +244,7 @@ pnpm --filter @sparkkeeper/automation send:smoke
 pnpm --filter @sparkkeeper/database db:migrate
 ```
 
-检查当前数据库的 PRAGMA、migration 数量和 accounts schema：
+检查当前数据库的 PRAGMA、migration 数量以及 accounts/friends schema：
 
 ```bash
 pnpm --filter @sparkkeeper/database db:check
@@ -258,14 +258,25 @@ pnpm --filter @sparkkeeper/database db:smoke
 
 正式数据库升级只使用已提交的 versioned migration；已执行的 migration 视为 immutable，后续结构变化必须新增 migration，不使用 destructive reset 或 `db push` 替代升级历史。
 
-V1-1 尚未实现 Friend persistence、MessageTemplate、DailyRun、SendRecord、Scheduler、Retry 或 Observability。
+### Friend Identity
+
+`FriendRepository` 提供 `create`、`findById`、`listByAccountId`、`listEnabledByAccountId` 和 `update`，支持一个 Account 持久化多个 Friend，并通过外键保持账号隔离和数据完整性。
+
+Friend 身份包含必需的 `displayName`，以及可选的 `remarkName`、`shortId`、`uniqueId` 和 `secUid`。当前真实页面能够可靠获得的字段仍然只有 `displayName`；其余字段只有未来页面能够可靠提供时才会填充，不会推断或伪造。
+
+身份值只做保守的 `trim()`；空白可选字段保存为 `null`。绑定使用一个受控 `matchField` 和从对应身份字段派生的精确 `matchKey`，默认优先级为 `secUid → uniqueId → shortId → remarkName → displayName`。昵称不具备唯一约束，多个同名 Friend 可以安全持久化；歧义处理仍属于后续 ContactResolver/application 编排。
+
+`enabled` 只提供数据库级启停和查询能力。V1-2 尚未把 FriendRepository 接入自动化，不会自动遍历或向多个联系人发送消息。
+
+V1-2 尚未实现 MessageTemplate、DailyRun、SendRecord、Scheduler、Retry 或 Observability。
 
 ## Roadmap
 
 - **Phase 0 — Project Foundation（已完成）**：建立 Monorepo、应用与 packages 骨架及统一工程命令。
 - **MVP Core Flow Complete（M1–M5 已完成）**：已验证持久浏览器、认证、Chat 适配、单联系人定位、一次发送及新增 outbound Bubble 验证链路。
 - **V1-1 Database Foundation（已完成）**：SQLite + Drizzle、versioned migration、WAL、最小 accounts schema、AccountRepository 和临时数据库测试基础。
-- **V1-2+（尚未完成）**：后续增加 Friend Identity、消息引擎、DailyRun/SendRecord 幂等、Scheduler、Retry 和 Observability。
+- **V1-2 Friend Identity（已完成）**：Account 1:N Friend、可演进身份字段、精确 match field/key、FriendRepository 和 migration upgrade 测试。
+- **V1-3+（尚未完成）**：后续增加消息引擎、DailyRun/SendRecord 幂等、Scheduler、Retry 和 Observability。
 - **V2**：增加正式 API、管理后台、实时状态、失败通知和完整自托管部署体验。
 
 各阶段必须通过验收后再进入下一阶段，避免提前引入尚未被真实需求验证的复杂度。
