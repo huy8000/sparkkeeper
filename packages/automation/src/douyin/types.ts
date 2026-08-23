@@ -1,4 +1,6 @@
-export type AuthStatus = 'READY' | 'AUTH_EXPIRED' | 'UNKNOWN';
+import type { LoginStatus } from '@sparkkeeper/shared';
+
+export type AuthStatus = LoginStatus;
 
 export interface AuthDetectionResult {
   readonly status: AuthStatus;
