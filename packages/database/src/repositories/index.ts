@@ -6,6 +6,13 @@ export {
   type UpdateAccountInput,
 } from './AccountRepository.js';
 export {
+  DailyRunRepository,
+  DailyRunRepositoryError,
+  type CreateOrGetDailyRunInput,
+  type DailyRun,
+  type DailyRunRepositoryErrorCode,
+} from './DailyRunRepository.js';
+export {
   FriendRepository,
   FriendRepositoryError,
   type CreateFriendInput,
@@ -19,3 +26,12 @@ export {
   type CreateMessageTemplateInput,
   type UpdateMessageTemplateInput,
 } from './MessageTemplateRepository.js';
+export {
+  SendRecordRepository,
+  SendRecordRepositoryError,
+  type ClaimSendRecordResult,
+  type PrepareSendRecordInput,
+  type PrepareSendRecordResult,
+  type SendRecord,
+  type SendRecordRepositoryErrorCode,
+} from './SendRecordRepository.js';

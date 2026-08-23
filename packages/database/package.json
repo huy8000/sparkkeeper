@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "domain:build": "pnpm --filter @sparkkeeper/message-engine build",
+    "domain:build": "pnpm --filter @sparkkeeper/shared build && pnpm --filter @sparkkeeper/message-engine build",
     "db:check": "pnpm domain:build && tsx scripts/database-cli.ts check",
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "db:migrate": "pnpm domain:build && tsx scripts/database-cli.ts migrate",

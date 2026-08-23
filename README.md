@@ -216,7 +216,7 @@ pnpm --filter @sparkkeeper/automation send:smoke
 
 只有在调用者明确将运行时发送授权开启后，命令才会执行 Composer 输入、单次 Send UI 动作和新增 outbound Bubble 验证。成功输出只包含认证、Chat、联系人、输入、发送动作和交付验证状态，不输出联系人或消息内容。
 
-发送动作一旦尝试，后续只观察验证结果；`VERIFY_FAILED` 或 `DELIVERY_UNKNOWN` 都不会触发第二次发送。正式幂等、Retry 和 SendRecord 属于后续 V1。
+发送动作一旦尝试，后续只观察验证结果；`VERIFY_FAILED` 或 `DELIVERY_UNKNOWN` 都不会触发第二次发送。V1-4 已建立离线 DailyRun/SendRecord 幂等基础，但尚未接入这条真实发送链路；Retry 仍属于后续 V1。
 
 ### Database Foundation
 
@@ -237,7 +237,7 @@ pnpm --filter @sparkkeeper/automation send:smoke
 - `busy_timeout = 5000`；
 - `synchronous = FULL`，适合当前低写入量并保留更强的掉电耐久性。
 
-首个 migration 只创建最小 `accounts` 表。V1-2 通过更高版本 migration 增加 Account 1:N `friends`，V1-3 再通过新的 migration 增加 `message_templates`；这些变化都不会回改已经执行的 migration。Account 保存内部 UUID、显示名称、启用状态、登录状态元数据和 UTC 毫秒时间戳；Friend 保存联系人身份元数据和当前精确绑定键。它们都不保存 Cookie、Token、密码、二维码、Browser Profile 或其他登录凭据。
+首个 migration 只创建最小 `accounts` 表。V1-2、V1-3、V1-4 分别通过更高版本 migration 增加 Account 1:N `friends`、`message_templates`，以及 `daily_runs`/`send_records`；这些变化都不会回改已经执行的 migration。Account 保存内部 UUID、显示名称、启用状态、登录状态元数据和 UTC 毫秒时间戳；Friend 保存联系人身份元数据和当前精确绑定键。它们都不保存 Cookie、Token、密码、二维码、Browser Profile 或其他登录凭据。
 
 在默认路径或指定的 `DATA_DIR` 上执行 migration：
 
@@ -245,7 +245,7 @@ pnpm --filter @sparkkeeper/automation send:smoke
 pnpm --filter @sparkkeeper/database db:migrate
 ```
 
-检查当前数据库的 PRAGMA、migration 数量以及 accounts/friends/message_templates schema：
+检查当前数据库的 PRAGMA、migration 数量以及 accounts/friends/message_templates/daily_runs/send_records schema：
 
 ```bash
 pnpm --filter @sparkkeeper/database db:check
@@ -285,7 +285,17 @@ V1-2 尚未把 FriendRepository 接入自动化运行链路。
 pnpm --filter @sparkkeeper/message-engine engine:smoke
 ```
 
-V1-3 尚未把 MessageEngine 接到真实 MessageSender，也未实现 DailyRun、SendRecord、Scheduler 或 Retry。
+V1-3 尚未把 MessageEngine 接到真实 MessageSender。V1-4 的 DailyRun/SendRecord 仍是独立的离线持久化能力，尚未接入真实发送、Scheduler 或 Retry。
+
+### Daily Run & Idempotency
+
+V1-4 使用 `BusinessDate` 表示由显式时刻和 `APP_TIMEZONE`（默认 `Asia/Shanghai`）解析出的 `YYYY-MM-DD` 业务日期。解析逻辑是纯 TypeScript，拒绝非法时区、非法时刻和不存在的公历日期；数据库保存规范化日期字符串，时间字段继续使用 UTC Unix epoch milliseconds。
+
+`DailyRunRepository` 以 `(account_id, business_date)` 唯一约束保证同一 Account 每个业务日只有一个 Run，并提供 `createOrGet`、查询和显式状态转换。`SendRecordRepository` 在准备阶段保存不可变的纯文本消息快照，以 `(friend_id, business_date)` 作为核心每日幂等键，并额外约束 `(daily_run_id, friend_id)`。重复准备返回既有记录，不覆盖首次快照；执行资格通过单条条件 `UPDATE ... WHERE status = 'READY'` 原子 claim，`SUCCESS` 记录不能再次取得执行资格。
+
+状态更新要求调用方显式传入时间，方便确定性测试。`send_records.friend_id` 使用 `NO ACTION` 保留历史身份引用，删除 DailyRun 会级联删除其 SendRecord，删除模板则将可选模板外键置空而保留已生成的消息快照。当前没有 Scheduler、自动运行、Retry、真实发送编排或网络依赖。
+
+`db:smoke` 会在临时 SQLite 中离线验证 migrate、同日重复 Run/SendRecord、消息快照、原子 claim、SUCCESS 终态、重开/重复 migrate，以及下一业务日可创建新记录；仅使用虚构数据并自动清理。
 
 ## Roadmap
 
@@ -294,7 +304,8 @@ V1-3 尚未把 MessageEngine 接到真实 MessageSender，也未实现 DailyRun�
 - **V1-1 Database Foundation（已完成）**：SQLite + Drizzle、versioned migration、WAL、最小 accounts schema、AccountRepository 和临时数据库测试基础。
 - **V1-2 Friend Identity（已完成）**：Account 1:N Friend、可演进身份字段、精确 match field/key、FriendRepository 和 migration upgrade 测试。
 - **V1-3 Message Engine（已完成）**：持久化消息模板、StaticProvider、RandomProvider、统一 runtime validation 与纯离线生成能力。
-- **V1-4+（尚未完成）**：后续增加 DailyRun/SendRecord 幂等、Scheduler、Retry 和 Observability。
+- **V1-4 Daily Run & Idempotency（已完成）**：BusinessDate、DailyRun/SendRecord、数据库唯一约束、消息快照、原子 claim 与离线持久化验证。
+- **V1-5+（尚未完成）**：后续增加 Scheduler、Retry 和 Observability。
 - **V2**：增加正式 API、管理后台、实时状态、失败通知和完整自托管部署体验。
 
 各阶段必须通过验收后再进入下一阶段，避免提前引入尚未被真实需求验证的复杂度。

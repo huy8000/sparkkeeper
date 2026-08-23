@@ -25,15 +25,19 @@ try {
       synchronous: inspection.pragmas.synchronous,
       appliedMigrationCount: inspection.appliedMigrationCount,
       accountsSchemaCompatible: inspection.accountsSchemaCompatible,
+      dailyRunsSchemaCompatible: inspection.dailyRunsSchemaCompatible,
       friendsSchemaCompatible: inspection.friendsSchemaCompatible,
       messageTemplatesSchemaCompatible: inspection.messageTemplatesSchemaCompatible,
+      sendRecordsSchemaCompatible: inspection.sendRecordsSchemaCompatible,
     }),
   );
 
   if (
     !inspection.accountsSchemaCompatible ||
+    !inspection.dailyRunsSchemaCompatible ||
     !inspection.friendsSchemaCompatible ||
-    !inspection.messageTemplatesSchemaCompatible
+    !inspection.messageTemplatesSchemaCompatible ||
+    !inspection.sendRecordsSchemaCompatible
   ) {
     process.exitCode = 1;
   }

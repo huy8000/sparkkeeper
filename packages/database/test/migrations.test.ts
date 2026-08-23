@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { parseBusinessDate } from '@sparkkeeper/shared';
 import { getTableColumns } from 'drizzle-orm';
 import test from 'node:test';
 
@@ -6,41 +7,52 @@ import {
   AccountRepository,
   accounts,
   createDatabase,
+  DailyRunRepository,
+  dailyRuns,
   DatabaseMigrationError,
   FriendRepository,
   friends,
   MessageTemplateRepository,
   messageTemplates,
+  SendRecordRepository,
+  sendRecords,
   type DatabaseClient,
 } from '../src/index.js';
 import {
   createTemporaryDatabase,
   createV1OneDatabase,
   createV1TwoDatabase,
+  createV1ThreeDatabase,
 } from './testDatabase.js';
 
-test('fresh database migration creates all V1-3 tables and three journal entries', (context) => {
+test('fresh database migration creates all V1-4 tables and four journal entries', (context) => {
   const { client } = createTemporaryDatabase(context, { migrate: false });
 
   const result = client.migrate();
   const inspection = client.inspect();
 
   assert.deepEqual(result, {
-    appliedMigrationCount: 3,
+    appliedMigrationCount: 4,
     accountsSchemaVerified: true,
+    dailyRunsSchemaVerified: true,
     friendsSchemaVerified: true,
     messageTemplatesSchemaVerified: true,
+    sendRecordsSchemaVerified: true,
   });
   assert.deepEqual(inspection.tables, [
     '__drizzle_migrations',
     'accounts',
+    'daily_runs',
     'friends',
     'message_templates',
+    'send_records',
   ]);
-  assert.equal(inspection.appliedMigrationCount, 3);
+  assert.equal(inspection.appliedMigrationCount, 4);
   assert.equal(inspection.accountsSchemaCompatible, true);
+  assert.equal(inspection.dailyRunsSchemaCompatible, true);
   assert.equal(inspection.friendsSchemaCompatible, true);
   assert.equal(inspection.messageTemplatesSchemaCompatible, true);
+  assert.equal(inspection.sendRecordsSchemaCompatible, true);
 });
 
 test('running migrations twice is safe and does not duplicate the journal entry', (context) => {
@@ -49,8 +61,8 @@ test('running migrations twice is safe and does not duplicate the journal entry'
   client.migrate();
   const second = client.migrate();
 
-  assert.equal(second.appliedMigrationCount, 3);
-  assert.equal(client.inspect().appliedMigrationCount, 3);
+  assert.equal(second.appliedMigrationCount, 4);
+  assert.equal(client.inspect().appliedMigrationCount, 4);
 });
 
 test('migration state remains correct after close and reopen', (context) => {
@@ -62,10 +74,12 @@ test('migration state remains correct after close and reopen', (context) => {
   context.after(() => reopened.close());
   const result = reopened.migrate();
 
-  assert.equal(result.appliedMigrationCount, 3);
+  assert.equal(result.appliedMigrationCount, 4);
   assert.equal(reopened.inspect().accountsSchemaCompatible, true);
+  assert.equal(reopened.inspect().dailyRunsSchemaCompatible, true);
   assert.equal(reopened.inspect().friendsSchemaCompatible, true);
   assert.equal(reopened.inspect().messageTemplatesSchemaCompatible, true);
+  assert.equal(reopened.inspect().sendRecordsSchemaCompatible, true);
   reopened.close();
 });
 
@@ -108,6 +122,24 @@ test('migrated SQLite columns align with the Drizzle friends definition', (conte
   ]);
 });
 
+test('migrated SQLite columns align with the Drizzle daily_runs definition', (context) => {
+  const { client } = createTemporaryDatabase(context);
+  const drizzleColumnNames = Object.values(getTableColumns(dailyRuns)).map((column) => column.name);
+  const sqliteColumnNames = client.inspect().dailyRunColumns.map((column) => column.name);
+
+  assert.deepEqual(sqliteColumnNames, drizzleColumnNames);
+  assert.deepEqual(sqliteColumnNames, [
+    'id',
+    'account_id',
+    'business_date',
+    'status',
+    'started_at',
+    'finished_at',
+    'created_at',
+    'updated_at',
+  ]);
+});
+
 test('migrated SQLite columns align with the Drizzle message_templates definition', (context) => {
   const { client } = createTemporaryDatabase(context);
   const drizzleColumnNames = Object.values(getTableColumns(messageTemplates)).map(
@@ -127,7 +159,30 @@ test('migrated SQLite columns align with the Drizzle message_templates definitio
   ]);
 });
 
-test('existing V1-1 database upgrades through V1-3 without losing account data', (context) => {
+test('migrated SQLite columns align with the Drizzle send_records definition', (context) => {
+  const { client } = createTemporaryDatabase(context);
+  const drizzleColumnNames = Object.values(getTableColumns(sendRecords)).map(
+    (column) => column.name,
+  );
+  const sqliteColumnNames = client.inspect().sendRecordColumns.map((column) => column.name);
+
+  assert.deepEqual(sqliteColumnNames, drizzleColumnNames);
+  assert.deepEqual(sqliteColumnNames, [
+    'id',
+    'daily_run_id',
+    'friend_id',
+    'business_date',
+    'message_template_id',
+    'message_text',
+    'status',
+    'started_at',
+    'finished_at',
+    'created_at',
+    'updated_at',
+  ]);
+});
+
+test('existing V1-1 database upgrades through V1-4 without losing account data', (context) => {
   const temporary = createV1OneDatabase(context);
   const { client } = temporary;
   const accountsRepository = new AccountRepository(client);
@@ -145,8 +200,8 @@ test('existing V1-1 database upgrades through V1-3 without losing account data',
     displayName: 'Upgrade Test User',
   });
 
-  assert.equal(migration.appliedMigrationCount, 3);
-  assert.equal(client.inspect().appliedMigrationCount, 3);
+  assert.equal(migration.appliedMigrationCount, 4);
+  assert.equal(client.inspect().appliedMigrationCount, 4);
   assert.equal(accountsRepository.findById(account.id)?.name, 'Upgrade Test Account');
   assert.equal(friend.accountId, account.id);
 
@@ -155,7 +210,7 @@ test('existing V1-1 database upgrades through V1-3 without losing account data',
   context.after(() => reopened.close());
   const repeated = reopened.migrate();
 
-  assert.equal(repeated.appliedMigrationCount, 3);
+  assert.equal(repeated.appliedMigrationCount, 4);
   assert.equal(new AccountRepository(reopened).findById(account.id)?.name, 'Upgrade Test Account');
   assert.equal(
     new FriendRepository(reopened).findById(friend.id)?.displayName,
@@ -164,7 +219,7 @@ test('existing V1-1 database upgrades through V1-3 without losing account data',
   reopened.close();
 });
 
-test('existing V1-2 database upgrades to V1-3 and preserves Account/Friend data', (context) => {
+test('existing V1-2 database upgrades through V1-4 and preserves Account/Friend data', (context) => {
   const temporary = createV1TwoDatabase(context);
   const { client } = temporary;
   const accountsRepository = new AccountRepository(client);
@@ -187,8 +242,8 @@ test('existing V1-2 database upgrades to V1-3 and preserves Account/Friend data'
     messages: ['Hello'],
   });
 
-  assert.equal(migration.appliedMigrationCount, 3);
-  assert.equal(client.inspect().appliedMigrationCount, 3);
+  assert.equal(migration.appliedMigrationCount, 4);
+  assert.equal(client.inspect().appliedMigrationCount, 4);
   assert.equal(accountsRepository.findById(account.id)?.name, 'V1-2 Test Account');
   assert.equal(friendsRepository.findById(alice.id)?.displayName, 'Alice');
   assert.equal(friendsRepository.findById(bob.id)?.displayName, 'Bob');
@@ -199,10 +254,79 @@ test('existing V1-2 database upgrades to V1-3 and preserves Account/Friend data'
   context.after(() => reopened.close());
   const repeated = reopened.migrate();
 
-  assert.equal(repeated.appliedMigrationCount, 3);
+  assert.equal(repeated.appliedMigrationCount, 4);
   assert.equal(new AccountRepository(reopened).findById(account.id)?.name, 'V1-2 Test Account');
   assert.equal(new FriendRepository(reopened).listByAccountId(account.id).length, 2);
   assert.equal(new MessageTemplateRepository(reopened).findById(template.id)?.messages[0], 'Hello');
+  reopened.close();
+});
+
+test('existing V1-3 database upgrades to V1-4 and preserves Account/Friend/Template data', (context) => {
+  const temporary = createV1ThreeDatabase(context);
+  const { client } = temporary;
+  const accountsRepository = new AccountRepository(client);
+  const account = accountsRepository.create({ name: 'V1-3 Test Account', loginStatus: 'READY' });
+  const friend = new FriendRepository(client).create({
+    accountId: account.id,
+    displayName: 'Alice',
+  });
+  const template = new MessageTemplateRepository(client).create({
+    name: 'V1-3 Test Template',
+    providerType: 'STATIC',
+    messages: ['Hello'],
+  });
+
+  const before = client.inspect();
+  assert.equal(before.appliedMigrationCount, 3);
+  assert.equal(before.dailyRunsSchemaCompatible, false);
+  assert.equal(before.sendRecordsSchemaCompatible, false);
+  assert.equal(before.tables.includes('daily_runs'), false);
+  assert.equal(before.tables.includes('send_records'), false);
+
+  const migration = client.migrate();
+  const businessDate = parseBusinessDate('2026-08-23');
+  const now = new Date('2026-08-23T10:00:00.000Z');
+  const dailyRun = new DailyRunRepository(client).createOrGet({
+    accountId: account.id,
+    businessDate,
+    now,
+  });
+  const prepared = new SendRecordRepository(client).prepare({
+    dailyRunId: dailyRun.id,
+    friendId: friend.id,
+    businessDate,
+    messageTemplateId: template.id,
+    messageText: 'Hello',
+    now,
+  });
+
+  assert.equal(migration.appliedMigrationCount, 4);
+  assert.equal(client.inspect().appliedMigrationCount, 4);
+  assert.equal(accountsRepository.findById(account.id)?.name, 'V1-3 Test Account');
+  assert.equal(new FriendRepository(client).findById(friend.id)?.displayName, 'Alice');
+  assert.equal(
+    new MessageTemplateRepository(client).findById(template.id)?.name,
+    'V1-3 Test Template',
+  );
+  assert.equal(prepared.type, 'PREPARED');
+
+  client.close();
+  const reopened = createDatabase({ databasePath: temporary.databasePath });
+  context.after(() => reopened.close());
+  const repeated = reopened.migrate();
+
+  assert.equal(repeated.appliedMigrationCount, 4);
+  assert.equal(new AccountRepository(reopened).findById(account.id)?.name, 'V1-3 Test Account');
+  assert.equal(new FriendRepository(reopened).findById(friend.id)?.displayName, 'Alice');
+  assert.equal(
+    new MessageTemplateRepository(reopened).findById(template.id)?.name,
+    'V1-3 Test Template',
+  );
+  assert.equal(new DailyRunRepository(reopened).findById(dailyRun.id)?.businessDate, businessDate);
+  assert.equal(
+    new SendRecordRepository(reopened).findById(prepared.record.id)?.messageText,
+    'Hello',
+  );
   reopened.close();
 });
 

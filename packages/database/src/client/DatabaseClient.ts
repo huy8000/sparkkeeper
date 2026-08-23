@@ -45,18 +45,24 @@ export interface DatabaseInspection {
   readonly tables: readonly string[];
   readonly appliedMigrationCount: number;
   readonly accountColumns: readonly DatabaseColumnState[];
+  readonly dailyRunColumns: readonly DatabaseColumnState[];
   readonly friendColumns: readonly DatabaseColumnState[];
   readonly messageTemplateColumns: readonly DatabaseColumnState[];
+  readonly sendRecordColumns: readonly DatabaseColumnState[];
   readonly accountsSchemaCompatible: boolean;
+  readonly dailyRunsSchemaCompatible: boolean;
   readonly friendsSchemaCompatible: boolean;
   readonly messageTemplatesSchemaCompatible: boolean;
+  readonly sendRecordsSchemaCompatible: boolean;
 }
 
 export interface DatabaseMigrationResult {
   readonly appliedMigrationCount: number;
   readonly accountsSchemaVerified: true;
+  readonly dailyRunsSchemaVerified: true;
   readonly friendsSchemaVerified: true;
   readonly messageTemplatesSchemaVerified: true;
+  readonly sendRecordsSchemaVerified: true;
 }
 
 interface SqliteCountRow {
@@ -99,12 +105,37 @@ const EXPECTED_FRIEND_COLUMNS: readonly DatabaseColumnState[] = [
   { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
 ];
 
+const EXPECTED_DAILY_RUN_COLUMNS: readonly DatabaseColumnState[] = [
+  { name: 'id', type: 'TEXT', notNull: true, primaryKey: true },
+  { name: 'account_id', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'business_date', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'status', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'started_at', type: 'INTEGER', notNull: false, primaryKey: false },
+  { name: 'finished_at', type: 'INTEGER', notNull: false, primaryKey: false },
+  { name: 'created_at', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
+];
+
 const EXPECTED_MESSAGE_TEMPLATE_COLUMNS: readonly DatabaseColumnState[] = [
   { name: 'id', type: 'TEXT', notNull: true, primaryKey: true },
   { name: 'name', type: 'TEXT', notNull: true, primaryKey: false },
   { name: 'provider_type', type: 'TEXT', notNull: true, primaryKey: false },
   { name: 'content', type: 'TEXT', notNull: true, primaryKey: false },
   { name: 'enabled', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'created_at', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
+];
+
+const EXPECTED_SEND_RECORD_COLUMNS: readonly DatabaseColumnState[] = [
+  { name: 'id', type: 'TEXT', notNull: true, primaryKey: true },
+  { name: 'daily_run_id', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'friend_id', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'business_date', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'message_template_id', type: 'TEXT', notNull: false, primaryKey: false },
+  { name: 'message_text', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'status', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'started_at', type: 'INTEGER', notNull: false, primaryKey: false },
+  { name: 'finished_at', type: 'INTEGER', notNull: false, primaryKey: false },
   { name: 'created_at', type: 'INTEGER', notNull: true, primaryKey: false },
   { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
 ];
@@ -139,8 +170,10 @@ export class DatabaseClient {
     const inspection = this.inspect();
     if (
       !inspection.accountsSchemaCompatible ||
+      !inspection.dailyRunsSchemaCompatible ||
       !inspection.friendsSchemaCompatible ||
-      !inspection.messageTemplatesSchemaCompatible
+      !inspection.messageTemplatesSchemaCompatible ||
+      !inspection.sendRecordsSchemaCompatible
     ) {
       throw new DatabaseSchemaError(
         'Database migrations completed, but the database tables are incompatible with the Drizzle schema.',
@@ -150,8 +183,10 @@ export class DatabaseClient {
     return {
       appliedMigrationCount: inspection.appliedMigrationCount,
       accountsSchemaVerified: true,
+      dailyRunsSchemaVerified: true,
       friendsSchemaVerified: true,
       messageTemplatesSchemaVerified: true,
+      sendRecordsSchemaVerified: true,
     };
   }
 
@@ -165,9 +200,13 @@ export class DatabaseClient {
       .all() as SqliteNameRow[];
     const tableNames = tables.map(({ name }) => name);
     const accountColumns = tableNames.includes('accounts') ? this.readAccountColumns() : [];
+    const dailyRunColumns = tableNames.includes('daily_runs') ? this.readDailyRunColumns() : [];
     const friendColumns = tableNames.includes('friends') ? this.readFriendColumns() : [];
     const messageTemplateColumns = tableNames.includes('message_templates')
       ? this.readMessageTemplateColumns()
+      : [];
+    const sendRecordColumns = tableNames.includes('send_records')
+      ? this.readSendRecordColumns()
       : [];
 
     return {
@@ -178,11 +217,15 @@ export class DatabaseClient {
         ? this.readMigrationCount()
         : 0,
       accountColumns,
+      dailyRunColumns,
       friendColumns,
       messageTemplateColumns,
+      sendRecordColumns,
       accountsSchemaCompatible: accountColumnsMatch(accountColumns),
+      dailyRunsSchemaCompatible: dailyRunColumnsMatch(dailyRunColumns),
       friendsSchemaCompatible: friendColumnsMatch(friendColumns),
       messageTemplatesSchemaCompatible: messageTemplateColumnsMatch(messageTemplateColumns),
+      sendRecordsSchemaCompatible: sendRecordColumnsMatch(sendRecordColumns),
     };
   }
 
@@ -232,8 +275,28 @@ export class DatabaseClient {
     }));
   }
 
+  private readDailyRunColumns(): DatabaseColumnState[] {
+    const rows = this.sqlite.pragma('table_info(daily_runs)') as SqliteTableInfoRow[];
+    return rows.map((row) => ({
+      name: row.name,
+      type: row.type.toUpperCase(),
+      notNull: row.notnull === 1,
+      primaryKey: row.pk === 1,
+    }));
+  }
+
   private readMessageTemplateColumns(): DatabaseColumnState[] {
     const rows = this.sqlite.pragma('table_info(message_templates)') as SqliteTableInfoRow[];
+    return rows.map((row) => ({
+      name: row.name,
+      type: row.type.toUpperCase(),
+      notNull: row.notnull === 1,
+      primaryKey: row.pk === 1,
+    }));
+  }
+
+  private readSendRecordColumns(): DatabaseColumnState[] {
+    const rows = this.sqlite.pragma('table_info(send_records)') as SqliteTableInfoRow[];
     return rows.map((row) => ({
       name: row.name,
       type: row.type.toUpperCase(),
@@ -316,8 +379,16 @@ function friendColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
   return columnsMatch(actual, EXPECTED_FRIEND_COLUMNS);
 }
 
+function dailyRunColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
+  return columnsMatch(actual, EXPECTED_DAILY_RUN_COLUMNS);
+}
+
 function messageTemplateColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
   return columnsMatch(actual, EXPECTED_MESSAGE_TEMPLATE_COLUMNS);
+}
+
+function sendRecordColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
+  return columnsMatch(actual, EXPECTED_SEND_RECORD_COLUMNS);
 }
 
 function columnsMatch(
