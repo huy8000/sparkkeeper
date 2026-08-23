@@ -1,0 +1,33 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# SparkKeeper runtime data
+data/
+logs/
+screenshots/
+browser-profile/
+*.db
+*.db-shm
+*.db-wal
+
+# Browser test artifacts
+playwright-report/
+test-results/
+
+# IDE and operating system files
+.DS_Store
+.idea/
+.vscode/
+
+# Debug logs
+*.log
+pnpm-debug.log*
+npm-debug.log*

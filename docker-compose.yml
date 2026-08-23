@@ -1,0 +1,5 @@
+name: sparkkeeper
+
+# Phase 0 only reserves the SparkKeeper Compose entry point.
+# Runtime services and persistent volumes will be added in their designated phase.
+services: {}
