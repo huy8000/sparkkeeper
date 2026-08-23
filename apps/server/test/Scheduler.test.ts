@@ -25,6 +25,7 @@ import type {
 } from '../src/application/DailyTaskAutomation.js';
 import { DailyTaskRunner } from '../src/application/DailyTaskRunner.js';
 import { resolveSchedulerConfig } from '../src/config/SchedulerConfig.js';
+import { SchedulerService } from '../src/lifecycle/SchedulerService.js';
 import { evaluateScheduleWindow } from '../src/scheduler/ScheduleWindow.js';
 import { TaskScheduler, type SchedulerTimer } from '../src/scheduler/TaskScheduler.js';
 
@@ -477,4 +478,242 @@ test('disabled Friends are excluded from execution', async (context) => {
   });
   assert.equal(await fixture.runner.run(fixture.account.id, businessDate), 'SUCCESS');
   assert.deepEqual(fixture.automation.sends, []);
+});
+
+const additionalWindowCases = [
+  [
+    'before start',
+    '2026-08-23T00:59:00Z',
+    'Asia/Shanghai',
+    '09:00',
+    '10:00',
+    'BEFORE_WINDOW',
+    '2026-08-23',
+  ],
+  ['middle', '2026-08-23T01:30:00Z', 'Asia/Shanghai', '09:00', '10:00', 'IN_WINDOW', '2026-08-23'],
+  [
+    'one minute before end',
+    '2026-08-23T01:59:00Z',
+    'Asia/Shanghai',
+    '09:00',
+    '10:00',
+    'IN_WINDOW',
+    '2026-08-23',
+  ],
+  [
+    'after end',
+    '2026-08-23T02:01:00Z',
+    'Asia/Shanghai',
+    '09:00',
+    '10:00',
+    'AFTER_WINDOW',
+    '2026-08-23',
+  ],
+  ['UTC timezone', '2026-08-23T09:30:00Z', 'UTC', '09:00', '10:00', 'IN_WINDOW', '2026-08-23'],
+  [
+    'month boundary',
+    '2026-08-31T16:30:00Z',
+    'Asia/Shanghai',
+    '00:00',
+    '01:00',
+    'IN_WINDOW',
+    '2026-09-01',
+  ],
+  [
+    'year boundary',
+    '2026-12-31T16:30:00Z',
+    'Asia/Shanghai',
+    '00:00',
+    '01:00',
+    'IN_WINDOW',
+    '2027-01-01',
+  ],
+  [
+    'DST-capable timezone',
+    '2026-07-01T13:30:00Z',
+    'America/New_York',
+    '09:00',
+    '10:00',
+    'IN_WINDOW',
+    '2026-07-01',
+  ],
+] as const;
+
+for (const [
+  label,
+  instant,
+  timezone,
+  start,
+  end,
+  position,
+  expectedDate,
+] of additionalWindowCases) {
+  test(`schedule window evaluates ${label}`, () => {
+    const result = evaluateScheduleWindow(
+      new Date(instant),
+      timezone,
+      parseScheduleTime(start),
+      parseScheduleTime(end),
+    );
+    assert.equal(result.position, position);
+    assert.equal(result.businessDate, expectedDate);
+  });
+}
+
+test('same instant evaluates independently in two configured timezones', () => {
+  const instant = new Date('2026-08-23T01:30:00Z');
+  const start = parseScheduleTime('09:00');
+  const end = parseScheduleTime('10:00');
+  assert.equal(evaluateScheduleWindow(instant, 'Asia/Shanghai', start, end).position, 'IN_WINDOW');
+  assert.equal(evaluateScheduleWindow(instant, 'UTC', start, end).position, 'BEFORE_WINDOW');
+});
+
+test('schedule window rejects invalid timezone without system-local fallback', () => {
+  assert.throws(() =>
+    evaluateScheduleWindow(
+      fixedNow,
+      'Not/AZone',
+      parseScheduleTime('09:00'),
+      parseScheduleTime('10:00'),
+    ),
+  );
+});
+
+test('schedule window output is independent of process local timezone', () => {
+  const result = evaluateScheduleWindow(
+    new Date('2026-08-22T16:30:00Z'),
+    'Asia/Shanghai',
+    parseScheduleTime('00:00'),
+    parseScheduleTime('01:00'),
+  );
+  assert.deepEqual(
+    { position: result.position, localTime: result.localTime, businessDate: result.businessDate },
+    { position: 'IN_WINDOW', localTime: '00:30', businessDate: '2026-08-23' },
+  );
+});
+
+test('SchedulerService stays offline when disabled or real-send blocked', async () => {
+  assert.equal(await new SchedulerService().start({}), 'DISABLED');
+  assert.equal(
+    await new SchedulerService().start({
+      SCHEDULER_ENABLED: 'true',
+      SCHEDULER_ACCOUNT_ID: 'fictional-account',
+      SCHEDULER_ALLOW_REAL_SEND: 'false',
+    }),
+    'BLOCKED',
+  );
+});
+
+for (const [label, instant, expected, calls] of [
+  ['before window', '2026-08-23T00:59:00Z', 'SKIPPED', 0],
+  ['inside window', '2026-08-23T01:30:00Z', 'TRIGGERED', 1],
+  ['after window', '2026-08-23T02:01:00Z', 'SKIPPED', 0],
+] as const) {
+  test(`service start ${label} has bounded behavior`, async () => {
+    let runCount = 0;
+    const schedule = {
+      accountId: 'a',
+      enabled: true,
+      timezone: 'Asia/Shanghai',
+      startTime: parseScheduleTime('09:00'),
+      endTime: parseScheduleTime('10:00'),
+    };
+    const scheduler = new TaskScheduler(
+      'a',
+      { findByAccountId: () => schedule } as never,
+      {
+        run: async () => {
+          runCount += 1;
+        },
+      },
+      { now: () => new Date(instant) },
+    );
+    assert.equal(await scheduler.tick(), expected);
+    assert.equal(runCount, calls);
+  });
+}
+
+test('new Scheduler instance same day reconstructs SUCCESS without sending', async (context) => {
+  const fixture = runnerFixture(context, 1);
+  assert.equal(await fixture.runner.run(fixture.account.id, businessDate), 'SUCCESS');
+  const sends = fixture.automation.sends.length;
+  const restarted = new TaskScheduler(fixture.account.id, fixture.schedules, fixture.runner, {
+    now: () => fixedNow,
+  });
+  assert.equal(await restarted.tick(), 'TRIGGERED');
+  assert.equal(fixture.automation.sends.length, sends);
+  assert.equal(fixture.dailyRuns.listByAccountId(fixture.account.id).length, 1);
+});
+
+test('disabled and unknown Accounts fail before browser startup', async (context) => {
+  const fixture = runnerFixture(context);
+  fixture.accounts.update(fixture.account.id, { enabled: false });
+  await assert.rejects(
+    () => fixture.runner.run(fixture.account.id, businessDate),
+    /unavailable or disabled/,
+  );
+  await assert.rejects(
+    () => fixture.runner.run('unknown-account', businessDate),
+    /does not match explicit/,
+  );
+  assert.equal(fixture.automation.starts, 0);
+});
+
+test('existing DELIVERY_UNKNOWN blocks all later external actions', async (context) => {
+  const fixture = runnerFixture(context);
+  const run = fixture.dailyRuns.createOrGet({
+    accountId: fixture.account.id,
+    businessDate,
+    now: fixedNow,
+  });
+  fixture.dailyRuns.markRunning(run.id, fixedNow);
+  const friend = fixture.friends.listByAccountId(fixture.account.id)[0]!;
+  const record = fixture.sendRecords.prepare({
+    dailyRunId: run.id,
+    friendId: friend.id,
+    businessDate,
+    messageTemplateId: fixture.template.id,
+    messageText: 'Snapshot',
+    now: fixedNow,
+  }).record;
+  fixture.sendRecords.claimForExecution(record.id, fixedNow);
+  fixture.sendRecords.markDeliveryUnknown(record.id, fixedNow);
+  assert.equal(await fixture.runner.run(fixture.account.id, businessDate), 'FAILED');
+  assert.deepEqual(fixture.automation.sends, []);
+});
+
+test('existing FAILED is not retried while safe remaining Friends continue', async (context) => {
+  const fixture = runnerFixture(context);
+  const run = fixture.dailyRuns.createOrGet({
+    accountId: fixture.account.id,
+    businessDate,
+    now: fixedNow,
+  });
+  fixture.dailyRuns.markRunning(run.id, fixedNow);
+  const allFriends = fixture.friends.listByAccountId(fixture.account.id);
+  const failedFriend = allFriends[0]!;
+  const remaining = allFriends[1]!;
+  const record = fixture.sendRecords.prepare({
+    dailyRunId: run.id,
+    friendId: failedFriend.id,
+    businessDate,
+    messageTemplateId: fixture.template.id,
+    messageText: 'Snapshot',
+    now: fixedNow,
+  }).record;
+  fixture.sendRecords.markFailedBeforeSend(record.id, fixedNow);
+  assert.equal(await fixture.runner.run(fixture.account.id, businessDate), 'FAILED');
+  assert.equal(fixture.sendRecords.findById(record.id)?.status, 'FAILED');
+  assert.deepEqual(fixture.automation.sends, [`${remaining.displayName}:Hello`]);
+});
+
+test('next businessDate creates a new DailyRun and send eligibility', async (context) => {
+  const fixture = runnerFixture(context, 1);
+  assert.equal(await fixture.runner.run(fixture.account.id, businessDate), 'SUCCESS');
+  assert.equal(
+    await fixture.runner.run(fixture.account.id, parseBusinessDate('2026-08-24')),
+    'SUCCESS',
+  );
+  assert.equal(fixture.dailyRuns.listByAccountId(fixture.account.id).length, 2);
+  assert.equal(fixture.automation.sends.length, 2);
 });
