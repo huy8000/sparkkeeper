@@ -22,6 +22,13 @@
       "when": 1787461817894,
       "tag": "0002_remarkable_fallen_one",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1787463387942,
+      "tag": "0003_petite_junta",
+      "breakpoints": true
     }
   ]
 }

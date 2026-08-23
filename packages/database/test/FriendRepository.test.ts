@@ -345,7 +345,7 @@ test('Friend persists after close, reopen, and repeated migration', (context) =>
   const migration = reopened.migrate();
   const persisted = new FriendRepository(reopened).findById(created.id);
 
-  assert.equal(migration.appliedMigrationCount, 3);
+  assert.equal(migration.appliedMigrationCount, 4);
   assert.equal(persisted?.displayName, 'Alice');
   assert.equal(persisted?.enabled, false);
   assert.equal(new AccountRepository(reopened).findById(account.id)?.name, 'Test Account');

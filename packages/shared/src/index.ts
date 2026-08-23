@@ -26,3 +26,17 @@ export interface MessageTemplate {
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
+
+export {
+  BusinessDateError,
+  DEFAULT_APP_TIMEZONE,
+  parseBusinessDate,
+  resolveBusinessDate,
+  resolveBusinessTimeZone,
+  type BusinessDate,
+  type BusinessDateErrorCode,
+} from './BusinessDate.js';
+
+export type DailyRunStatus = 'READY' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'AUTH_EXPIRED';
+
+export type SendRecordStatus = 'READY' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'DELIVERY_UNKNOWN';
