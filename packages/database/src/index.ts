@@ -25,10 +25,33 @@ export {
   type ResolveDatabasePathOptions,
 } from './config/databaseConfig.js';
 export {
+  FRIEND_MATCH_FIELDS,
+  FRIEND_MATCH_PRIORITY,
+  FriendIdentityError,
+  normalizeFriendIdentity,
+  selectFriendMatch,
+  type FriendMatch,
+  type NormalizedFriendIdentity,
+} from './identity/index.js';
+export {
   AccountRepository,
   AccountRepositoryError,
   type Account,
   type CreateAccountInput,
   type UpdateAccountInput,
+  FriendRepository,
+  FriendRepositoryError,
+  type CreateFriendInput,
+  type Friend,
+  type UpdateFriendInput,
 } from './repositories/index.js';
-export { accounts, LOGIN_STATUSES, type AccountRow, type NewAccountRow } from './schema/index.js';
+export {
+  accounts,
+  friends,
+  LOGIN_STATUSES,
+  type AccountRow,
+  type FriendRow,
+  type NewAccountRow,
+  type NewFriendRow,
+} from './schema/index.js';
+export type { FriendIdentity, FriendMatchField } from '@sparkkeeper/shared';

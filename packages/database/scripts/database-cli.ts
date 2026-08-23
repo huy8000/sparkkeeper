@@ -25,10 +25,11 @@ try {
       synchronous: inspection.pragmas.synchronous,
       appliedMigrationCount: inspection.appliedMigrationCount,
       accountsSchemaCompatible: inspection.accountsSchemaCompatible,
+      friendsSchemaCompatible: inspection.friendsSchemaCompatible,
     }),
   );
 
-  if (!inspection.accountsSchemaCompatible) {
+  if (!inspection.accountsSchemaCompatible || !inspection.friendsSchemaCompatible) {
     process.exitCode = 1;
   }
 } finally {
