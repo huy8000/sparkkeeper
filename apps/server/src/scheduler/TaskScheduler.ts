@@ -2,6 +2,7 @@ import type { BusinessDate } from '@sparkkeeper/shared';
 import type { ScheduleRepository } from '@sparkkeeper/database';
 
 import { evaluateScheduleWindow } from './ScheduleWindow.js';
+import { NoopRuntimeObserver, type RuntimeObserver } from '../observability/RuntimeObserver.js';
 
 export interface SchedulerClock {
   now(): Date;
@@ -22,6 +23,7 @@ export class TaskScheduler {
   private intervalHandle: unknown;
   private activeTick: Promise<'TRIGGERED' | 'SKIPPED'> | undefined;
   private stopped = true;
+  private lastCleanupBusinessDate: BusinessDate | undefined;
 
   constructor(
     private readonly accountId: string,
@@ -31,6 +33,7 @@ export class TaskScheduler {
     private readonly timer: SchedulerTimer = defaultTimer,
     private readonly pollIntervalMs = DEFAULT_SCHEDULER_POLL_INTERVAL_MS,
     private readonly onError: SchedulerErrorHandler = defaultErrorHandler,
+    private readonly observer: Pick<RuntimeObserver, 'cleanup'> = new NoopRuntimeObserver(),
   ) {
     if (!Number.isInteger(pollIntervalMs) || pollIntervalMs < 1) {
       throw new Error('Scheduler poll interval must be a positive integer.');
@@ -78,6 +81,14 @@ export class TaskScheduler {
       schedule.startTime,
       schedule.endTime,
     );
+    if (this.lastCleanupBusinessDate !== evaluation.businessDate) {
+      try {
+        await this.observer.cleanup();
+      } catch {
+        // Retention is observability-only and cannot block scheduling.
+      }
+      this.lastCleanupBusinessDate = evaluation.businessDate;
+    }
     if (evaluation.position !== 'IN_WINDOW') {
       await this.runner.finalizeExpired?.(schedule.accountId, evaluation.businessDate);
       return 'SKIPPED';

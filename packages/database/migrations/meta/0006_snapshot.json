@@ -1,0 +1,849 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "d743e7f3-1dd2-4fd1-a87e-b0e2df16f9de",
+  "prevId": "96132d65-3a9f-46a4-bce4-bd0e4cdc520b",
+  "tables": {
+    "accounts": {
+      "name": "accounts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "login_status": {
+          "name": "login_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'UNKNOWN'"
+        },
+        "last_login_at": {
+          "name": "last_login_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "accounts_login_status_check": {
+          "name": "accounts_login_status_check",
+          "value": "\"accounts\".\"login_status\" in ('READY', 'AUTH_EXPIRED', 'UNKNOWN')"
+        },
+        "accounts_name_not_empty_check": {
+          "name": "accounts_name_not_empty_check",
+          "value": "length(trim(\"accounts\".\"name\")) > 0"
+        }
+      }
+    },
+    "daily_runs": {
+      "name": "daily_runs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "business_date": {
+          "name": "business_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'READY'"
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "daily_runs_account_business_date_unique": {
+          "name": "daily_runs_account_business_date_unique",
+          "columns": ["account_id", "business_date"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "daily_runs_account_id_accounts_id_fk": {
+          "name": "daily_runs_account_id_accounts_id_fk",
+          "tableFrom": "daily_runs",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "daily_runs_business_date_check": {
+          "name": "daily_runs_business_date_check",
+          "value": "strftime('%Y-%m-%d', \"daily_runs\".\"business_date\") = \"daily_runs\".\"business_date\""
+        },
+        "daily_runs_status_check": {
+          "name": "daily_runs_status_check",
+          "value": "\"daily_runs\".\"status\" in ('READY', 'RUNNING', 'SUCCESS', 'FAILED', 'AUTH_EXPIRED')"
+        }
+      }
+    },
+    "friends": {
+      "name": "friends",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "remark_name": {
+          "name": "remark_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "short_id": {
+          "name": "short_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "unique_id": {
+          "name": "unique_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sec_uid": {
+          "name": "sec_uid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "match_field": {
+          "name": "match_field",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "match_key": {
+          "name": "match_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "friends_account_id_idx": {
+          "name": "friends_account_id_idx",
+          "columns": ["account_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "friends_account_id_accounts_id_fk": {
+          "name": "friends_account_id_accounts_id_fk",
+          "tableFrom": "friends",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "friends_display_name_not_empty_check": {
+          "name": "friends_display_name_not_empty_check",
+          "value": "length(trim(\"friends\".\"display_name\")) > 0"
+        },
+        "friends_match_key_not_empty_check": {
+          "name": "friends_match_key_not_empty_check",
+          "value": "length(\"friends\".\"match_key\") > 0"
+        },
+        "friends_match_field_check": {
+          "name": "friends_match_field_check",
+          "value": "\"friends\".\"match_field\" in ('displayName', 'remarkName', 'shortId', 'uniqueId', 'secUid')"
+        },
+        "friends_match_consistency_check": {
+          "name": "friends_match_consistency_check",
+          "value": "case \"friends\".\"match_field\"\n        when 'displayName' then \"friends\".\"match_key\" = trim(\"friends\".\"display_name\")\n        when 'remarkName' then \"friends\".\"remark_name\" is not null and \"friends\".\"match_key\" = trim(\"friends\".\"remark_name\")\n        when 'shortId' then \"friends\".\"short_id\" is not null and \"friends\".\"match_key\" = trim(\"friends\".\"short_id\")\n        when 'uniqueId' then \"friends\".\"unique_id\" is not null and \"friends\".\"match_key\" = trim(\"friends\".\"unique_id\")\n        when 'secUid' then \"friends\".\"sec_uid\" is not null and \"friends\".\"match_key\" = trim(\"friends\".\"sec_uid\")\n        else 0\n      end"
+        }
+      }
+    },
+    "message_templates": {
+      "name": "message_templates",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider_type": {
+          "name": "provider_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "message_templates_name_not_empty_check": {
+          "name": "message_templates_name_not_empty_check",
+          "value": "length(trim(\"message_templates\".\"name\")) > 0"
+        },
+        "message_templates_provider_type_check": {
+          "name": "message_templates_provider_type_check",
+          "value": "\"message_templates\".\"provider_type\" in ('STATIC', 'RANDOM')"
+        }
+      }
+    },
+    "schedules": {
+      "name": "schedules",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "start_time": {
+          "name": "start_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "end_time": {
+          "name": "end_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "max_attempts": {
+          "name": "max_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 3
+        },
+        "retry_interval_seconds": {
+          "name": "retry_interval_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 60
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "schedules_account_id_unique": {
+          "name": "schedules_account_id_unique",
+          "columns": ["account_id"],
+          "isUnique": true
+        },
+        "schedules_enabled_idx": {
+          "name": "schedules_enabled_idx",
+          "columns": ["enabled"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "schedules_account_id_accounts_id_fk": {
+          "name": "schedules_account_id_accounts_id_fk",
+          "tableFrom": "schedules",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "schedules_start_time_check": {
+          "name": "schedules_start_time_check",
+          "value": "\"schedules\".\"start_time\" glob '[0-2][0-9]:[0-5][0-9]' and cast(substr(\"schedules\".\"start_time\", 1, 2) as integer) between 0 and 23"
+        },
+        "schedules_end_time_check": {
+          "name": "schedules_end_time_check",
+          "value": "\"schedules\".\"end_time\" glob '[0-2][0-9]:[0-5][0-9]' and cast(substr(\"schedules\".\"end_time\", 1, 2) as integer) between 0 and 23"
+        },
+        "schedules_window_check": {
+          "name": "schedules_window_check",
+          "value": "\"schedules\".\"start_time\" < \"schedules\".\"end_time\""
+        },
+        "schedules_timezone_not_empty_check": {
+          "name": "schedules_timezone_not_empty_check",
+          "value": "length(trim(\"schedules\".\"timezone\")) > 0"
+        },
+        "schedules_max_attempts_check": {
+          "name": "schedules_max_attempts_check",
+          "value": "\"schedules\".\"max_attempts\" between 1 and 5"
+        },
+        "schedules_retry_interval_seconds_check": {
+          "name": "schedules_retry_interval_seconds_check",
+          "value": "\"schedules\".\"retry_interval_seconds\" between 1 and 86400"
+        }
+      }
+    },
+    "send_records": {
+      "name": "send_records",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "daily_run_id": {
+          "name": "daily_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "friend_id": {
+          "name": "friend_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "business_date": {
+          "name": "business_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "message_template_id": {
+          "name": "message_template_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "message_text": {
+          "name": "message_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'READY'"
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "next_retry_at": {
+          "name": "next_retry_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_error_code": {
+          "name": "last_error_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "send_action_started_at": {
+          "name": "send_action_started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "send_records_friend_business_date_unique": {
+          "name": "send_records_friend_business_date_unique",
+          "columns": ["friend_id", "business_date"],
+          "isUnique": true
+        },
+        "send_records_daily_run_friend_unique": {
+          "name": "send_records_daily_run_friend_unique",
+          "columns": ["daily_run_id", "friend_id"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "send_records_daily_run_id_daily_runs_id_fk": {
+          "name": "send_records_daily_run_id_daily_runs_id_fk",
+          "tableFrom": "send_records",
+          "tableTo": "daily_runs",
+          "columnsFrom": ["daily_run_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "send_records_friend_id_friends_id_fk": {
+          "name": "send_records_friend_id_friends_id_fk",
+          "tableFrom": "send_records",
+          "tableTo": "friends",
+          "columnsFrom": ["friend_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "send_records_message_template_id_message_templates_id_fk": {
+          "name": "send_records_message_template_id_message_templates_id_fk",
+          "tableFrom": "send_records",
+          "tableTo": "message_templates",
+          "columnsFrom": ["message_template_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "send_records_business_date_check": {
+          "name": "send_records_business_date_check",
+          "value": "strftime('%Y-%m-%d', \"send_records\".\"business_date\") = \"send_records\".\"business_date\""
+        },
+        "send_records_message_text_not_empty_check": {
+          "name": "send_records_message_text_not_empty_check",
+          "value": "length(trim(\"send_records\".\"message_text\")) > 0"
+        },
+        "send_records_status_check": {
+          "name": "send_records_status_check",
+          "value": "\"send_records\".\"status\" in ('READY', 'RUNNING', 'RETRY_WAIT', 'SUCCESS', 'FAILED', 'DELIVERY_UNKNOWN')"
+        },
+        "send_records_attempt_count_check": {
+          "name": "send_records_attempt_count_check",
+          "value": "\"send_records\".\"attempt_count\" between 0 and 5"
+        },
+        "send_records_retry_wait_check": {
+          "name": "send_records_retry_wait_check",
+          "value": "(\"send_records\".\"status\" = 'RETRY_WAIT' and \"send_records\".\"next_retry_at\" is not null and \"send_records\".\"finished_at\" is null) or (\"send_records\".\"status\" <> 'RETRY_WAIT' and \"send_records\".\"next_retry_at\" is null)"
+        },
+        "send_records_last_error_code_check": {
+          "name": "send_records_last_error_code_check",
+          "value": "\"send_records\".\"last_error_code\" is null or \"send_records\".\"last_error_code\" in ('NETWORK_TRANSIENT', 'PAGE_LOAD_TIMEOUT', 'CONTACT_LIST_NOT_READY', 'BROWSER_TRANSIENT', 'CONTACT_NOT_FOUND', 'AMBIGUOUS_CONTACT', 'SELECTOR_FAILURE', 'CONVERSATION_VERIFICATION_FAILED', 'MESSAGE_INPUT_FAILED', 'SEND_ACTION_FAILED', 'VERIFY_FAILED', 'AUTH_EXPIRED', 'AUTH_UNKNOWN', 'TEMPLATE_INVALID', 'CONFIG_INVALID', 'PROCESS_INTERRUPTED_BEFORE_SEND', 'RETRY_WINDOW_EXPIRED', 'MAX_ATTEMPTS_EXHAUSTED', 'DELIVERY_UNKNOWN')"
+        }
+      }
+    },
+    "system_events": {
+      "name": "system_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "level": {
+          "name": "level",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "friend_id": {
+          "name": "friend_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "attempt": {
+          "name": "attempt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "error_code": {
+          "name": "error_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "screenshot_path": {
+          "name": "screenshot_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "trace_path": {
+          "name": "trace_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "system_events_created_at_idx": {
+          "name": "system_events_created_at_idx",
+          "columns": ["created_at"],
+          "isUnique": false
+        },
+        "system_events_run_id_idx": {
+          "name": "system_events_run_id_idx",
+          "columns": ["run_id"],
+          "isUnique": false
+        },
+        "system_events_account_id_idx": {
+          "name": "system_events_account_id_idx",
+          "columns": ["account_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "system_events_run_id_daily_runs_id_fk": {
+          "name": "system_events_run_id_daily_runs_id_fk",
+          "tableFrom": "system_events",
+          "tableTo": "daily_runs",
+          "columnsFrom": ["run_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "system_events_account_id_accounts_id_fk": {
+          "name": "system_events_account_id_accounts_id_fk",
+          "tableFrom": "system_events",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "system_events_friend_id_friends_id_fk": {
+          "name": "system_events_friend_id_friends_id_fk",
+          "tableFrom": "system_events",
+          "tableTo": "friends",
+          "columnsFrom": ["friend_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "system_events_level_check": {
+          "name": "system_events_level_check",
+          "value": "\"system_events\".\"level\" in ('INFO', 'WARN', 'ERROR')"
+        },
+        "system_events_event_type_check": {
+          "name": "system_events_event_type_check",
+          "value": "\"system_events\".\"event_type\" in ('RUN_STARTED', 'RUN_FINISHED', 'AUTH_CHECKING', 'AUTH_EXPIRED', 'AUTH_UNKNOWN', 'FRIEND_RESOLVING', 'CONTACT_NOT_FOUND', 'AMBIGUOUS_CONTACT', 'MESSAGE_BUILDING', 'MESSAGE_SENDING', 'VERIFYING', 'VERIFY_SUCCESS', 'RETRY_WAIT', 'TASK_FAILED', 'SELECTOR_FAILURE', 'BROWSER_ERROR', 'DELIVERY_UNKNOWN', 'CONVERSATION_VERIFICATION_FAILED', 'SKIPPED_IDEMPOTENT', 'CONSECUTIVE_RUN_FAILURE', 'OBSERVABILITY_ERROR')"
+        },
+        "system_events_attempt_check": {
+          "name": "system_events_attempt_check",
+          "value": "\"system_events\".\"attempt\" is null or \"system_events\".\"attempt\" > 0"
+        },
+        "system_events_message_not_empty_check": {
+          "name": "system_events_message_not_empty_check",
+          "value": "length(trim(\"system_events\".\"message\")) > 0"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

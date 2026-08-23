@@ -63,3 +63,12 @@ export {
   validateScheduleWindow,
   type ScheduleTime,
 } from './ScheduleTime.js';
+
+export {
+  isRuntimeEventType,
+  isSystemEventLevel,
+  RUNTIME_EVENT_TYPES,
+  SYSTEM_EVENT_LEVELS,
+  type RuntimeEventType,
+  type SystemEventLevel,
+} from './RuntimeEvent.js';

@@ -30,6 +30,7 @@ try {
       messageTemplatesSchemaCompatible: inspection.messageTemplatesSchemaCompatible,
       sendRecordsSchemaCompatible: inspection.sendRecordsSchemaCompatible,
       schedulesSchemaCompatible: inspection.schedulesSchemaCompatible,
+      systemEventsSchemaCompatible: inspection.systemEventsSchemaCompatible,
     }),
   );
 
@@ -39,7 +40,8 @@ try {
     !inspection.friendsSchemaCompatible ||
     !inspection.messageTemplatesSchemaCompatible ||
     !inspection.sendRecordsSchemaCompatible ||
-    !inspection.schedulesSchemaCompatible
+    !inspection.schedulesSchemaCompatible ||
+    !inspection.systemEventsSchemaCompatible
   ) {
     process.exitCode = 1;
   }

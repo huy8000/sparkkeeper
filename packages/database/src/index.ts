@@ -71,6 +71,12 @@ export {
   type ScheduleRetryInput,
   type SendRecord,
   type SendRecordRepositoryErrorCode,
+  DEFAULT_SYSTEM_EVENT_LIMIT,
+  MAX_SYSTEM_EVENT_LIMIT,
+  SystemEventRepository,
+  SystemEventRepositoryError,
+  type CreateSystemEventInput,
+  type SystemEvent,
 } from './repositories/index.js';
 export {
   accounts,
@@ -94,6 +100,9 @@ export {
   type NewSendRecordRow,
   type SendRecordRow,
   type ScheduleRow,
+  systemEvents,
+  type NewSystemEventRow,
+  type SystemEventRow,
 } from './schema/index.js';
 export type {
   BusinessDate,
@@ -104,4 +113,6 @@ export type {
   MessageTemplate,
   ScheduleTime,
   SendRecordStatus,
+  RuntimeEventType,
+  SystemEventLevel,
 } from '@sparkkeeper/shared';

@@ -18,6 +18,13 @@ import {
   type DailyTaskAutomation,
 } from './DailyTaskAutomation.js';
 import { RetryPolicy, type RetryDecision } from './retry/RetryPolicy.js';
+import {
+  NoopRuntimeObserver,
+  type RuntimeObservation,
+  type RuntimeObserver,
+  type RuntimeRunContext,
+  type RuntimeRunResult,
+} from '../observability/RuntimeObserver.js';
 
 export interface DailyTaskRunnerOptions {
   readonly accountId: string;
@@ -33,6 +40,7 @@ export interface DailyTaskRunnerOptions {
   readonly messageEngine?: MessageEngine;
   readonly retryPolicy?: RetryPolicy;
   readonly now?: () => Date;
+  readonly observer?: RuntimeObserver;
 }
 
 export type DailyTaskRunResult = 'SUCCESS' | 'FAILED' | 'AUTH_EXPIRED' | 'RETRY_WAIT' | 'SKIPPED';
@@ -46,11 +54,13 @@ export class DailyTaskRunner {
   private readonly engine: MessageEngine;
   private readonly retryPolicy: RetryPolicy;
   private readonly now: () => Date;
+  private readonly observer: RuntimeObserver;
 
   constructor(private readonly options: DailyTaskRunnerOptions) {
     this.engine = options.messageEngine ?? new MessageEngine();
     this.retryPolicy = options.retryPolicy ?? new RetryPolicy();
     this.now = options.now ?? (() => new Date());
+    this.observer = options.observer ?? new NoopRuntimeObserver();
   }
 
   async run(accountId: string, businessDate: BusinessDate): Promise<DailyTaskRunResult> {
@@ -77,30 +87,88 @@ export class DailyTaskRunner {
       if (claim.type !== 'CLAIMED') return 'SKIPPED';
       run = claim.run;
     }
+    const observationContext: RuntimeRunContext = {
+      accountId: account.id,
+      runId: run.id,
+      businessDate,
+    };
+    await this.safeObserve({ ...observationContext, eventType: 'RUN_STARTED', level: 'info' });
 
     if (this.recoverInterruptedAttempts(run.id, schedule, businessDate)) {
       this.options.dailyRuns.markFailed(run.id, this.now());
+      await this.safeObserve({
+        ...observationContext,
+        eventType: 'TASK_FAILED',
+        level: 'error',
+        errorCode: 'DELIVERY_UNKNOWN',
+        captureScreenshot: false,
+      });
+      await this.safeObserve({
+        ...observationContext,
+        eventType: 'RUN_FINISHED',
+        level: 'info',
+        runResult: 'FAILED',
+      });
       return 'FAILED';
     }
 
     const enabledFriends = this.options.friends.listEnabledByAccountId(account.id);
     if (!this.hasActionableWork(run.id, enabledFriends, businessDate, schedule)) {
-      return this.aggregate(run.id, enabledFriends, businessDate);
+      const result = this.aggregate(run.id, enabledFriends, businessDate);
+      if (result === 'FAILED') {
+        await this.safeObserve({
+          ...observationContext,
+          eventType: 'TASK_FAILED',
+          level: 'error',
+          captureScreenshot: false,
+        });
+      }
+      await this.safeObserve({
+        ...observationContext,
+        eventType: 'RUN_FINISHED',
+        level: 'info',
+        runResult: result,
+      });
+      return result;
     }
 
     let started = false;
     let activeRecordId: string | undefined;
     let stopRun = false;
+    let observedFailure = false;
+    let observedOutcome: RuntimeRunResult = 'SUCCESS';
     try {
       await this.options.automation.start();
       started = true;
+      await this.safeStartRun(observationContext);
+      await this.safeObserve({
+        ...observationContext,
+        eventType: 'AUTH_CHECKING',
+        level: 'info',
+      });
       const auth = await this.options.automation.checkAuth();
       if (auth === 'AUTH_EXPIRED') {
+        observedFailure = true;
+        observedOutcome = 'AUTH_EXPIRED';
+        await this.safeObserve({
+          ...observationContext,
+          eventType: 'AUTH_EXPIRED',
+          level: 'error',
+          errorCode: 'AUTH_EXPIRED',
+        });
         this.options.accounts.update(account.id, { loginStatus: 'AUTH_EXPIRED' });
         this.options.dailyRuns.markAuthExpired(run.id, this.now());
         return 'AUTH_EXPIRED';
       }
       if (auth !== 'READY') {
+        observedFailure = true;
+        observedOutcome = 'FAILED';
+        await this.safeObserve({
+          ...observationContext,
+          eventType: 'AUTH_UNKNOWN',
+          level: 'error',
+          errorCode: 'AUTH_UNKNOWN',
+        });
         this.options.accounts.update(account.id, { loginStatus: 'UNKNOWN' });
         this.options.dailyRuns.markFailed(run.id, this.now());
         return 'FAILED';
@@ -114,6 +182,14 @@ export class DailyTaskRunner {
           record?.status === 'FAILED' ||
           record?.status === 'DELIVERY_UNKNOWN'
         ) {
+          if (record.status === 'SUCCESS') {
+            await this.safeObserve({
+              ...observationContext,
+              friendId: friend.id,
+              eventType: 'SKIPPED_IDEMPOTENT',
+              level: 'debug',
+            });
+          }
           if (record.status === 'DELIVERY_UNKNOWN') stopRun = true;
           if (stopRun) break;
           continue;
@@ -124,6 +200,13 @@ export class DailyTaskRunner {
         }
 
         if (record === undefined) {
+          await this.safeObserve({
+            ...observationContext,
+            friendId: friend.id,
+            attempt: 1,
+            eventType: 'MESSAGE_BUILDING',
+            level: 'info',
+          });
           const messageText = await this.engine.build(template);
           record = this.options.sendRecords.prepare({
             dailyRunId: run.id,
@@ -156,8 +239,16 @@ export class DailyTaskRunner {
         }
 
         activeRecordId = claim.record.id;
+        await this.safeObserve({
+          ...observationContext,
+          friendId: friend.id,
+          attempt: claim.record.attemptCount,
+          eventType: 'FRIEND_RESOLVING',
+          level: 'info',
+        });
         const opened = await this.options.automation.resolveAndOpen(friend);
         if (opened.status !== 'VERIFIED') {
+          observedFailure = true;
           const failure = this.applyFailure(
             claim.record,
             opened.failureCode,
@@ -166,6 +257,14 @@ export class DailyTaskRunner {
             businessDate,
           );
           activeRecordId = undefined;
+          await this.observeDecision(
+            observationContext,
+            friend.id,
+            claim.record.attemptCount,
+            opened.failureCode,
+            failure.decision,
+          );
+          observedOutcome = failure.decision.type === 'RETRY_SCHEDULED' ? 'RETRY_WAIT' : 'FAILED';
           if (failure.stopRun) {
             stopRun = true;
             break;
@@ -174,20 +273,59 @@ export class DailyTaskRunner {
         }
 
         const marked = this.options.sendRecords.markSendActionStarted(claim.record.id, this.now());
+        await this.safeObserve({
+          ...observationContext,
+          friendId: friend.id,
+          attempt: marked.attemptCount,
+          eventType: 'MESSAGE_SENDING',
+          level: 'info',
+        });
+        await this.safeObserve({
+          ...observationContext,
+          friendId: friend.id,
+          attempt: marked.attemptCount,
+          eventType: 'VERIFYING',
+          level: 'info',
+        });
         const result = await this.options.automation.sendAndVerify(friend, marked);
         activeRecordId = undefined;
         if (result.status === 'SUCCESS') {
           this.options.sendRecords.markSuccess(record.id, this.now());
+          await this.safeObserve({
+            ...observationContext,
+            friendId: friend.id,
+            attempt: marked.attemptCount,
+            eventType: 'VERIFY_SUCCESS',
+            level: 'info',
+          });
           continue;
         }
 
+        observedFailure = true;
         const failure = this.applySendFailure(marked, result, schedule, businessDate);
+        await this.observeDecision(
+          observationContext,
+          friend.id,
+          marked.attemptCount,
+          result.failureCode,
+          failure.decision,
+        );
+        observedOutcome = failure.decision.type === 'RETRY_SCHEDULED' ? 'RETRY_WAIT' : 'FAILED';
         if (failure.stopRun) {
           stopRun = true;
           break;
         }
       }
+      observedOutcome = this.resolveAggregate(enabledFriends, businessDate);
     } catch (error) {
+      observedFailure = true;
+      observedOutcome = 'FAILED';
+      await this.safeObserve({
+        ...observationContext,
+        eventType: 'BROWSER_ERROR',
+        level: 'error',
+        errorCode: error instanceof DailyTaskAutomationError ? error.failureCode : 'CONFIG_INVALID',
+      });
       if (activeRecordId !== undefined) {
         const active = this.options.sendRecords.findById(activeRecordId);
         if (active?.status === 'RUNNING') {
@@ -201,7 +339,9 @@ export class DailyTaskRunner {
               error instanceof DailyTaskAutomationError
                 ? error.externalActionState
                 : ('NOT_STARTED' as const);
-            stopRun = this.applyFailure(active, code, state, schedule, businessDate).stopRun;
+            const failure = this.applyFailure(active, code, state, schedule, businessDate);
+            stopRun = failure.stopRun;
+            observedOutcome = failure.decision.type === 'RETRY_SCHEDULED' ? 'RETRY_WAIT' : 'FAILED';
           }
         }
       } else {
@@ -210,6 +350,7 @@ export class DailyTaskRunner {
         throw error;
       }
     } finally {
+      await this.safeFinishRun(observationContext, observedOutcome, observedFailure);
       if (started) await this.options.automation.close();
     }
 
@@ -387,22 +528,78 @@ export class DailyTaskRunner {
     };
   }
 
+  private async observeDecision(
+    context: RuntimeRunContext,
+    friendId: string,
+    attempt: number,
+    failureCode: RetryFailureCode,
+    decision: RetryDecision,
+  ): Promise<void> {
+    const eventType =
+      decision.type === 'RETRY_SCHEDULED'
+        ? 'RETRY_WAIT'
+        : decision.type === 'DELIVERY_UNKNOWN'
+          ? 'DELIVERY_UNKNOWN'
+          : runtimeEventForFailure(failureCode);
+    await this.safeObserve({
+      ...context,
+      friendId,
+      attempt,
+      eventType,
+      level: decision.type === 'RETRY_SCHEDULED' ? 'warn' : 'error',
+      errorCode: failureCode,
+      ...(decision.type === 'RETRY_SCHEDULED' ? { nextRetryAt: decision.nextRetryAt } : {}),
+    });
+  }
+
+  private async safeObserve(event: RuntimeObservation): Promise<void> {
+    try {
+      await this.observer.observe(event);
+    } catch {
+      // Observability must not control send, retry, or idempotency state.
+    }
+  }
+
+  private async safeStartRun(context: RuntimeRunContext): Promise<void> {
+    try {
+      await this.observer.startRun(context);
+    } catch {
+      // Trace startup is evidence-only.
+    }
+  }
+
+  private async safeFinishRun(
+    context: RuntimeRunContext,
+    result: RuntimeRunResult,
+    evidenceFailed: boolean,
+  ): Promise<void> {
+    try {
+      await this.observer.finishRun(context, result, evidenceFailed);
+    } catch {
+      // Trace saving and final runtime evidence are evidence-only.
+    }
+  }
+
   private aggregate(
     dailyRunId: string,
+    friends: readonly { readonly id: string }[],
+    businessDate: BusinessDate,
+  ): DailyTaskRunResult {
+    const result = this.resolveAggregate(friends, businessDate);
+    if (result === 'FAILED') this.options.dailyRuns.markFailed(dailyRunId, this.now());
+    else if (result === 'SUCCESS') this.options.dailyRuns.markSuccess(dailyRunId, this.now());
+    return result;
+  }
+
+  private resolveAggregate(
     friends: readonly { readonly id: string }[],
     businessDate: BusinessDate,
   ): DailyTaskRunResult {
     const records = friends.map((friend) =>
       this.options.sendRecords.findByFriendAndBusinessDate(friend.id, businessDate),
     );
-    if (records.some((record) => record?.status === 'DELIVERY_UNKNOWN')) {
-      this.options.dailyRuns.markFailed(dailyRunId, this.now());
-      return 'FAILED';
-    }
-    if (records.some((record) => record?.status === 'FAILED')) {
-      this.options.dailyRuns.markFailed(dailyRunId, this.now());
-      return 'FAILED';
-    }
+    if (records.some((record) => record?.status === 'DELIVERY_UNKNOWN')) return 'FAILED';
+    if (records.some((record) => record?.status === 'FAILED')) return 'FAILED';
     if (
       records.some(
         (record) =>
@@ -414,7 +611,6 @@ export class DailyTaskRunner {
     ) {
       return 'RETRY_WAIT';
     }
-    this.options.dailyRuns.markSuccess(dailyRunId, this.now());
     return 'SUCCESS';
   }
 
@@ -431,4 +627,26 @@ export class DailyTaskRunner {
       this.options.dailyRuns.markFailed(run.id, this.now());
     }
   }
+}
+
+function runtimeEventForFailure(failureCode: RetryFailureCode): RuntimeObservation['eventType'] {
+  if (failureCode === 'CONTACT_NOT_FOUND') return 'CONTACT_NOT_FOUND';
+  if (failureCode === 'AMBIGUOUS_CONTACT') return 'AMBIGUOUS_CONTACT';
+  if (failureCode === 'SELECTOR_FAILURE') return 'SELECTOR_FAILURE';
+  if (failureCode === 'CONVERSATION_VERIFICATION_FAILED') {
+    return 'CONVERSATION_VERIFICATION_FAILED';
+  }
+  if (failureCode === 'AUTH_EXPIRED') return 'AUTH_EXPIRED';
+  if (failureCode === 'AUTH_UNKNOWN') return 'AUTH_UNKNOWN';
+  if (failureCode === 'DELIVERY_UNKNOWN' || failureCode === 'VERIFY_FAILED') {
+    return 'DELIVERY_UNKNOWN';
+  }
+  if (
+    failureCode === 'BROWSER_TRANSIENT' ||
+    failureCode === 'NETWORK_TRANSIENT' ||
+    failureCode === 'PAGE_LOAD_TIMEOUT'
+  ) {
+    return 'BROWSER_ERROR';
+  }
+  return 'TASK_FAILED';
 }

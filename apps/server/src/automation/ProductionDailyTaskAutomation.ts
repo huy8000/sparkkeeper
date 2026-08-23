@@ -110,6 +110,19 @@ export class ProductionDailyTaskAutomation implements DailyTaskAutomation {
     await this.browser.close();
   }
 
+  async captureScreenshot(absolutePath: string): Promise<void> {
+    await this.browser.getPage().screenshot({ path: absolutePath, fullPage: true });
+  }
+
+  async startTrace(): Promise<void> {
+    await this.browser.getContext().tracing.start({ screenshots: true, snapshots: true });
+  }
+
+  async stopTrace(absolutePath?: string): Promise<void> {
+    if (absolutePath === undefined) await this.browser.getContext().tracing.stop();
+    else await this.browser.getContext().tracing.stop({ path: absolutePath });
+  }
+
   private requireChat(): DouyinChatPage {
     if (this.chat === undefined) throw new Error('Daily task browser is not started.');
     return this.chat;
