@@ -1,14 +1,23 @@
 import { AccountRepository, createDatabase, ScheduleRepository } from '../src/index.js';
 
-const [accountId, startTime, endTime, timezone = 'Asia/Shanghai', enabledValue = 'true'] =
-  process.argv.slice(2);
+const [
+  accountId,
+  startTime,
+  endTime,
+  timezone = 'Asia/Shanghai',
+  enabledValue = 'true',
+  maxAttemptsValue = '3',
+  retryIntervalSecondsValue = '60',
+] = process.argv.slice(2);
 if (accountId === undefined || startTime === undefined || endTime === undefined) {
   throw new Error(
-    'Usage: schedule-configure.ts <account-id> <start-HH:mm> <end-HH:mm> [timezone] [true|false]',
+    'Usage: schedule-configure.ts <account-id> <start-HH:mm> <end-HH:mm> [timezone] [true|false] [max-attempts] [retry-interval-seconds]',
   );
 }
 if (enabledValue !== 'true' && enabledValue !== 'false')
   throw new Error('Schedule enabled value must be true or false.');
+const maxAttempts = Number(maxAttemptsValue);
+const retryIntervalSeconds = Number(retryIntervalSecondsValue);
 
 const client = createDatabase();
 try {
@@ -25,6 +34,8 @@ try {
           endTime,
           timezone,
           enabled: enabledValue === 'true',
+          maxAttempts,
+          retryIntervalSeconds,
           now: new Date(),
         })
       : repository.update(existing.id, {
@@ -32,6 +43,8 @@ try {
           endTime,
           timezone,
           enabled: enabledValue === 'true',
+          maxAttempts,
+          retryIntervalSeconds,
           now: new Date(),
         });
   console.log(JSON.stringify({ scheduleId: schedule?.id, accountId, configured: true }));

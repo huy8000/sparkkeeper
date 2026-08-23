@@ -14,6 +14,8 @@ export const schedules = sqliteTable(
     startTime: text('start_time').$type<ScheduleTime>().notNull(),
     endTime: text('end_time').$type<ScheduleTime>().notNull(),
     timezone: text('timezone').notNull(),
+    maxAttempts: integer('max_attempts').notNull().default(3),
+    retryIntervalSeconds: integer('retry_interval_seconds').notNull().default(60),
     enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
@@ -31,6 +33,11 @@ export const schedules = sqliteTable(
     ),
     check('schedules_window_check', sql`${table.startTime} < ${table.endTime}`),
     check('schedules_timezone_not_empty_check', sql`length(trim(${table.timezone})) > 0`),
+    check('schedules_max_attempts_check', sql`${table.maxAttempts} between 1 and 5`),
+    check(
+      'schedules_retry_interval_seconds_check',
+      sql`${table.retryIntervalSeconds} between 1 and 86400`,
+    ),
   ],
 );
 

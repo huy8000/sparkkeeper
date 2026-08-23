@@ -31,6 +31,8 @@ test('creates and finds a Schedule by id and Account', (context) => {
     now,
   });
   assert.equal(schedule.enabled, true);
+  assert.equal(schedule.maxAttempts, 3);
+  assert.equal(schedule.retryIntervalSeconds, 60);
   assert.equal(repository.findById(schedule.id)?.startTime, '09:00');
   assert.equal(repository.findByAccountId(account.id)?.id, schedule.id);
   assert.equal(schedule.createdAt.getTime(), now.getTime());
@@ -78,6 +80,51 @@ test('updates the complete window, timezone, enabled flag and timestamp', (conte
   assert.equal(updated?.timezone, 'UTC');
   assert.equal(updated?.enabled, false);
   assert.equal(updated?.updatedAt.getTime(), later.getTime());
+});
+
+test('creates and updates bounded retry configuration', (context) => {
+  const { account, repository } = fixture(context);
+  const schedule = repository.create({
+    accountId: account.id,
+    startTime: '09:00',
+    endTime: '10:00',
+    maxAttempts: 5,
+    retryIntervalSeconds: 30,
+    now,
+  });
+  assert.equal(schedule.maxAttempts, 5);
+  assert.equal(schedule.retryIntervalSeconds, 30);
+
+  const updated = repository.update(schedule.id, {
+    maxAttempts: 2,
+    retryIntervalSeconds: 120,
+    now: later,
+  });
+  assert.equal(updated?.maxAttempts, 2);
+  assert.equal(updated?.retryIntervalSeconds, 120);
+});
+
+test('rejects unbounded Attempt and retry interval configuration', (context) => {
+  const { account, repository } = fixture(context);
+  for (const retry of [
+    { maxAttempts: 0 },
+    { maxAttempts: 6 },
+    { retryIntervalSeconds: 0 },
+    { retryIntervalSeconds: 86_401 },
+  ]) {
+    assert.throws(
+      () =>
+        repository.create({
+          accountId: account.id,
+          startTime: '09:00',
+          endTime: '10:00',
+          ...retry,
+          now,
+        }),
+      (error: unknown) =>
+        error instanceof ScheduleRepositoryError && error.code === 'INVALID_RETRY_CONFIG',
+    );
+  }
 });
 
 test('returns undefined for missing find and update', (context) => {
@@ -181,6 +228,6 @@ test('persists Schedule through close, reopen and repeated migrate', (context) =
   temporary.client.close();
   const reopened = createDatabase({ databasePath: temporary.databasePath });
   context.after(() => reopened.close());
-  assert.equal(reopened.migrate().appliedMigrationCount, 5);
+  assert.equal(reopened.migrate().appliedMigrationCount, 6);
   assert.equal(new ScheduleRepository(reopened).findById(schedule.id)?.accountId, account.id);
 });

@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "pnpm --filter @sparkkeeper/shared build && pnpm --filter @sparkkeeper/message-engine build && pnpm --filter @sparkkeeper/database build && pnpm --filter @sparkkeeper/automation build",
     "test": "tsx --test test/*.test.ts",
-    "scheduler:smoke": "pnpm pretest && tsx scripts/scheduler-smoke.ts"
+    "scheduler:smoke": "pnpm pretest && tsx scripts/scheduler-smoke.ts",
+    "retry:smoke": "pnpm pretest && tsx scripts/retry-smoke.ts"
   },
   "dependencies": {
     "@sparkkeeper/automation": "workspace:*",

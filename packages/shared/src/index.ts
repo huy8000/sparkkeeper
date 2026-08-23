@@ -39,7 +39,22 @@ export {
 
 export type DailyRunStatus = 'READY' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'AUTH_EXPIRED';
 
-export type SendRecordStatus = 'READY' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'DELIVERY_UNKNOWN';
+export type SendRecordStatus =
+  'READY' | 'RUNNING' | 'RETRY_WAIT' | 'SUCCESS' | 'FAILED' | 'DELIVERY_UNKNOWN';
+
+export {
+  DEFAULT_MAX_ATTEMPTS,
+  DEFAULT_RETRY_INTERVAL_SECONDS,
+  MAX_MAX_ATTEMPTS,
+  MAX_RETRY_INTERVAL_SECONDS,
+  MIN_MAX_ATTEMPTS,
+  MIN_RETRY_INTERVAL_SECONDS,
+  RetryConfigurationError,
+  validateMaxAttempts,
+  validateRetryIntervalSeconds,
+  type ExternalActionState,
+  type RetryFailureCode,
+} from './Retry.js';
 
 export {
   parseScheduleTime,

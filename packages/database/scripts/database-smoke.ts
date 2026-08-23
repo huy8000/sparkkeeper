@@ -33,7 +33,7 @@ try {
   const firstMigration = client.migrate();
   const firstInspection = client.inspect();
 
-  assert.equal(firstMigration.appliedMigrationCount, 5);
+  assert.equal(firstMigration.appliedMigrationCount, 6);
   assert.equal(firstInspection.pragmas.journalMode, 'wal');
   assert.equal(firstInspection.pragmas.foreignKeys, 1);
 
@@ -126,7 +126,7 @@ try {
   const persistedStatic = reopenedTemplates.findById(staticTemplate.id);
   const persistedRandom = reopenedTemplates.findById(randomTemplate.id);
 
-  assert.equal(secondMigration.appliedMigrationCount, 5);
+  assert.equal(secondMigration.appliedMigrationCount, 6);
   assert.equal(reopenedAccount?.name, 'Test Account');
   assert.equal(reopenedAccount?.loginStatus, 'READY');
   assert.equal(new ScheduleRepository(client).findById(schedule.id)?.startTime, '09:00');

@@ -1,9 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  DEFAULT_MAX_ATTEMPTS,
+  DEFAULT_RETRY_INTERVAL_SECONDS,
   parseScheduleTime,
   resolveBusinessTimeZone,
   ScheduleTimeError,
+  validateMaxAttempts,
+  validateRetryIntervalSeconds,
   validateScheduleWindow,
   type ScheduleTime,
 } from '@sparkkeeper/shared';
@@ -19,6 +23,8 @@ export interface CreateScheduleInput {
   readonly startTime: string;
   readonly endTime: string;
   readonly timezone?: string;
+  readonly maxAttempts?: number;
+  readonly retryIntervalSeconds?: number;
   readonly enabled?: boolean;
   readonly now: Date;
 }
@@ -27,6 +33,8 @@ export interface UpdateScheduleInput {
   readonly startTime?: string;
   readonly endTime?: string;
   readonly timezone?: string;
+  readonly maxAttempts?: number;
+  readonly retryIntervalSeconds?: number;
   readonly enabled?: boolean;
   readonly now: Date;
 }
@@ -36,6 +44,7 @@ export type ScheduleRepositoryErrorCode =
   | 'INVALID_TIME'
   | 'INVALID_WINDOW'
   | 'INVALID_TIMEZONE'
+  | 'INVALID_RETRY_CONFIG'
   | 'INVALID_TIMESTAMP'
   | 'EMPTY_UPDATE'
   | 'DATABASE_OPERATION_FAILED';
@@ -79,6 +88,11 @@ export class ScheduleRepository {
         accountId: input.accountId,
         ...window,
         timezone: validateTimezone(input.timezone, operation),
+        maxAttempts: validateRetryAttempts(input.maxAttempts ?? DEFAULT_MAX_ATTEMPTS, operation),
+        retryIntervalSeconds: validateRetryInterval(
+          input.retryIntervalSeconds ?? DEFAULT_RETRY_INTERVAL_SECONDS,
+          operation,
+        ),
         enabled: input.enabled ?? true,
         createdAt: now,
         updatedAt: now,
@@ -171,6 +185,8 @@ export class ScheduleRepository {
         input.startTime !== undefined ||
         input.endTime !== undefined ||
         input.timezone !== undefined ||
+        input.maxAttempts !== undefined ||
+        input.retryIntervalSeconds !== undefined ||
         input.enabled !== undefined;
       if (!hasMutableField) {
         throw new ScheduleRepositoryError(
@@ -191,6 +207,14 @@ export class ScheduleRepository {
           input.timezone === undefined
             ? existing.timezone
             : validateTimezone(input.timezone, operation),
+        maxAttempts:
+          input.maxAttempts === undefined
+            ? existing.maxAttempts
+            : validateRetryAttempts(input.maxAttempts, operation),
+        retryIntervalSeconds:
+          input.retryIntervalSeconds === undefined
+            ? existing.retryIntervalSeconds
+            : validateRetryInterval(input.retryIntervalSeconds, operation),
         updatedAt: validateTimestamp(input.now, operation),
       };
       if (input.enabled !== undefined) {
@@ -211,6 +235,38 @@ export class ScheduleRepository {
         error,
       );
     }
+  }
+}
+
+function validateRetryAttempts(
+  value: number,
+  operation: ScheduleRepositoryError['operation'],
+): number {
+  try {
+    return validateMaxAttempts(value);
+  } catch (error) {
+    throw new ScheduleRepositoryError(
+      operation,
+      'INVALID_RETRY_CONFIG',
+      'Schedule maxAttempts is outside the supported bounded range.',
+      error,
+    );
+  }
+}
+
+function validateRetryInterval(
+  value: number,
+  operation: ScheduleRepositoryError['operation'],
+): number {
+  try {
+    return validateRetryIntervalSeconds(value);
+  } catch (error) {
+    throw new ScheduleRepositoryError(
+      operation,
+      'INVALID_RETRY_CONFIG',
+      'Schedule retryIntervalSeconds is outside the supported bounded range.',
+      error,
+    );
   }
 }
 
