@@ -377,6 +377,56 @@ export class DatabaseClient {
   }
 }
 
+export class ReadOnlyDatabaseClient {
+  readonly databasePath: string;
+  readonly orm: DatabaseClient['orm'];
+
+  constructor(private readonly client: DatabaseClient) {
+    this.databasePath = client.databasePath;
+    this.orm = client.orm;
+  }
+
+  inspect(): DatabaseInspection {
+    return this.client.inspect();
+  }
+
+  close(): void {
+    this.client.close();
+  }
+
+  isOpen(): boolean {
+    return this.client.isOpen();
+  }
+}
+
+export function openDatabaseReadOnly(
+  options: ResolveDatabasePathOptions = {},
+): ReadOnlyDatabaseClient {
+  const databasePath = resolveDatabasePath(options);
+  let sqlite: BetterSqlite3.Database;
+  try {
+    sqlite = new BetterSqlite3(databasePath, { readonly: true, fileMustExist: true });
+  } catch (error) {
+    throw new DatabaseInitializationError(
+      `Unable to open existing SQLite database read-only at "${databasePath}".`,
+      error,
+    );
+  }
+
+  try {
+    applyReadOnlyPragmas(sqlite);
+    return new ReadOnlyDatabaseClient(
+      new DatabaseClient(databasePath, sqlite, DEFAULT_MIGRATIONS_DIRECTORY),
+    );
+  } catch (error) {
+    sqlite.close();
+    throw new DatabaseInitializationError(
+      `Unable to initialize read-only SQLite database "${databasePath}".`,
+      error,
+    );
+  }
+}
+
 export function createDatabase(options: CreateDatabaseOptions = {}): DatabaseClient {
   const databasePath = resolveDatabasePath(options);
   const migrationsDirectory = path.resolve(
@@ -429,6 +479,24 @@ function applyPragmas(sqlite: BetterSqlite3.Database): void {
   ) {
     throw new DatabaseClientError(
       'SQLite PRAGMA initialization did not produce the required state.',
+    );
+  }
+}
+
+function applyReadOnlyPragmas(sqlite: BetterSqlite3.Database): void {
+  sqlite.pragma('foreign_keys = ON');
+  sqlite.pragma(`busy_timeout = ${DATABASE_BUSY_TIMEOUT_MS}`);
+  sqlite.pragma('synchronous = FULL');
+
+  const state = readPragmaState(sqlite);
+  if (
+    state.journalMode !== 'wal' ||
+    state.foreignKeys !== 1 ||
+    state.busyTimeoutMs !== DATABASE_BUSY_TIMEOUT_MS ||
+    state.synchronous !== DATABASE_SYNCHRONOUS_MODE
+  ) {
+    throw new DatabaseClientError(
+      'Read-only SQLite inspection did not observe the required PRAGMA state.',
     );
   }
 }

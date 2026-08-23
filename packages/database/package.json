@@ -17,6 +17,7 @@
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "db:migrate": "pnpm domain:build && tsx scripts/database-cli.ts migrate",
     "db:smoke": "pnpm domain:build && tsx scripts/database-smoke.ts",
+    "maintenance": "pnpm domain:build && tsx scripts/maintenance-cli.ts",
     "schedule:configure": "pnpm domain:build && tsx scripts/schedule-configure.ts",
     "test": "pnpm domain:build && tsx --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
