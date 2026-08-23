@@ -1,0 +1,285 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "a8c0aad2-4d46-47b8-a277-ed35f2c3dd82",
+  "prevId": "8cd82b0a-afa6-4cbf-b507-33b1d5c32da0",
+  "tables": {
+    "accounts": {
+      "name": "accounts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "login_status": {
+          "name": "login_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'UNKNOWN'"
+        },
+        "last_login_at": {
+          "name": "last_login_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "accounts_login_status_check": {
+          "name": "accounts_login_status_check",
+          "value": "\"accounts\".\"login_status\" in ('READY', 'AUTH_EXPIRED', 'UNKNOWN')"
+        },
+        "accounts_name_not_empty_check": {
+          "name": "accounts_name_not_empty_check",
+          "value": "length(trim(\"accounts\".\"name\")) > 0"
+        }
+      }
+    },
+    "friends": {
+      "name": "friends",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "remark_name": {
+          "name": "remark_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "short_id": {
+          "name": "short_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "unique_id": {
+          "name": "unique_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sec_uid": {
+          "name": "sec_uid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "match_field": {
+          "name": "match_field",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "match_key": {
+          "name": "match_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "friends_account_id_idx": {
+          "name": "friends_account_id_idx",
+          "columns": ["account_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "friends_account_id_accounts_id_fk": {
+          "name": "friends_account_id_accounts_id_fk",
+          "tableFrom": "friends",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "friends_display_name_not_empty_check": {
+          "name": "friends_display_name_not_empty_check",
+          "value": "length(trim(\"friends\".\"display_name\")) > 0"
+        },
+        "friends_match_key_not_empty_check": {
+          "name": "friends_match_key_not_empty_check",
+          "value": "length(\"friends\".\"match_key\") > 0"
+        },
+        "friends_match_field_check": {
+          "name": "friends_match_field_check",
+          "value": "\"friends\".\"match_field\" in ('displayName', 'remarkName', 'shortId', 'uniqueId', 'secUid')"
+        },
+        "friends_match_consistency_check": {
+          "name": "friends_match_consistency_check",
+          "value": "case \"friends\".\"match_field\"\n        when 'displayName' then \"friends\".\"match_key\" = trim(\"friends\".\"display_name\")\n        when 'remarkName' then \"friends\".\"remark_name\" is not null and \"friends\".\"match_key\" = trim(\"friends\".\"remark_name\")\n        when 'shortId' then \"friends\".\"short_id\" is not null and \"friends\".\"match_key\" = trim(\"friends\".\"short_id\")\n        when 'uniqueId' then \"friends\".\"unique_id\" is not null and \"friends\".\"match_key\" = trim(\"friends\".\"unique_id\")\n        when 'secUid' then \"friends\".\"sec_uid\" is not null and \"friends\".\"match_key\" = trim(\"friends\".\"sec_uid\")\n        else 0\n      end"
+        }
+      }
+    },
+    "message_templates": {
+      "name": "message_templates",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider_type": {
+          "name": "provider_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "message_templates_name_not_empty_check": {
+          "name": "message_templates_name_not_empty_check",
+          "value": "length(trim(\"message_templates\".\"name\")) > 0"
+        },
+        "message_templates_provider_type_check": {
+          "name": "message_templates_provider_type_check",
+          "value": "\"message_templates\".\"provider_type\" in ('STATIC', 'RANDOM')"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

@@ -2,7 +2,7 @@
   "name": "@sparkkeeper/database",
   "version": "0.0.0",
   "private": true,
-  "description": "SparkKeeper SQLite persistence foundation",
+  "description": "SparkKeeper SQLite persistence and repositories",
   "type": "module",
   "exports": {
     ".": {
@@ -12,14 +12,16 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "db:check": "tsx scripts/database-cli.ts check",
+    "domain:build": "pnpm --filter @sparkkeeper/message-engine build",
+    "db:check": "pnpm domain:build && tsx scripts/database-cli.ts check",
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
-    "db:migrate": "tsx scripts/database-cli.ts migrate",
-    "db:smoke": "tsx scripts/database-smoke.ts",
-    "test": "tsx --test test/*.test.ts",
+    "db:migrate": "pnpm domain:build && tsx scripts/database-cli.ts migrate",
+    "db:smoke": "pnpm domain:build && tsx scripts/database-smoke.ts",
+    "test": "pnpm domain:build && tsx --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@sparkkeeper/message-engine": "workspace:*",
     "@sparkkeeper/shared": "workspace:*",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.2"

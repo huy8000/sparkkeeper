@@ -44,14 +44,27 @@ export {
   type CreateFriendInput,
   type Friend,
   type UpdateFriendInput,
+  MessageTemplateDataError,
+  MessageTemplateRepository,
+  MessageTemplateRepositoryError,
+  type CreateMessageTemplateInput,
+  type UpdateMessageTemplateInput,
 } from './repositories/index.js';
 export {
   accounts,
   friends,
   LOGIN_STATUSES,
+  messageTemplates,
   type AccountRow,
   type FriendRow,
   type NewAccountRow,
   type NewFriendRow,
+  type MessageTemplateRow,
+  type NewMessageTemplateRow,
 } from './schema/index.js';
-export type { FriendIdentity, FriendMatchField } from '@sparkkeeper/shared';
+export type {
+  FriendIdentity,
+  FriendMatchField,
+  MessageProviderType,
+  MessageTemplate,
+} from '@sparkkeeper/shared';

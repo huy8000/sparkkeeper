@@ -12,3 +12,10 @@ export {
   type Friend,
   type UpdateFriendInput,
 } from './FriendRepository.js';
+export {
+  MessageTemplateDataError,
+  MessageTemplateRepository,
+  MessageTemplateRepositoryError,
+  type CreateMessageTemplateInput,
+  type UpdateMessageTemplateInput,
+} from './MessageTemplateRepository.js';

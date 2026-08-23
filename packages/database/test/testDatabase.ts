@@ -36,23 +36,37 @@ export function createTemporaryDatabase(
 }
 
 export function createV1OneDatabase(context: TestContext): TemporaryDatabase {
-  const directory = mkdtempSync(path.join(tmpdir(), 'sparkkeeper-v1-one-database-test-'));
+  return createHistoricalDatabase(context, 'v1-one', 1);
+}
+
+export function createV1TwoDatabase(context: TestContext): TemporaryDatabase {
+  return createHistoricalDatabase(context, 'v1-two', 2);
+}
+
+function createHistoricalDatabase(
+  context: TestContext,
+  label: string,
+  migrationCount: number,
+): TemporaryDatabase {
+  const directory = mkdtempSync(path.join(tmpdir(), `sparkkeeper-${label}-database-test-`));
   const databasePath = path.join(directory, 'sparkkeeper.db');
-  const migrationsDirectory = path.join(directory, 'v1-one-migrations');
+  const migrationsDirectory = path.join(directory, `${label}-migrations`);
   const metadataDirectory = path.join(migrationsDirectory, 'meta');
   mkdirSync(metadataDirectory, { recursive: true });
 
-  copyFileSync(
-    path.join(DEFAULT_MIGRATIONS_DIRECTORY, '0000_secret_redwing.sql'),
-    path.join(migrationsDirectory, '0000_secret_redwing.sql'),
-  );
-
   const journal = JSON.parse(
     readFileSync(path.join(DEFAULT_MIGRATIONS_DIRECTORY, 'meta', '_journal.json'), 'utf8'),
-  ) as { entries: unknown[] };
+  ) as { entries: Array<{ tag: string }> };
+  const entries = journal.entries.slice(0, migrationCount);
+  for (const entry of entries) {
+    copyFileSync(
+      path.join(DEFAULT_MIGRATIONS_DIRECTORY, `${entry.tag}.sql`),
+      path.join(migrationsDirectory, `${entry.tag}.sql`),
+    );
+  }
   writeFileSync(
     path.join(metadataDirectory, '_journal.json'),
-    `${JSON.stringify({ ...journal, entries: journal.entries.slice(0, 1) }, null, 2)}\n`,
+    `${JSON.stringify({ ...journal, entries }, null, 2)}\n`,
   );
 
   const sqlite = new BetterSqlite3(databasePath);

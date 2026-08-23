@@ -26,10 +26,15 @@ try {
       appliedMigrationCount: inspection.appliedMigrationCount,
       accountsSchemaCompatible: inspection.accountsSchemaCompatible,
       friendsSchemaCompatible: inspection.friendsSchemaCompatible,
+      messageTemplatesSchemaCompatible: inspection.messageTemplatesSchemaCompatible,
     }),
   );
 
-  if (!inspection.accountsSchemaCompatible || !inspection.friendsSchemaCompatible) {
+  if (
+    !inspection.accountsSchemaCompatible ||
+    !inspection.friendsSchemaCompatible ||
+    !inspection.messageTemplatesSchemaCompatible
+  ) {
     process.exitCode = 1;
   }
 } finally {

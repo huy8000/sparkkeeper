@@ -15,6 +15,13 @@
       "when": 1787460199268,
       "tag": "0001_fresh_king_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787461817894,
+      "tag": "0002_remarkable_fallen_one",
+      "breakpoints": true
     }
   ]
 }
