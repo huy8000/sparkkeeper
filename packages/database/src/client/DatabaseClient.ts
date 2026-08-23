@@ -49,11 +49,13 @@ export interface DatabaseInspection {
   readonly friendColumns: readonly DatabaseColumnState[];
   readonly messageTemplateColumns: readonly DatabaseColumnState[];
   readonly sendRecordColumns: readonly DatabaseColumnState[];
+  readonly scheduleColumns: readonly DatabaseColumnState[];
   readonly accountsSchemaCompatible: boolean;
   readonly dailyRunsSchemaCompatible: boolean;
   readonly friendsSchemaCompatible: boolean;
   readonly messageTemplatesSchemaCompatible: boolean;
   readonly sendRecordsSchemaCompatible: boolean;
+  readonly schedulesSchemaCompatible: boolean;
 }
 
 export interface DatabaseMigrationResult {
@@ -63,6 +65,7 @@ export interface DatabaseMigrationResult {
   readonly friendsSchemaVerified: true;
   readonly messageTemplatesSchemaVerified: true;
   readonly sendRecordsSchemaVerified: true;
+  readonly schedulesSchemaVerified: true;
 }
 
 interface SqliteCountRow {
@@ -140,6 +143,17 @@ const EXPECTED_SEND_RECORD_COLUMNS: readonly DatabaseColumnState[] = [
   { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
 ];
 
+const EXPECTED_SCHEDULE_COLUMNS: readonly DatabaseColumnState[] = [
+  { name: 'id', type: 'TEXT', notNull: true, primaryKey: true },
+  { name: 'account_id', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'start_time', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'end_time', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'timezone', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'enabled', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'created_at', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
+];
+
 export class DatabaseClient {
   readonly databasePath: string;
   readonly orm: BetterSQLite3Database<typeof schema>;
@@ -173,7 +187,8 @@ export class DatabaseClient {
       !inspection.dailyRunsSchemaCompatible ||
       !inspection.friendsSchemaCompatible ||
       !inspection.messageTemplatesSchemaCompatible ||
-      !inspection.sendRecordsSchemaCompatible
+      !inspection.sendRecordsSchemaCompatible ||
+      !inspection.schedulesSchemaCompatible
     ) {
       throw new DatabaseSchemaError(
         'Database migrations completed, but the database tables are incompatible with the Drizzle schema.',
@@ -187,6 +202,7 @@ export class DatabaseClient {
       friendsSchemaVerified: true,
       messageTemplatesSchemaVerified: true,
       sendRecordsSchemaVerified: true,
+      schedulesSchemaVerified: true,
     };
   }
 
@@ -208,6 +224,7 @@ export class DatabaseClient {
     const sendRecordColumns = tableNames.includes('send_records')
       ? this.readSendRecordColumns()
       : [];
+    const scheduleColumns = tableNames.includes('schedules') ? this.readScheduleColumns() : [];
 
     return {
       databasePath: this.databasePath,
@@ -221,11 +238,13 @@ export class DatabaseClient {
       friendColumns,
       messageTemplateColumns,
       sendRecordColumns,
+      scheduleColumns,
       accountsSchemaCompatible: accountColumnsMatch(accountColumns),
       dailyRunsSchemaCompatible: dailyRunColumnsMatch(dailyRunColumns),
       friendsSchemaCompatible: friendColumnsMatch(friendColumns),
       messageTemplatesSchemaCompatible: messageTemplateColumnsMatch(messageTemplateColumns),
       sendRecordsSchemaCompatible: sendRecordColumnsMatch(sendRecordColumns),
+      schedulesSchemaCompatible: scheduleColumnsMatch(scheduleColumns),
     };
   }
 
@@ -297,6 +316,16 @@ export class DatabaseClient {
 
   private readSendRecordColumns(): DatabaseColumnState[] {
     const rows = this.sqlite.pragma('table_info(send_records)') as SqliteTableInfoRow[];
+    return rows.map((row) => ({
+      name: row.name,
+      type: row.type.toUpperCase(),
+      notNull: row.notnull === 1,
+      primaryKey: row.pk === 1,
+    }));
+  }
+
+  private readScheduleColumns(): DatabaseColumnState[] {
+    const rows = this.sqlite.pragma('table_info(schedules)') as SqliteTableInfoRow[];
     return rows.map((row) => ({
       name: row.name,
       type: row.type.toUpperCase(),
@@ -389,6 +418,10 @@ function messageTemplateColumnsMatch(actual: readonly DatabaseColumnState[]): bo
 
 function sendRecordColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
   return columnsMatch(actual, EXPECTED_SEND_RECORD_COLUMNS);
+}
+
+function scheduleColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
+  return columnsMatch(actual, EXPECTED_SCHEDULE_COLUMNS);
 }
 
 function columnsMatch(

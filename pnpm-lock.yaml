@@ -51,7 +51,20 @@ importers:
         specifier: ^3.5.20
         version: 3.5.41(typescript@5.9.2)
 
-  apps/server: {}
+  apps/server:
+    dependencies:
+      '@sparkkeeper/automation':
+        specifier: workspace:*
+        version: link:../../packages/automation
+      '@sparkkeeper/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@sparkkeeper/message-engine':
+        specifier: workspace:*
+        version: link:../../packages/message-engine
+      '@sparkkeeper/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
 
   packages/automation:
     dependencies:

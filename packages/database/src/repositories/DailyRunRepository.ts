@@ -19,6 +19,11 @@ export interface CreateOrGetDailyRunInput {
   readonly now: Date;
 }
 
+export type ClaimDailyRunResult =
+  | { readonly type: 'CLAIMED'; readonly run: DailyRun }
+  | { readonly type: 'NOT_CLAIMABLE'; readonly run: DailyRun }
+  | { readonly type: 'NOT_FOUND' };
+
 export type DailyRunRepositoryErrorCode =
   | 'INVALID_BUSINESS_DATE'
   | 'INVALID_TIMESTAMP'
@@ -34,6 +39,7 @@ export class DailyRunRepositoryError extends Error {
       | 'findByAccountAndBusinessDate'
       | 'listByAccountId'
       | 'markRunning'
+      | 'claimForExecution'
       | 'markSuccess'
       | 'markFailed'
       | 'markAuthExpired',
@@ -151,6 +157,33 @@ export class DailyRunRepository {
 
   markRunning(id: string, now: Date): DailyRun {
     return this.transition(id, 'RUNNING', ['READY'], now, 'markRunning');
+  }
+
+  claimForExecution(id: string, timestamp: Date): ClaimDailyRunResult {
+    const operation = 'claimForExecution' as const;
+    try {
+      const now = validateTimestamp(timestamp, operation);
+      const claimed = this.client.orm
+        .update(dailyRuns)
+        .set({ status: 'RUNNING', startedAt: now, updatedAt: now })
+        .where(and(eq(dailyRuns.id, id), eq(dailyRuns.status, 'READY')))
+        .returning()
+        .get();
+      if (claimed !== undefined) {
+        return { type: 'CLAIMED', run: claimed };
+      }
+      const existing = this.client.orm.select().from(dailyRuns).where(eq(dailyRuns.id, id)).get();
+      return existing === undefined
+        ? { type: 'NOT_FOUND' }
+        : { type: 'NOT_CLAIMABLE', run: existing };
+    } catch (error) {
+      throw dailyRunError(
+        operation,
+        'DATABASE_OPERATION_FAILED',
+        'Failed to claim daily run.',
+        error,
+      );
+    }
   }
 
   markSuccess(id: string, now: Date): DailyRun {
