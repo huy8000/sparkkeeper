@@ -34,8 +34,8 @@ const fixedNow = new Date('2026-08-23T01:30:00.000Z'); // 09:30 Asia/Shanghai
 
 class FakeAutomation implements DailyTaskAutomation {
   auth: AutomationAuthResult = 'READY';
-  open: ContactOpenResult = 'VERIFIED';
-  send: AutomationSendResult = { status: 'SUCCESS', sendAttemptCount: 1 };
+  open: ContactOpenResult = { status: 'VERIFIED' };
+  send: AutomationSendResult = { status: 'SUCCESS', sendAction: 'TRIGGERED' };
   starts = 0;
   closes = 0;
   opens: string[] = [];
@@ -171,7 +171,7 @@ test('scheduler config requires explicit Account and real-send Template', () => 
   assert.throws(() => resolveSchedulerConfig({ SCHEDULER_ENABLED: 'yes' }), /true or false/);
 });
 
-test('scheduler triggers once per business date and ignores repeated ticks', async () => {
+test('scheduler delegates every in-window tick so persisted retry state can decide actionability', async () => {
   let calls = 0;
   const schedule = {
     accountId: 'account',
@@ -191,8 +191,8 @@ test('scheduler triggers once per business date and ignores repeated ticks', asy
     { now: () => fixedNow },
   );
   assert.equal(await scheduler.tick(), 'TRIGGERED');
-  assert.equal(await scheduler.tick(), 'SKIPPED');
-  assert.equal(calls, 1);
+  assert.equal(await scheduler.tick(), 'TRIGGERED');
+  assert.equal(calls, 2);
 });
 
 test('scheduler skips missing, disabled and out-of-window schedules', async () => {
@@ -338,7 +338,7 @@ test('DailyTaskRunner skips a completed DailyRun without browser startup', async
   const fixture = runnerFixture(context, 0);
   assert.equal(await fixture.runner.run(fixture.account.id, businessDate), 'SUCCESS');
   assert.equal(await fixture.runner.run(fixture.account.id, businessDate), 'SKIPPED');
-  assert.equal(fixture.automation.starts, 1);
+  assert.equal(fixture.automation.starts, 0);
 });
 
 test('DailyTaskRunner rejects unauthorized execution before browser startup', async (context) => {
@@ -381,7 +381,7 @@ test('UNKNOWN auth fails DailyRun without resolving or sending', async (context)
 
 test('contact resolution failure marks snapshot FAILED before any send', async (context) => {
   const fixture = runnerFixture(context, 1);
-  fixture.automation.open = 'AMBIGUOUS';
+  fixture.automation.open = { status: 'FAILED', failureCode: 'AMBIGUOUS_CONTACT' };
   assert.equal(await fixture.runner.run(fixture.account.id, businessDate), 'FAILED');
   const records = fixture.sendRecords.listByFriendId(
     fixture.friends.listByAccountId(fixture.account.id)[0]!.id,
@@ -392,7 +392,11 @@ test('contact resolution failure marks snapshot FAILED before any send', async (
 
 test('DELIVERY_UNKNOWN stops later Friends and is never retried', async (context) => {
   const fixture = runnerFixture(context);
-  fixture.automation.send = { status: 'DELIVERY_UNKNOWN', sendAttemptCount: 1 };
+  fixture.automation.send = {
+    status: 'DELIVERY_UNKNOWN',
+    failureCode: 'DELIVERY_UNKNOWN',
+    sendAction: 'TRIGGERED',
+  };
   assert.equal(await fixture.runner.run(fixture.account.id, businessDate), 'FAILED');
   assert.equal(fixture.automation.sends.length, 1);
   assert.equal(
@@ -403,7 +407,7 @@ test('DELIVERY_UNKNOWN stops later Friends and is never retried', async (context
   );
 });
 
-test('RUNNING SendRecord recovery is blocked and other Friends continue safely', async (context) => {
+test('RUNNING SendRecord before the action boundary recovers while other Friends continue safely', async (context) => {
   const fixture = runnerFixture(context);
   const run = fixture.dailyRuns.createOrGet({
     accountId: fixture.account.id,
@@ -423,8 +427,8 @@ test('RUNNING SendRecord recovery is blocked and other Friends continue safely',
     now: fixedNow,
   });
   fixture.sendRecords.claimForExecution(prepared.record.id, fixedNow);
-  assert.equal(await fixture.runner.run(fixture.account.id, businessDate), 'FAILED');
-  assert.equal(fixture.sendRecords.findById(prepared.record.id)?.status, 'RUNNING');
+  assert.equal(await fixture.runner.run(fixture.account.id, businessDate), 'RETRY_WAIT');
+  assert.equal(fixture.sendRecords.findById(prepared.record.id)?.status, 'RETRY_WAIT');
   assert.deepEqual(fixture.automation.sends, [`${remaining.displayName}:Hello`]);
 });
 
@@ -640,7 +644,7 @@ test('new Scheduler instance same day reconstructs SUCCESS without sending', asy
   const restarted = new TaskScheduler(fixture.account.id, fixture.schedules, fixture.runner, {
     now: () => fixedNow,
   });
-  assert.equal(await restarted.tick(), 'TRIGGERED');
+  assert.equal(await restarted.tick(), 'SKIPPED');
   assert.equal(fixture.automation.sends.length, sends);
   assert.equal(fixture.dailyRuns.listByAccountId(fixture.account.id).length, 1);
 });
@@ -710,8 +714,21 @@ test('existing FAILED is not retried while safe remaining Friends continue', asy
 test('next businessDate creates a new DailyRun and send eligibility', async (context) => {
   const fixture = runnerFixture(context, 1);
   assert.equal(await fixture.runner.run(fixture.account.id, businessDate), 'SUCCESS');
+  const nextRunner = new DailyTaskRunner({
+    accountId: fixture.account.id,
+    messageTemplateId: fixture.template.id,
+    allowRealSend: true,
+    automation: fixture.automation,
+    accounts: fixture.accounts,
+    schedules: fixture.schedules,
+    friends: fixture.friends,
+    templates: fixture.templates,
+    dailyRuns: fixture.dailyRuns,
+    sendRecords: fixture.sendRecords,
+    now: () => new Date('2026-08-24T01:30:00.000Z'),
+  });
   assert.equal(
-    await fixture.runner.run(fixture.account.id, parseBusinessDate('2026-08-24')),
+    await nextRunner.run(fixture.account.id, parseBusinessDate('2026-08-24')),
     'SUCCESS',
   );
   assert.equal(fixture.dailyRuns.listByAccountId(fixture.account.id).length, 2);

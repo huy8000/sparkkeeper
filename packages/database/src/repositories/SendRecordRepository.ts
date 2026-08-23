@@ -2,11 +2,14 @@ import { randomUUID } from 'node:crypto';
 
 import {
   BusinessDateError,
+  DEFAULT_MAX_ATTEMPTS,
   parseBusinessDate,
+  validateMaxAttempts,
   type BusinessDate,
+  type RetryFailureCode,
   type SendRecordStatus,
 } from '@sparkkeeper/shared';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, lt, lte, sql } from 'drizzle-orm';
 
 import type { DatabaseClient } from '../client/DatabaseClient.js';
 import {
@@ -38,6 +41,25 @@ export type ClaimSendRecordResult =
   | { readonly type: 'NOT_CLAIMABLE'; readonly record: SendRecord }
   | { readonly type: 'NOT_FOUND' };
 
+export interface ScheduleRetryInput {
+  readonly failureCode: RetryFailureCode;
+  readonly maxAttempts: number;
+  readonly nextRetryAt: Date;
+  readonly now: Date;
+  readonly externalActionConfirmedAbsent: true;
+}
+
+export interface RecoverInterruptedBeforeSendInput {
+  readonly maxAttempts: number;
+  readonly nextRetryAt: Date;
+  readonly now: Date;
+}
+
+export type InterruptedRecoveryResult =
+  | { readonly type: 'RECOVERED'; readonly record: SendRecord }
+  | { readonly type: 'NOT_RECOVERABLE'; readonly record: SendRecord }
+  | { readonly type: 'NOT_FOUND' };
+
 export type SendRecordRepositoryErrorCode =
   | 'INVALID_BUSINESS_DATE'
   | 'INVALID_TIMESTAMP'
@@ -59,9 +81,17 @@ export class SendRecordRepositoryError extends Error {
       | 'findByFriendAndBusinessDate'
       | 'listByDailyRunId'
       | 'listByFriendId'
+      | 'listDueRetriesByDailyRunId'
       | 'claimForExecution'
+      | 'claimInitialAttempt'
+      | 'claimRetryAttempt'
+      | 'scheduleRetry'
+      | 'markSendActionStarted'
+      | 'recoverInterruptedBeforeSend'
+      | 'recoverInterruptedAfterSendBoundary'
       | 'markSuccess'
       | 'markFailed'
+      | 'markFinalFailed'
       | 'markFailedBeforeSend'
       | 'markDeliveryUnknown',
     readonly code: SendRecordRepositoryErrorCode,
@@ -254,14 +284,58 @@ export class SendRecordRepository {
     }
   }
 
-  claimForExecution(id: string, timestamp: Date): ClaimSendRecordResult {
-    const operation = 'claimForExecution' as const;
+  listDueRetriesByDailyRunId(dailyRunId: string, timestamp: Date): SendRecord[] {
+    const operation = 'listDueRetriesByDailyRunId' as const;
     try {
       const now = validateTimestamp(timestamp, operation);
+      return this.client.orm
+        .select()
+        .from(sendRecords)
+        .where(
+          and(
+            eq(sendRecords.dailyRunId, dailyRunId),
+            eq(sendRecords.status, 'RETRY_WAIT'),
+            lte(sendRecords.nextRetryAt, now),
+          ),
+        )
+        .orderBy(asc(sendRecords.nextRetryAt), asc(sendRecords.createdAt), asc(sendRecords.id))
+        .all();
+    } catch (error) {
+      throw sendRecordError(
+        operation,
+        'DATABASE_OPERATION_FAILED',
+        'Failed to list due SendRecord retries.',
+        error,
+      );
+    }
+  }
+
+  claimForExecution(id: string, timestamp: Date): ClaimSendRecordResult {
+    return this.claimInitialAttempt(id, timestamp, DEFAULT_MAX_ATTEMPTS);
+  }
+
+  claimInitialAttempt(id: string, timestamp: Date, maxAttempts: number): ClaimSendRecordResult {
+    const operation = 'claimInitialAttempt' as const;
+    try {
+      const now = validateTimestamp(timestamp, operation);
+      const attemptLimit = validateMaxAttempts(maxAttempts);
       const claimed = this.client.orm
         .update(sendRecords)
-        .set({ status: 'RUNNING', startedAt: now, updatedAt: now })
-        .where(and(eq(sendRecords.id, id), eq(sendRecords.status, 'READY')))
+        .set({
+          status: 'RUNNING',
+          attemptCount: sql`${sendRecords.attemptCount} + 1`,
+          nextRetryAt: null,
+          sendActionStartedAt: null,
+          startedAt: now,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(sendRecords.id, id),
+            eq(sendRecords.status, 'READY'),
+            lt(sendRecords.attemptCount, attemptLimit),
+          ),
+        )
         .returning()
         .get();
       if (claimed !== undefined) {
@@ -280,7 +354,241 @@ export class SendRecordRepository {
       throw sendRecordError(
         operation,
         'DATABASE_OPERATION_FAILED',
-        'Failed to claim send record.',
+        'Failed to claim initial SendRecord Attempt.',
+        error,
+      );
+    }
+  }
+
+  claimRetryAttempt(id: string, timestamp: Date, maxAttempts: number): ClaimSendRecordResult {
+    const operation = 'claimRetryAttempt' as const;
+    try {
+      const now = validateTimestamp(timestamp, operation);
+      const attemptLimit = validateMaxAttempts(maxAttempts);
+      const claimed = this.client.orm
+        .update(sendRecords)
+        .set({
+          status: 'RUNNING',
+          attemptCount: sql`${sendRecords.attemptCount} + 1`,
+          nextRetryAt: null,
+          sendActionStartedAt: null,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(sendRecords.id, id),
+            eq(sendRecords.status, 'RETRY_WAIT'),
+            lte(sendRecords.nextRetryAt, now),
+            lt(sendRecords.attemptCount, attemptLimit),
+          ),
+        )
+        .returning()
+        .get();
+      if (claimed !== undefined) {
+        return { type: 'CLAIMED', record: claimed };
+      }
+      const existing = this.client.orm
+        .select()
+        .from(sendRecords)
+        .where(eq(sendRecords.id, id))
+        .get();
+      return existing === undefined
+        ? { type: 'NOT_FOUND' }
+        : { type: 'NOT_CLAIMABLE', record: existing };
+    } catch (error) {
+      throw sendRecordError(
+        operation,
+        'DATABASE_OPERATION_FAILED',
+        'Failed to claim due SendRecord retry Attempt.',
+        error,
+      );
+    }
+  }
+
+  scheduleRetry(id: string, input: ScheduleRetryInput): SendRecord {
+    const operation = 'scheduleRetry' as const;
+    try {
+      const now = validateTimestamp(input.now, operation);
+      const nextRetryAt = validateTimestamp(input.nextRetryAt, operation);
+      const attemptLimit = validateMaxAttempts(input.maxAttempts);
+      if (input.externalActionConfirmedAbsent !== true) {
+        throw new SendRecordRepositoryError(
+          operation,
+          'INVALID_STATE_TRANSITION',
+          'Retry scheduling requires explicit proof that no uncertain external action occurred.',
+        );
+      }
+      if (nextRetryAt.getTime() <= now.getTime()) {
+        throw new SendRecordRepositoryError(
+          operation,
+          'INVALID_TIMESTAMP',
+          'SendRecord nextRetryAt must be later than the scheduling timestamp.',
+        );
+      }
+      const updated = this.client.orm
+        .update(sendRecords)
+        .set({
+          status: 'RETRY_WAIT',
+          nextRetryAt,
+          finishedAt: null,
+          lastErrorCode: input.failureCode,
+          sendActionStartedAt: null,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(sendRecords.id, id),
+            eq(sendRecords.status, 'RUNNING'),
+            lt(sendRecords.attemptCount, attemptLimit),
+          ),
+        )
+        .returning()
+        .get();
+      return updated ?? this.throwTransitionError(id, 'RETRY_WAIT', operation);
+    } catch (error) {
+      throw sendRecordError(
+        operation,
+        'DATABASE_OPERATION_FAILED',
+        'Failed to schedule SendRecord retry.',
+        error,
+      );
+    }
+  }
+
+  markSendActionStarted(id: string, timestamp: Date): SendRecord {
+    const operation = 'markSendActionStarted' as const;
+    try {
+      const now = validateTimestamp(timestamp, operation);
+      const updated = this.client.orm
+        .update(sendRecords)
+        .set({ sendActionStartedAt: now, updatedAt: now })
+        .where(
+          and(
+            eq(sendRecords.id, id),
+            eq(sendRecords.status, 'RUNNING'),
+            sql`${sendRecords.sendActionStartedAt} is null`,
+          ),
+        )
+        .returning()
+        .get();
+      if (updated !== undefined) {
+        return updated;
+      }
+      const existing = this.client.orm
+        .select()
+        .from(sendRecords)
+        .where(eq(sendRecords.id, id))
+        .get();
+      if (existing?.status === 'RUNNING' && existing.sendActionStartedAt !== null) {
+        return existing;
+      }
+      return this.throwTransitionError(id, 'RUNNING', operation);
+    } catch (error) {
+      throw sendRecordError(
+        operation,
+        'DATABASE_OPERATION_FAILED',
+        'Failed to persist the SendRecord external-action boundary.',
+        error,
+      );
+    }
+  }
+
+  recoverInterruptedBeforeSend(
+    id: string,
+    input: RecoverInterruptedBeforeSendInput,
+  ): InterruptedRecoveryResult {
+    const operation = 'recoverInterruptedBeforeSend' as const;
+    try {
+      const now = validateTimestamp(input.now, operation);
+      const nextRetryAt = validateTimestamp(input.nextRetryAt, operation);
+      const attemptLimit = validateMaxAttempts(input.maxAttempts);
+      if (nextRetryAt.getTime() <= now.getTime()) {
+        throw new SendRecordRepositoryError(
+          operation,
+          'INVALID_TIMESTAMP',
+          'Interrupted Attempt recovery requires a future retry timestamp.',
+        );
+      }
+      const recovered = this.client.orm
+        .update(sendRecords)
+        .set({
+          status: 'RETRY_WAIT',
+          nextRetryAt,
+          lastErrorCode: 'PROCESS_INTERRUPTED_BEFORE_SEND',
+          sendActionStartedAt: null,
+          finishedAt: null,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(sendRecords.id, id),
+            eq(sendRecords.status, 'RUNNING'),
+            isNull(sendRecords.sendActionStartedAt),
+            lt(sendRecords.attemptCount, attemptLimit),
+          ),
+        )
+        .returning()
+        .get();
+      if (recovered !== undefined) {
+        return { type: 'RECOVERED', record: recovered };
+      }
+      const existing = this.client.orm
+        .select()
+        .from(sendRecords)
+        .where(eq(sendRecords.id, id))
+        .get();
+      return existing === undefined
+        ? { type: 'NOT_FOUND' }
+        : { type: 'NOT_RECOVERABLE', record: existing };
+    } catch (error) {
+      throw sendRecordError(
+        operation,
+        'DATABASE_OPERATION_FAILED',
+        'Failed to recover interrupted pre-send Attempt.',
+        error,
+      );
+    }
+  }
+
+  recoverInterruptedAfterSendBoundary(id: string, timestamp: Date): SendRecord {
+    const operation = 'recoverInterruptedAfterSendBoundary' as const;
+    try {
+      const now = validateTimestamp(timestamp, operation);
+      const recovered = this.client.orm
+        .update(sendRecords)
+        .set({
+          status: 'DELIVERY_UNKNOWN',
+          nextRetryAt: null,
+          lastErrorCode: 'DELIVERY_UNKNOWN',
+          finishedAt: now,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(sendRecords.id, id),
+            eq(sendRecords.status, 'RUNNING'),
+            isNotNull(sendRecords.sendActionStartedAt),
+          ),
+        )
+        .returning()
+        .get();
+      if (recovered !== undefined) {
+        return recovered;
+      }
+      const existing = this.client.orm
+        .select()
+        .from(sendRecords)
+        .where(eq(sendRecords.id, id))
+        .get();
+      if (existing?.status === 'DELIVERY_UNKNOWN') {
+        return existing;
+      }
+      return this.throwTransitionError(id, 'DELIVERY_UNKNOWN', operation);
+    } catch (error) {
+      throw sendRecordError(
+        operation,
+        'DATABASE_OPERATION_FAILED',
+        'Failed to recover interrupted post-boundary Attempt.',
         error,
       );
     }
@@ -292,6 +600,44 @@ export class SendRecordRepository {
 
   markFailed(id: string, now: Date): SendRecord {
     return this.markTerminal(id, 'FAILED', now, 'markFailed');
+  }
+
+  markFinalFailed(id: string, timestamp: Date, failureCode: RetryFailureCode): SendRecord {
+    const operation = 'markFinalFailed' as const;
+    try {
+      const now = validateTimestamp(timestamp, operation);
+      const updated = this.client.orm
+        .update(sendRecords)
+        .set({
+          status: 'FAILED',
+          nextRetryAt: null,
+          lastErrorCode: failureCode,
+          finishedAt: now,
+          updatedAt: now,
+        })
+        .where(and(eq(sendRecords.id, id), inArray(sendRecords.status, ['RUNNING', 'RETRY_WAIT'])))
+        .returning()
+        .get();
+      if (updated !== undefined) {
+        return updated;
+      }
+      const existing = this.client.orm
+        .select()
+        .from(sendRecords)
+        .where(eq(sendRecords.id, id))
+        .get();
+      if (existing?.status === 'FAILED') {
+        return existing;
+      }
+      return this.throwTransitionError(id, 'FAILED', operation);
+    } catch (error) {
+      throw sendRecordError(
+        operation,
+        'DATABASE_OPERATION_FAILED',
+        'Failed to finalize SendRecord failure.',
+        error,
+      );
+    }
   }
 
   markFailedBeforeSend(id: string, timestamp: Date): SendRecord {
@@ -349,9 +695,20 @@ export class SendRecordRepository {
   ): SendRecord {
     try {
       const now = validateTimestamp(timestamp, operation);
+      const values: Partial<NewSendRecordRow> = {
+        status: target,
+        nextRetryAt: null,
+        finishedAt: now,
+        updatedAt: now,
+        ...(target === 'SUCCESS'
+          ? { sentAt: now, lastErrorCode: null }
+          : target === 'DELIVERY_UNKNOWN'
+            ? { lastErrorCode: 'DELIVERY_UNKNOWN' }
+            : {}),
+      };
       const updated = this.client.orm
         .update(sendRecords)
-        .set({ status: target, finishedAt: now, updatedAt: now })
+        .set(values)
         .where(and(eq(sendRecords.id, id), eq(sendRecords.status, 'RUNNING')))
         .returning()
         .get();
@@ -387,6 +744,26 @@ export class SendRecordRepository {
         error,
       );
     }
+  }
+
+  private throwTransitionError(
+    id: string,
+    target: SendRecordStatus,
+    operation: SendRecordRepositoryError['operation'],
+  ): never {
+    const existing = this.client.orm.select().from(sendRecords).where(eq(sendRecords.id, id)).get();
+    if (existing === undefined) {
+      throw new SendRecordRepositoryError(
+        operation,
+        'SEND_RECORD_NOT_FOUND',
+        'Send record was not found.',
+      );
+    }
+    throw new SendRecordRepositoryError(
+      operation,
+      'INVALID_STATE_TRANSITION',
+      `Send record cannot transition from ${existing.status} to ${target}.`,
+    );
   }
 }
 

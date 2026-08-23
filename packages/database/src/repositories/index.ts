@@ -33,6 +33,9 @@ export {
   type ClaimSendRecordResult,
   type PrepareSendRecordInput,
   type PrepareSendRecordResult,
+  type RecoverInterruptedBeforeSendInput,
+  type InterruptedRecoveryResult,
+  type ScheduleRetryInput,
   type SendRecord,
   type SendRecordRepositoryErrorCode,
 } from './SendRecordRepository.js';

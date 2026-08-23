@@ -12,7 +12,7 @@ SparkKeeper 是一套面向固定 Linux 服务器的自托管抖音火花维护�
 
 ## 当前开发阶段
 
-Project Foundation 以及 **MVP Task M1–M5** 均已完成，当前状态为 **MVP Core Flow Complete**。V1 已完成 **V1-1 Database Foundation**、**V1-2 Friend Identity**、**V1-3 Message Engine**、**V1-4 Daily Run & Idempotency** 和 **V1-5 Scheduler**；V1-6 及后续任务尚未开始。
+Project Foundation 以及 **MVP Task M1–M5** 均已完成，当前状态为 **MVP Core Flow Complete**。V1 已完成 **V1-1 Database Foundation**、**V1-2 Friend Identity**、**V1-3 Message Engine**、**V1-4 Daily Run & Idempotency**、**V1-5 Scheduler** 和 **V1-6 Retry & Failure State**；V1-7 Observability 尚未开始。
 
 `packages/automation` 现在提供基于 Playwright Chromium 的持久化浏览器会话基础：
 
@@ -216,7 +216,7 @@ pnpm --filter @sparkkeeper/automation send:smoke
 
 只有在调用者明确将运行时发送授权开启后，命令才会执行 Composer 输入、单次 Send UI 动作和新增 outbound Bubble 验证。成功输出只包含认证、Chat、联系人、输入、发送动作和交付验证状态，不输出联系人或消息内容。
 
-发送动作一旦尝试，后续只观察验证结果；`VERIFY_FAILED` 或 `DELIVERY_UNKNOWN` 都不会触发第二次发送。V1-4 已建立离线 DailyRun/SendRecord 幂等基础，但尚未接入这条真实发送链路；Retry 仍属于后续 V1。
+发送动作一旦尝试，后续只观察验证结果；`VERIFY_FAILED` 或 `DELIVERY_UNKNOWN` 都不会触发第二次发送。V1-4 已建立 DailyRun/SendRecord 幂等基础，V1-6 只会自动重试能够确认外部发送未发生的失败，绝不会把发送结果不确定的记录当作可重试项。
 
 ### Database Foundation
 
@@ -237,7 +237,7 @@ pnpm --filter @sparkkeeper/automation send:smoke
 - `busy_timeout = 5000`；
 - `synchronous = FULL`，适合当前低写入量并保留更强的掉电耐久性。
 
-首个 migration 只创建最小 `accounts` 表。V1-2、V1-3、V1-4、V1-5 分别通过更高版本 migration 增加 Account 1:N `friends`、`message_templates`、`daily_runs`/`send_records`，以及每个 Account 唯一的 `schedules`；这些变化都不会回改已经执行的 migration。Account 保存内部 UUID、显示名称、启用状态、登录状态元数据和 UTC 毫秒时间戳；Friend 保存联系人身份元数据和当前精确绑定键。它们都不保存 Cookie、Token、密码、二维码、Browser Profile 或其他登录凭据。
+首个 migration 只创建最小 `accounts` 表。V1-2 至 V1-6 分别通过更高版本 migration 增加 Account 1:N `friends`、`message_templates`、`daily_runs`/`send_records`、每个 Account 唯一的 `schedules`，以及持久化 retry/failure state；这些变化都不会回改已经执行的 migration。Account 保存内部 UUID、显示名称、启用状态、登录状态元数据和 UTC 毫秒时间戳；Friend 保存联系人身份元数据和当前精确绑定键。它们都不保存 Cookie、Token、密码、二维码、Browser Profile 或其他登录凭据。
 
 在默认路径或指定的 `DATA_DIR` 上执行 migration：
 
@@ -285,7 +285,7 @@ V1-2 尚未把 FriendRepository 接入自动化运行链路。
 pnpm --filter @sparkkeeper/message-engine engine:smoke
 ```
 
-V1-5 的 DailyTaskRunner 已将 MessageEngine 与现有 MessageSender 通过显式授权的生产适配器编排；安全默认仍为关闭，V1-4 的 DailyRun/SendRecord 负责消息快照和执行幂等。Retry 尚未实现。
+V1-5 的 DailyTaskRunner 已将 MessageEngine 与现有 MessageSender 通过显式授权的生产适配器编排；安全默认仍为关闭，V1-4 的 DailyRun/SendRecord 负责消息快照和执行幂等。V1-6 重试始终复用首次持久化的消息快照，不会重新调用 RandomProvider 生成另一条消息。
 
 ### Daily Run & Idempotency
 
@@ -299,14 +299,14 @@ V1-4 使用 `BusinessDate` 表示由显式时刻和 `APP_TIMEZONE`（默认 `Asi
 
 ### Task Scheduler
 
-V1-5 增加每个 Account 一条的 Schedule（严格 `HH:mm`、显式 IANA timezone、`[start,end)` 同日窗口）和进程内 `TaskScheduler`。Scheduler 使用 60 秒有界轮询、注入式 clock/timer、进程内防重入，并由数据库 DailyRun/SendRecord 负责重启后的幂等恢复。执行只遍历启用的 Friend，顺序执行且每个 DailyRun 只启动/关闭一次 Browser Session。
+V1-5 增加每个 Account 一条的 Schedule（严格 `HH:mm`、显式 IANA timezone、`[start,end)` 同日窗口）和进程内 `TaskScheduler`。Scheduler 使用 60 秒有界轮询、注入式 clock/timer、进程内防重入，并由数据库 DailyRun/SendRecord 负责重启后的幂等恢复。执行只遍历启用的 Friend，顺序执行且每个 tick 最多启动/关闭一次 Browser Session。
 
-安全默认值为 `SCHEDULER_ENABLED=false` 和 `SCHEDULER_ALLOW_REAL_SEND=false`。启用时必须显式给出 `SCHEDULER_ACCOUNT_ID`；真实发送还必须同时显式给出 `SCHEDULER_MESSAGE_TEMPLATE_ID` 和发送授权。系统不会自动选择第一条 Account、Template 或 Friend。`DELIVERY_UNKNOWN`、已有 RUNNING/FAILED SendRecord 都不会自动重置或重发；Retry 留待 V1-6。
+安全默认值为 `SCHEDULER_ENABLED=false` 和 `SCHEDULER_ALLOW_REAL_SEND=false`。启用时必须显式给出 `SCHEDULER_ACCOUNT_ID`；真实发送还必须同时显式给出 `SCHEDULER_MESSAGE_TEMPLATE_ID` 和发送授权。系统不会自动选择第一条 Account、Template 或 Friend。`DELIVERY_UNKNOWN`、终态 `FAILED` 和 `SUCCESS` 都不能重新 claim 或自动重发。
 
 为明确的 Account 创建或更新 Schedule：
 
 ```bash
-pnpm --filter @sparkkeeper/database schedule:configure -- <account-id> 09:00 10:00 Asia/Shanghai true
+pnpm --filter @sparkkeeper/database schedule:configure -- <account-id> 09:00 10:00 Asia/Shanghai true 3 60
 ```
 
 执行完全离线、临时 SQLite 和 fake runner 的 Scheduler Smoke：
@@ -317,6 +317,22 @@ pnpm --filter @sparkkeeper/server scheduler:smoke
 
 该 Smoke 不启动 Playwright、不访问 Douyin、不读取 Browser Profile，也不发送消息。
 
+### Retry & Failure State
+
+V1-6 为 Schedule 增加有界的 `maxAttempts`（默认 3，范围 1–5，包含初始 Attempt）和固定 `retryIntervalSeconds`（默认 60，范围 1–86400）。系统不实现指数退避或 jitter；重试只能安排在原 BusinessDate 的 `[start,end)` 执行窗口内，超出窗口会终结为 `FAILED`。
+
+每次成功原子 claim 才会增加 `send_records.attempt_count`。确定外部发送尚未发生的 transient failure 可以进入 `RETRY_WAIT`，并持久化 `next_retry_at` 和受控的 `last_error_code`；Scheduler 后续 tick 只在到期时 claim。存在 `RETRY_WAIT` 时 DailyRun 保持 `RUNNING`，全部记录成功后才成为 `SUCCESS`，任一终态失败或 `DELIVERY_UNKNOWN` 会使 Run 终结失败。
+
+`send_action_started_at` 是外部发送不确定性边界，必须在调用 MessageSender 之前持久化。重启遇到 marker 为空的 stale `RUNNING` 可以安全进入有界重试；marker 已存在则保守转为 `DELIVERY_UNKNOWN`，永不自动重试。Retry 不等于盲目 resend：`SUCCESS`、终态 `FAILED`、认证/身份/配置等确定性失败和任何发送后验证不确定性均不会自动重试。
+
+执行完全离线、临时 SQLite、fake clock/automation 和虚构数据的 Retry Smoke：
+
+```bash
+pnpm --filter @sparkkeeper/server retry:smoke
+```
+
+该 Smoke 验证固定间隔、到期 claim、最大三次 Attempt、交付不确定性保护、数据库重开和两种 crash recovery；不启动 Browser、不访问网络，也不输出消息正文。
+
 ## Roadmap
 
 - **Phase 0 — Project Foundation（已完成）**：建立 Monorepo、应用与 packages 骨架及统一工程命令。
@@ -326,7 +342,8 @@ pnpm --filter @sparkkeeper/server scheduler:smoke
 - **V1-3 Message Engine（已完成）**：持久化消息模板、StaticProvider、RandomProvider、统一 runtime validation 与纯离线生成能力。
 - **V1-4 Daily Run & Idempotency（已完成）**：BusinessDate、DailyRun/SendRecord、数据库唯一约束、消息快照、原子 claim 与离线持久化验证。
 - **V1-5 Scheduler（已完成）**：Schedule 持久化、同日时区窗口、进程内轮询、防重入、DailyTaskRunner 恢复边界与离线验证。
-- **V1-6+（尚未完成）**：后续增加 Retry 和 Observability。
+- **V1-6 Retry & Failure State（已完成）**：有界固定间隔重试、持久化 Attempt/等待状态、原子到期 claim、执行窗口约束和外部发送不确定性保护。
+- **V1-7 Observability（尚未完成）**：后续增加受控日志、SystemEvent 与诊断生命周期。
 - **V2**：增加正式 API、管理后台、实时状态、失败通知和完整自托管部署体验。
 
 各阶段必须通过验收后再进入下一阶段，避免提前引入尚未被真实需求验证的复杂度。

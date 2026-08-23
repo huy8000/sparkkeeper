@@ -29,11 +29,11 @@ class SmokeAutomation implements DailyTaskAutomation {
     return 'READY' as const;
   }
   async resolveAndOpen() {
-    return 'VERIFIED' as const;
+    return { status: 'VERIFIED' as const };
   }
   async sendAndVerify() {
     this.sendCount += 1;
-    return { status: 'SUCCESS' as const, sendAttemptCount: 1 as const };
+    return { status: 'SUCCESS' as const, sendAction: 'TRIGGERED' as const };
   }
   async close() {
     this.closeCount += 1;
@@ -45,7 +45,7 @@ const databasePath = path.join(directory, 'sparkkeeper.db');
 let client: DatabaseClient = createDatabase({ databasePath });
 
 try {
-  assert.equal(client.migrate().appliedMigrationCount, 5);
+  assert.equal(client.migrate().appliedMigrationCount, 6);
   const account = new AccountRepository(client).create({
     name: 'Test Account',
     loginStatus: 'READY',
@@ -80,7 +80,7 @@ try {
 
   client.close();
   client = createDatabase({ databasePath });
-  assert.equal(client.migrate().appliedMigrationCount, 5);
+  assert.equal(client.migrate().appliedMigrationCount, 6);
   assert.equal(new ScheduleRepository(client).findById(schedule.id)?.accountId, account.id);
   const restartAutomation = new SmokeAutomation();
   const restartRunner = createRunner(
@@ -96,7 +96,7 @@ try {
     restartRunner,
     { now: () => clock },
   );
-  assert.equal(await restartedScheduler.tick(), 'TRIGGERED');
+  assert.equal(await restartedScheduler.tick(), 'SKIPPED');
   assert.equal(restartAutomation.sendCount, 0);
 
   clock = new Date('2026-08-24T01:30:00Z');

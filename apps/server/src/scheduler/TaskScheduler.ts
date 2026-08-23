@@ -12,6 +12,7 @@ export interface SchedulerTimer {
 }
 export interface DailyRunTrigger {
   run(accountId: string, businessDate: BusinessDate): Promise<unknown>;
+  finalizeExpired?(accountId: string, currentBusinessDate: BusinessDate): Promise<void>;
 }
 export type SchedulerErrorHandler = (error: unknown) => void;
 
@@ -21,7 +22,6 @@ export class TaskScheduler {
   private intervalHandle: unknown;
   private activeTick: Promise<'TRIGGERED' | 'SKIPPED'> | undefined;
   private stopped = true;
-  private readonly attempted = new Set<string>();
 
   constructor(
     private readonly accountId: string,
@@ -78,12 +78,12 @@ export class TaskScheduler {
       schedule.startTime,
       schedule.endTime,
     );
-    if (evaluation.position !== 'IN_WINDOW') return 'SKIPPED';
-    const key = `${schedule.accountId}:${evaluation.businessDate}`;
-    if (this.attempted.has(key)) return 'SKIPPED';
-    this.attempted.add(key);
-    await this.runner.run(schedule.accountId, evaluation.businessDate);
-    return 'TRIGGERED';
+    if (evaluation.position !== 'IN_WINDOW') {
+      await this.runner.finalizeExpired?.(schedule.accountId, evaluation.businessDate);
+      return 'SKIPPED';
+    }
+    const result = await this.runner.run(schedule.accountId, evaluation.businessDate);
+    return result === 'SKIPPED' ? 'SKIPPED' : 'TRIGGERED';
   }
 }
 

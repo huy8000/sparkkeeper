@@ -51,6 +51,10 @@ export function createV1FourDatabase(context: TestContext): TemporaryDatabase {
   return createHistoricalDatabase(context, 'v1-four', 4);
 }
 
+export function createV1FiveDatabase(context: TestContext): TemporaryDatabase {
+  return createHistoricalDatabase(context, 'v1-five', 5);
+}
+
 function createHistoricalDatabase(
   context: TestContext,
   label: string,
