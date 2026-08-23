@@ -9,6 +9,7 @@ export {
   DailyRunRepository,
   DailyRunRepositoryError,
   type CreateOrGetDailyRunInput,
+  type ClaimDailyRunResult,
   type DailyRun,
   type DailyRunRepositoryErrorCode,
 } from './DailyRunRepository.js';
@@ -35,3 +36,11 @@ export {
   type SendRecord,
   type SendRecordRepositoryErrorCode,
 } from './SendRecordRepository.js';
+export {
+  ScheduleRepository,
+  ScheduleRepositoryError,
+  type CreateScheduleInput,
+  type Schedule,
+  type ScheduleRepositoryErrorCode,
+  type UpdateScheduleInput,
+} from './ScheduleRepository.js';

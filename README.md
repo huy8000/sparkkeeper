@@ -12,7 +12,7 @@ SparkKeeper 是一套面向固定 Linux 服务器的自托管抖音火花维护�
 
 ## 当前开发阶段
 
-Project Foundation 以及 **MVP Task M1–M5** 均已完成，当前状态为 **MVP Core Flow Complete**。V1 已完成 **V1-1 Database Foundation**、**V1-2 Friend Identity** 和 **V1-3 Message Engine**；V1-4 及后续任务尚未开始。
+Project Foundation 以及 **MVP Task M1–M5** 均已完成，当前状态为 **MVP Core Flow Complete**。V1 已完成 **V1-1 Database Foundation**、**V1-2 Friend Identity**、**V1-3 Message Engine**、**V1-4 Daily Run & Idempotency** 和 **V1-5 Scheduler**；V1-6 及后续任务尚未开始。
 
 `packages/automation` 现在提供基于 Playwright Chromium 的持久化浏览器会话基础：
 
@@ -237,7 +237,7 @@ pnpm --filter @sparkkeeper/automation send:smoke
 - `busy_timeout = 5000`；
 - `synchronous = FULL`，适合当前低写入量并保留更强的掉电耐久性。
 
-首个 migration 只创建最小 `accounts` 表。V1-2、V1-3、V1-4 分别通过更高版本 migration 增加 Account 1:N `friends`、`message_templates`，以及 `daily_runs`/`send_records`；这些变化都不会回改已经执行的 migration。Account 保存内部 UUID、显示名称、启用状态、登录状态元数据和 UTC 毫秒时间戳；Friend 保存联系人身份元数据和当前精确绑定键。它们都不保存 Cookie、Token、密码、二维码、Browser Profile 或其他登录凭据。
+首个 migration 只创建最小 `accounts` 表。V1-2、V1-3、V1-4、V1-5 分别通过更高版本 migration 增加 Account 1:N `friends`、`message_templates`、`daily_runs`/`send_records`，以及每个 Account 唯一的 `schedules`；这些变化都不会回改已经执行的 migration。Account 保存内部 UUID、显示名称、启用状态、登录状态元数据和 UTC 毫秒时间戳；Friend 保存联系人身份元数据和当前精确绑定键。它们都不保存 Cookie、Token、密码、二维码、Browser Profile 或其他登录凭据。
 
 在默认路径或指定的 `DATA_DIR` 上执行 migration：
 
@@ -245,7 +245,7 @@ pnpm --filter @sparkkeeper/automation send:smoke
 pnpm --filter @sparkkeeper/database db:migrate
 ```
 
-检查当前数据库的 PRAGMA、migration 数量以及 accounts/friends/message_templates/daily_runs/send_records schema：
+检查当前数据库的 PRAGMA、migration 数量以及 accounts/friends/message_templates/daily_runs/send_records/schedules schema：
 
 ```bash
 pnpm --filter @sparkkeeper/database db:check
@@ -285,7 +285,7 @@ V1-2 尚未把 FriendRepository 接入自动化运行链路。
 pnpm --filter @sparkkeeper/message-engine engine:smoke
 ```
 
-V1-3 尚未把 MessageEngine 接到真实 MessageSender。V1-4 的 DailyRun/SendRecord 仍是独立的离线持久化能力，尚未接入真实发送、Scheduler 或 Retry。
+V1-5 的 DailyTaskRunner 已将 MessageEngine 与现有 MessageSender 通过显式授权的生产适配器编排；安全默认仍为关闭，V1-4 的 DailyRun/SendRecord 负责消息快照和执行幂等。Retry 尚未实现。
 
 ### Daily Run & Idempotency
 
@@ -293,9 +293,29 @@ V1-4 使用 `BusinessDate` 表示由显式时刻和 `APP_TIMEZONE`（默认 `Asi
 
 `DailyRunRepository` 以 `(account_id, business_date)` 唯一约束保证同一 Account 每个业务日只有一个 Run，并提供 `createOrGet`、查询和显式状态转换。`SendRecordRepository` 在准备阶段保存不可变的纯文本消息快照，以 `(friend_id, business_date)` 作为核心每日幂等键，并额外约束 `(daily_run_id, friend_id)`。重复准备返回既有记录，不覆盖首次快照；执行资格通过单条条件 `UPDATE ... WHERE status = 'READY'` 原子 claim，`SUCCESS` 记录不能再次取得执行资格。
 
-状态更新要求调用方显式传入时间，方便确定性测试。`send_records.friend_id` 使用 `NO ACTION` 保留历史身份引用，删除 DailyRun 会级联删除其 SendRecord，删除模板则将可选模板外键置空而保留已生成的消息快照。当前没有 Scheduler、自动运行、Retry、真实发送编排或网络依赖。
+状态更新要求调用方显式传入时间，方便确定性测试。`send_records.friend_id` 使用 `NO ACTION` 保留历史身份引用，删除 DailyRun 会级联删除其 SendRecord，删除模板则将可选模板外键置空而保留已生成的消息快照。V1-4 的持久化层本身没有网络依赖；V1-5 通过独立 Scheduler 编排这些能力。
 
 `db:smoke` 会在临时 SQLite 中离线验证 migrate、同日重复 Run/SendRecord、消息快照、原子 claim、SUCCESS 终态、重开/重复 migrate，以及下一业务日可创建新记录；仅使用虚构数据并自动清理。
+
+### Task Scheduler
+
+V1-5 增加每个 Account 一条的 Schedule（严格 `HH:mm`、显式 IANA timezone、`[start,end)` 同日窗口）和进程内 `TaskScheduler`。Scheduler 使用 60 秒有界轮询、注入式 clock/timer、进程内防重入，并由数据库 DailyRun/SendRecord 负责重启后的幂等恢复。执行只遍历启用的 Friend，顺序执行且每个 DailyRun 只启动/关闭一次 Browser Session。
+
+安全默认值为 `SCHEDULER_ENABLED=false` 和 `SCHEDULER_ALLOW_REAL_SEND=false`。启用时必须显式给出 `SCHEDULER_ACCOUNT_ID`；真实发送还必须同时显式给出 `SCHEDULER_MESSAGE_TEMPLATE_ID` 和发送授权。系统不会自动选择第一条 Account、Template 或 Friend。`DELIVERY_UNKNOWN`、已有 RUNNING/FAILED SendRecord 都不会自动重置或重发；Retry 留待 V1-6。
+
+为明确的 Account 创建或更新 Schedule：
+
+```bash
+pnpm --filter @sparkkeeper/database schedule:configure -- <account-id> 09:00 10:00 Asia/Shanghai true
+```
+
+执行完全离线、临时 SQLite 和 fake runner 的 Scheduler Smoke：
+
+```bash
+pnpm --filter @sparkkeeper/server scheduler:smoke
+```
+
+该 Smoke 不启动 Playwright、不访问 Douyin、不读取 Browser Profile，也不发送消息。
 
 ## Roadmap
 
@@ -305,7 +325,8 @@ V1-4 使用 `BusinessDate` 表示由显式时刻和 `APP_TIMEZONE`（默认 `Asi
 - **V1-2 Friend Identity（已完成）**：Account 1:N Friend、可演进身份字段、精确 match field/key、FriendRepository 和 migration upgrade 测试。
 - **V1-3 Message Engine（已完成）**：持久化消息模板、StaticProvider、RandomProvider、统一 runtime validation 与纯离线生成能力。
 - **V1-4 Daily Run & Idempotency（已完成）**：BusinessDate、DailyRun/SendRecord、数据库唯一约束、消息快照、原子 claim 与离线持久化验证。
-- **V1-5+（尚未完成）**：后续增加 Scheduler、Retry 和 Observability。
+- **V1-5 Scheduler（已完成）**：Schedule 持久化、同日时区窗口、进程内轮询、防重入、DailyTaskRunner 恢复边界与离线验证。
+- **V1-6+（尚未完成）**：后续增加 Retry 和 Observability。
 - **V2**：增加正式 API、管理后台、实时状态、失败通知和完整自托管部署体验。
 
 各阶段必须通过验收后再进入下一阶段，避免提前引入尚未被真实需求验证的复杂度。

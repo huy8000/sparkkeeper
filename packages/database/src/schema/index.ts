@@ -17,3 +17,4 @@ export {
   type NewSendRecordRow,
   type SendRecordRow,
 } from './sendRecords.js';
+export { schedules, type NewScheduleRow, type ScheduleRow } from './schedules.js';

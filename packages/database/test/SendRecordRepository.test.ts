@@ -55,6 +55,19 @@ test('findById returns undefined for an unknown SendRecord', (context) => {
   assert.equal(new SendRecordRepository(client).findById('missing-send-record'), undefined);
 });
 
+test('findByFriendAndBusinessDate returns the exact idempotency record', (context) => {
+  const fixture = createSendFixture(context);
+  const record = prepareRecord(fixture).record;
+  assert.equal(
+    fixture.repository.findByFriendAndBusinessDate(fixture.friend.id, BUSINESS_DATE)?.id,
+    record.id,
+  );
+  assert.equal(
+    fixture.repository.findByFriendAndBusinessDate(fixture.friend.id, NEXT_BUSINESS_DATE),
+    undefined,
+  );
+});
+
 test('listByDailyRunId returns only that DailyRun records', (context) => {
   const fixture = createSendFixture(context);
   const secondFriend = new FriendRepository(fixture.client).create({
@@ -328,6 +341,16 @@ test('markFailed performs RUNNING to FAILED', (context) => {
   assert.equal(fixture.repository.markFailed(prepared.id, FINISHED_AT).status, 'FAILED');
 });
 
+test('markFailedBeforeSend transitions READY directly to FAILED without a claim', (context) => {
+  const fixture = createSendFixture(context);
+  const record = prepareRecord(fixture).record;
+  const failed = fixture.repository.markFailedBeforeSend(record.id, FINISHED_AT);
+  assert.equal(failed.status, 'FAILED');
+  assert.equal(failed.startedAt, null);
+  assert.equal(failed.finishedAt?.getTime(), FINISHED_AT.getTime());
+  assert.equal(fixture.repository.claimForExecution(record.id, CLAIMED_AT).type, 'NOT_CLAIMABLE');
+});
+
 test('markDeliveryUnknown performs RUNNING to DELIVERY_UNKNOWN', (context) => {
   const fixture = createSendFixture(context);
   const prepared = prepareRecord(fixture).record;
@@ -472,7 +495,7 @@ test('SendRecord persists after close, reopen, and repeated migrate', (context) 
 
   const reopened = createDatabase({ databasePath: fixture.databasePath });
   context.after(() => reopened.close());
-  assert.equal(reopened.migrate().appliedMigrationCount, 4);
+  assert.equal(reopened.migrate().appliedMigrationCount, 5);
   const persisted = new SendRecordRepository(reopened).findById(prepared.id);
   assert.equal(persisted?.status, 'SUCCESS');
   assert.equal(persisted?.messageText, 'Message A');

@@ -13,6 +13,7 @@ import {
   FriendRepository,
   MessageTemplateRepository,
   SendRecordRepository,
+  ScheduleRepository,
   type DatabaseClient,
 } from '../src/index.js';
 
@@ -32,7 +33,7 @@ try {
   const firstMigration = client.migrate();
   const firstInspection = client.inspect();
 
-  assert.equal(firstMigration.appliedMigrationCount, 4);
+  assert.equal(firstMigration.appliedMigrationCount, 5);
   assert.equal(firstInspection.pragmas.journalMode, 'wal');
   assert.equal(firstInspection.pragmas.foreignKeys, 1);
 
@@ -41,6 +42,13 @@ try {
     name: 'Test Account',
     enabled: true,
     loginStatus: 'READY',
+  });
+  const schedule = new ScheduleRepository(client).create({
+    accountId: account.id,
+    startTime: '09:00',
+    endTime: '10:00',
+    timezone: 'Asia/Shanghai',
+    now: createdAt,
   });
   const friendsRepository = new FriendRepository(client);
   const alice = friendsRepository.create({
@@ -118,9 +126,10 @@ try {
   const persistedStatic = reopenedTemplates.findById(staticTemplate.id);
   const persistedRandom = reopenedTemplates.findById(randomTemplate.id);
 
-  assert.equal(secondMigration.appliedMigrationCount, 4);
+  assert.equal(secondMigration.appliedMigrationCount, 5);
   assert.equal(reopenedAccount?.name, 'Test Account');
   assert.equal(reopenedAccount?.loginStatus, 'READY');
+  assert.equal(new ScheduleRepository(client).findById(schedule.id)?.startTime, '09:00');
   assert.equal(reopenedFriends.findById(alice.id)?.displayName, 'Alice');
   assert.deepEqual(
     new Set(reopenedFriends.listByAccountId(account.id).map((friend) => friend.displayName)),
@@ -193,6 +202,7 @@ try {
     conditionalClaim: 'VERIFIED',
     successTerminal: 'VERIFIED',
     nextBusinessDate: 'VERIFIED',
+    schedulePersistence: 'VERIFIED',
     networkAccess: 'NONE',
   };
 } finally {

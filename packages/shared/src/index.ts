@@ -40,3 +40,11 @@ export {
 export type DailyRunStatus = 'READY' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'AUTH_EXPIRED';
 
 export type SendRecordStatus = 'READY' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'DELIVERY_UNKNOWN';
+
+export {
+  parseScheduleTime,
+  ScheduleTimeError,
+  scheduleTimeToMinutes,
+  validateScheduleWindow,
+  type ScheduleTime,
+} from './ScheduleTime.js';

@@ -155,6 +155,22 @@ test('markRunning performs READY to RUNNING with startedAt', (context) => {
   assert.equal(running.updatedAt.getTime(), STARTED_AT.getTime());
 });
 
+test('claimForExecution grants READY DailyRun execution only once', (context) => {
+  const fixture = createDailyRunFixture(context);
+  const first = fixture.repository.claimForExecution(fixture.run.id, STARTED_AT);
+  const second = fixture.repository.claimForExecution(fixture.run.id, STARTED_AT);
+  assert.equal(first.type, 'CLAIMED');
+  assert.equal(second.type, 'NOT_CLAIMABLE');
+  assert.equal(second.type === 'NOT_CLAIMABLE' ? second.run.status : undefined, 'RUNNING');
+});
+
+test('claimForExecution reports a missing DailyRun without creating one', (context) => {
+  const { client } = createTemporaryDatabase(context);
+  assert.deepEqual(new DailyRunRepository(client).claimForExecution('missing', STARTED_AT), {
+    type: 'NOT_FOUND',
+  });
+});
+
 test('markSuccess performs RUNNING to SUCCESS with finishedAt', (context) => {
   const fixture = createDailyRunFixture(context);
   fixture.repository.markRunning(fixture.run.id, STARTED_AT);
@@ -242,7 +258,7 @@ test('DailyRun persists after close, reopen, and repeated migrate', (context) =>
 
   const reopened = createDatabase({ databasePath: fixture.databasePath });
   context.after(() => reopened.close());
-  assert.equal(reopened.migrate().appliedMigrationCount, 4);
+  assert.equal(reopened.migrate().appliedMigrationCount, 5);
   assert.equal(
     new DailyRunRepository(reopened).findById(fixture.run.id)?.businessDate,
     BUSINESS_DATE,

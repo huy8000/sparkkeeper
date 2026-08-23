@@ -56,11 +56,13 @@ export class SendRecordRepositoryError extends Error {
     readonly operation:
       | 'prepare'
       | 'findById'
+      | 'findByFriendAndBusinessDate'
       | 'listByDailyRunId'
       | 'listByFriendId'
       | 'claimForExecution'
       | 'markSuccess'
       | 'markFailed'
+      | 'markFailedBeforeSend'
       | 'markDeliveryUnknown',
     readonly code: SendRecordRepositoryErrorCode,
     message: string,
@@ -194,6 +196,28 @@ export class SendRecordRepository {
     }
   }
 
+  findByFriendAndBusinessDate(
+    friendId: string,
+    businessDate: BusinessDate,
+  ): SendRecord | undefined {
+    const operation = 'findByFriendAndBusinessDate' as const;
+    try {
+      const date = validateBusinessDate(businessDate, operation);
+      return this.client.orm
+        .select()
+        .from(sendRecords)
+        .where(and(eq(sendRecords.friendId, friendId), eq(sendRecords.businessDate, date)))
+        .get();
+    } catch (error) {
+      throw sendRecordError(
+        operation,
+        'DATABASE_OPERATION_FAILED',
+        'Failed to find send record by Friend and business date.',
+        error,
+      );
+    }
+  }
+
   listByDailyRunId(dailyRunId: string): SendRecord[] {
     try {
       return this.client.orm
@@ -268,6 +292,49 @@ export class SendRecordRepository {
 
   markFailed(id: string, now: Date): SendRecord {
     return this.markTerminal(id, 'FAILED', now, 'markFailed');
+  }
+
+  markFailedBeforeSend(id: string, timestamp: Date): SendRecord {
+    const operation = 'markFailedBeforeSend' as const;
+    try {
+      const now = validateTimestamp(timestamp, operation);
+      const updated = this.client.orm
+        .update(sendRecords)
+        .set({ status: 'FAILED', finishedAt: now, updatedAt: now })
+        .where(and(eq(sendRecords.id, id), eq(sendRecords.status, 'READY')))
+        .returning()
+        .get();
+      if (updated !== undefined) {
+        return updated;
+      }
+      const existing = this.client.orm
+        .select()
+        .from(sendRecords)
+        .where(eq(sendRecords.id, id))
+        .get();
+      if (existing === undefined) {
+        throw new SendRecordRepositoryError(
+          operation,
+          'SEND_RECORD_NOT_FOUND',
+          'Send record was not found.',
+        );
+      }
+      if (existing.status === 'FAILED') {
+        return existing;
+      }
+      throw new SendRecordRepositoryError(
+        operation,
+        'INVALID_STATE_TRANSITION',
+        `Send record cannot transition from ${existing.status} to FAILED before send.`,
+      );
+    } catch (error) {
+      throw sendRecordError(
+        operation,
+        'DATABASE_OPERATION_FAILED',
+        'Failed to reject send record before send.',
+        error,
+      );
+    }
   }
 
   markDeliveryUnknown(id: string, now: Date): SendRecord {
