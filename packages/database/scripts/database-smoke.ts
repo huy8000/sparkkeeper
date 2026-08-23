@@ -3,10 +3,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+import { MessageEngine, RandomProvider, StaticProvider } from '@sparkkeeper/message-engine';
+
 import {
   AccountRepository,
   createDatabase,
   FriendRepository,
+  MessageTemplateRepository,
   type DatabaseClient,
 } from '../src/index.js';
 
@@ -20,7 +23,7 @@ try {
   const firstMigration = client.migrate();
   const firstInspection = client.inspect();
 
-  assert.equal(firstMigration.appliedMigrationCount, 2);
+  assert.equal(firstMigration.appliedMigrationCount, 3);
   assert.equal(firstInspection.pragmas.journalMode, 'wal');
   assert.equal(firstInspection.pragmas.foreignKeys, 1);
 
@@ -40,14 +43,28 @@ try {
     displayName: 'Bob',
     enabled: false,
   });
+  const messageTemplatesRepository = new MessageTemplateRepository(client);
+  const staticTemplate = messageTemplatesRepository.create({
+    name: 'Static Test Template',
+    providerType: 'STATIC',
+    messages: ['Hello'],
+  });
+  const randomTemplate = messageTemplatesRepository.create({
+    name: 'Random Test Template',
+    providerType: 'RANDOM',
+    messages: ['Message A', 'Message B'],
+  });
 
   client.close();
   client = createDatabase({ databasePath });
   const secondMigration = client.migrate();
   const reopenedAccount = new AccountRepository(client).findById(account.id);
   const reopenedFriends = new FriendRepository(client);
+  const reopenedTemplates = new MessageTemplateRepository(client);
+  const persistedStatic = reopenedTemplates.findById(staticTemplate.id);
+  const persistedRandom = reopenedTemplates.findById(randomTemplate.id);
 
-  assert.equal(secondMigration.appliedMigrationCount, 2);
+  assert.equal(secondMigration.appliedMigrationCount, 3);
   assert.equal(reopenedAccount?.name, 'Test Account');
   assert.equal(reopenedAccount?.loginStatus, 'READY');
   assert.equal(reopenedFriends.findById(alice.id)?.displayName, 'Alice');
@@ -59,6 +76,12 @@ try {
     reopenedFriends.listEnabledByAccountId(account.id).map((friend) => friend.displayName),
     ['Alice'],
   );
+  assert.ok(persistedStatic);
+  assert.ok(persistedRandom);
+
+  const engine = new MessageEngine([new StaticProvider(), new RandomProvider(() => 0.999_999)]);
+  assert.equal(await engine.build(persistedStatic), 'Hello');
+  assert.equal(await engine.build(persistedRandom), 'Message B');
 
   smokeResult = {
     freshMigration: 'PASS',
@@ -70,6 +93,10 @@ try {
     closeReopen: 'PASS',
     repeatedMigration: 'PASS',
     persistence: 'PASS',
+    staticTemplate: 'VERIFIED',
+    randomTemplate: 'VERIFIED',
+    messageEngine: 'VERIFIED',
+    networkAccess: 'NONE',
   };
 } finally {
   client?.close();

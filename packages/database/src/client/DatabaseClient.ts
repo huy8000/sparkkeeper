@@ -46,14 +46,17 @@ export interface DatabaseInspection {
   readonly appliedMigrationCount: number;
   readonly accountColumns: readonly DatabaseColumnState[];
   readonly friendColumns: readonly DatabaseColumnState[];
+  readonly messageTemplateColumns: readonly DatabaseColumnState[];
   readonly accountsSchemaCompatible: boolean;
   readonly friendsSchemaCompatible: boolean;
+  readonly messageTemplatesSchemaCompatible: boolean;
 }
 
 export interface DatabaseMigrationResult {
   readonly appliedMigrationCount: number;
   readonly accountsSchemaVerified: true;
   readonly friendsSchemaVerified: true;
+  readonly messageTemplatesSchemaVerified: true;
 }
 
 interface SqliteCountRow {
@@ -96,6 +99,16 @@ const EXPECTED_FRIEND_COLUMNS: readonly DatabaseColumnState[] = [
   { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
 ];
 
+const EXPECTED_MESSAGE_TEMPLATE_COLUMNS: readonly DatabaseColumnState[] = [
+  { name: 'id', type: 'TEXT', notNull: true, primaryKey: true },
+  { name: 'name', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'provider_type', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'content', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'enabled', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'created_at', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
+];
+
 export class DatabaseClient {
   readonly databasePath: string;
   readonly orm: BetterSQLite3Database<typeof schema>;
@@ -124,7 +137,11 @@ export class DatabaseClient {
     }
 
     const inspection = this.inspect();
-    if (!inspection.accountsSchemaCompatible || !inspection.friendsSchemaCompatible) {
+    if (
+      !inspection.accountsSchemaCompatible ||
+      !inspection.friendsSchemaCompatible ||
+      !inspection.messageTemplatesSchemaCompatible
+    ) {
       throw new DatabaseSchemaError(
         'Database migrations completed, but the database tables are incompatible with the Drizzle schema.',
       );
@@ -134,6 +151,7 @@ export class DatabaseClient {
       appliedMigrationCount: inspection.appliedMigrationCount,
       accountsSchemaVerified: true,
       friendsSchemaVerified: true,
+      messageTemplatesSchemaVerified: true,
     };
   }
 
@@ -148,6 +166,9 @@ export class DatabaseClient {
     const tableNames = tables.map(({ name }) => name);
     const accountColumns = tableNames.includes('accounts') ? this.readAccountColumns() : [];
     const friendColumns = tableNames.includes('friends') ? this.readFriendColumns() : [];
+    const messageTemplateColumns = tableNames.includes('message_templates')
+      ? this.readMessageTemplateColumns()
+      : [];
 
     return {
       databasePath: this.databasePath,
@@ -158,8 +179,10 @@ export class DatabaseClient {
         : 0,
       accountColumns,
       friendColumns,
+      messageTemplateColumns,
       accountsSchemaCompatible: accountColumnsMatch(accountColumns),
       friendsSchemaCompatible: friendColumnsMatch(friendColumns),
+      messageTemplatesSchemaCompatible: messageTemplateColumnsMatch(messageTemplateColumns),
     };
   }
 
@@ -201,6 +224,16 @@ export class DatabaseClient {
 
   private readFriendColumns(): DatabaseColumnState[] {
     const rows = this.sqlite.pragma('table_info(friends)') as SqliteTableInfoRow[];
+    return rows.map((row) => ({
+      name: row.name,
+      type: row.type.toUpperCase(),
+      notNull: row.notnull === 1,
+      primaryKey: row.pk === 1,
+    }));
+  }
+
+  private readMessageTemplateColumns(): DatabaseColumnState[] {
+    const rows = this.sqlite.pragma('table_info(message_templates)') as SqliteTableInfoRow[];
     return rows.map((row) => ({
       name: row.name,
       type: row.type.toUpperCase(),
@@ -281,6 +314,10 @@ function accountColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
 
 function friendColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
   return columnsMatch(actual, EXPECTED_FRIEND_COLUMNS);
+}
+
+function messageTemplateColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
+  return columnsMatch(actual, EXPECTED_MESSAGE_TEMPLATE_COLUMNS);
 }
 
 function columnsMatch(

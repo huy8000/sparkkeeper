@@ -1,0 +1,23 @@
+{
+  "name": "@sparkkeeper/message-engine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SparkKeeper offline message template engine",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "engine:smoke": "tsx scripts/engine-smoke.ts",
+    "pretest": "pnpm build",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@sparkkeeper/shared": "workspace:*"
+  }
+}

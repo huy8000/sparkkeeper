@@ -64,6 +64,9 @@ importers:
 
   packages/database:
     dependencies:
+      '@sparkkeeper/message-engine':
+        specifier: workspace:*
+        version: link:../message-engine
       '@sparkkeeper/shared':
         specifier: workspace:*
         version: link:../shared
@@ -80,6 +83,12 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
+
+  packages/message-engine:
+    dependencies:
+      '@sparkkeeper/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   packages/notifier: {}
 

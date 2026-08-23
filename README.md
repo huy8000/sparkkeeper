@@ -12,7 +12,7 @@ SparkKeeper 是一套面向固定 Linux 服务器的自托管抖音火花维护�
 
 ## 当前开发阶段
 
-Project Foundation 以及 **MVP Task M1–M5** 均已完成，当前状态为 **MVP Core Flow Complete**。V1 已完成 **V1-1 Database Foundation** 和 **V1-2 Friend Identity**；V1-3 及后续任务尚未开始。
+Project Foundation 以及 **MVP Task M1–M5** 均已完成，当前状态为 **MVP Core Flow Complete**。V1 已完成 **V1-1 Database Foundation**、**V1-2 Friend Identity** 和 **V1-3 Message Engine**；V1-4 及后续任务尚未开始。
 
 `packages/automation` 现在提供基于 Playwright Chromium 的持久化浏览器会话基础：
 
@@ -81,7 +81,8 @@ sparkkeeper/
 │   └── admin-web/       # Vue 3 管理端基础应用
 ├── packages/
 │   ├── automation/      # Persistent Browser Session
-│   ├── database/        # SQLite、Drizzle migration、Account/Friend Repository
+│   ├── database/        # SQLite、Drizzle migration 与具体 Repository
+│   ├── message-engine/  # 纯 TypeScript 消息模板校验与 Provider
 │   ├── shared/          # 跨应用共享类型与定义
 │   └── notifier/        # 后续通知抽象
 ├── docs/                # 产品、技术与架构设计文档
@@ -120,7 +121,7 @@ pnpm test
 pnpm build
 ```
 
-`pnpm test` 会运行 Browser Session 配置/生命周期测试、使用受控页面的 AuthDetector、Chat Adapter、Contact Resolver 和 MessageSender 契约测试，以及全部基于临时 SQLite 文件的 Database migration/Repository 测试。
+`pnpm test` 会运行 Browser Session 配置/生命周期测试、使用受控页面的 AuthDetector、Chat Adapter、Contact Resolver 和 MessageSender 契约测试、纯离线 Message Engine 测试，以及全部基于临时 SQLite 文件的 Database migration/Repository 测试。
 
 如需创建本地配置：
 
@@ -236,7 +237,7 @@ pnpm --filter @sparkkeeper/automation send:smoke
 - `busy_timeout = 5000`；
 - `synchronous = FULL`，适合当前低写入量并保留更强的掉电耐久性。
 
-首个 migration 只创建最小 `accounts` 表。V1-2 通过新的更高版本 migration 增加 Account 1:N `friends`，不会回改已经执行的 migration。Account 保存内部 UUID、显示名称、启用状态、登录状态元数据和 UTC 毫秒时间戳；Friend 保存联系人身份元数据和当前精确绑定键。两者都不保存 Cookie、Token、密码、二维码、Browser Profile 或其他登录凭据。
+首个 migration 只创建最小 `accounts` 表。V1-2 通过更高版本 migration 增加 Account 1:N `friends`，V1-3 再通过新的 migration 增加 `message_templates`；这些变化都不会回改已经执行的 migration。Account 保存内部 UUID、显示名称、启用状态、登录状态元数据和 UTC 毫秒时间戳；Friend 保存联系人身份元数据和当前精确绑定键。它们都不保存 Cookie、Token、密码、二维码、Browser Profile 或其他登录凭据。
 
 在默认路径或指定的 `DATA_DIR` 上执行 migration：
 
@@ -244,7 +245,7 @@ pnpm --filter @sparkkeeper/automation send:smoke
 pnpm --filter @sparkkeeper/database db:migrate
 ```
 
-检查当前数据库的 PRAGMA、migration 数量以及 accounts/friends schema：
+检查当前数据库的 PRAGMA、migration 数量以及 accounts/friends/message_templates schema：
 
 ```bash
 pnpm --filter @sparkkeeper/database db:check
@@ -268,7 +269,23 @@ Friend 身份包含必需的 `displayName`，以及可选的 `remarkName`、`sho
 
 `enabled` 只提供数据库级启停和查询能力。V1-2 尚未把 FriendRepository 接入自动化，不会自动遍历或向多个联系人发送消息。
 
-V1-2 尚未实现 MessageTemplate、DailyRun、SendRecord、Scheduler、Retry 或 Observability。
+V1-2 尚未把 FriendRepository 接入自动化运行链路。
+
+### Message Engine
+
+`packages/message-engine` 是不依赖 Playwright、SQLite driver、网络或 Browser Profile 的纯 TypeScript 包。它接受持久化模板对应的领域对象，通过 `MessageEngine` 分派给 `StaticProvider` 或 `RandomProvider`，并返回最终纯文本消息。
+
+所有模板统一使用 `messages: string[]`：`STATIC` 必须恰好包含一条非空白消息，`RANDOM` 必须包含至少一条非空白消息。校验只使用 `trim()` 判断空白，不修改最终消息内容，也不猜测平台最大消息长度。`RandomProvider` 默认使用 `Math.random`，测试或调用方可以注入最小 `RandomSource` 以获得确定性行为。
+
+`message_templates.content` 将消息数组保存为 JSON 字符串。`MessageTemplateRepository` 提供 `create`、`findById`、`list`、`listEnabled` 和 `update`；每次写入及读取都会执行 runtime validation，损坏 JSON、未知 Provider、禁用模板和非法消息均会明确失败。模板名称不是唯一键，内部身份使用 UUID。
+
+执行完全离线、只含虚构消息的 Message Engine Smoke：
+
+```bash
+pnpm --filter @sparkkeeper/message-engine engine:smoke
+```
+
+V1-3 尚未把 MessageEngine 接到真实 MessageSender，也未实现 DailyRun、SendRecord、Scheduler 或 Retry。
 
 ## Roadmap
 
@@ -276,7 +293,8 @@ V1-2 尚未实现 MessageTemplate、DailyRun、SendRecord、Scheduler、Retry �
 - **MVP Core Flow Complete（M1–M5 已完成）**：已验证持久浏览器、认证、Chat 适配、单联系人定位、一次发送及新增 outbound Bubble 验证链路。
 - **V1-1 Database Foundation（已完成）**：SQLite + Drizzle、versioned migration、WAL、最小 accounts schema、AccountRepository 和临时数据库测试基础。
 - **V1-2 Friend Identity（已完成）**：Account 1:N Friend、可演进身份字段、精确 match field/key、FriendRepository 和 migration upgrade 测试。
-- **V1-3+（尚未完成）**：后续增加消息引擎、DailyRun/SendRecord 幂等、Scheduler、Retry 和 Observability。
+- **V1-3 Message Engine（已完成）**：持久化消息模板、StaticProvider、RandomProvider、统一 runtime validation 与纯离线生成能力。
+- **V1-4+（尚未完成）**：后续增加 DailyRun/SendRecord 幂等、Scheduler、Retry 和 Observability。
 - **V2**：增加正式 API、管理后台、实时状态、失败通知和完整自托管部署体验。
 
 各阶段必须通过验收后再进入下一阶段，避免提前引入尚未被真实需求验证的复杂度。
