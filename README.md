@@ -352,6 +352,77 @@ pnpm --filter @sparkkeeper/server observability:smoke
 
 Logger、SystemEvent、Screenshot、Trace 或 Retention 失败均为观察失败：不会增加 Send Attempt，不会改变 SUCCESS，不会把 DELIVERY_UNKNOWN 变为可重试状态。V1 功能开发已完成，但尚未通过 V1 Release Gate 或连续受控验证期，也尚未发布 `v1.0.0`。
 
+### V1 Release Gate（NOT RELEASED）
+
+V1-1 至 V1-7 的功能实现已经完成，但 **V1 仍未发布**。正式进入 `v1.0.0` 前必须依次完成：
+
+1. Phase A 工程与配置 preflight；
+2. 在本地 SQLite 中显式维护 Account、至少 2 个 enabled Friends、MessageTemplate 和 Schedule；
+3. Phase B 在受控环境中由 Scheduler 完成至少 3 个连续 BusinessDate 的真实运行；
+4. 每个 BusinessDate 执行只读 Audit 并保存验收结论；
+5. 最终 Release Audit；
+6. 只有全部证据通过后才允许合并到 `main` 并创建 `v1.0.0`。
+
+V1 无需 Web UI 即可通过脚本化 CLI 完成最小维护。以下示例只使用虚构名称和占位 ID：
+
+```bash
+# Account：create / list / set-enabled
+pnpm --filter @sparkkeeper/database maintenance -- account create --name "Test Account"
+pnpm --filter @sparkkeeper/database maintenance -- account list
+pnpm --filter @sparkkeeper/database maintenance -- account set-enabled --id <account-id> --enabled false
+
+# Friend：显式 Account、list、identity update、enable/disable
+pnpm --filter @sparkkeeper/database maintenance -- friend create --account-id <account-id> --display-name "Test User"
+pnpm --filter @sparkkeeper/database maintenance -- friend list --account-id <account-id>
+pnpm --filter @sparkkeeper/database maintenance -- friend update --id <friend-id> --unique-id <known-unique-id>
+pnpm --filter @sparkkeeper/database maintenance -- friend set-enabled --id <friend-id> --enabled false
+
+# MessageTemplate：STATIC / RANDOM、safe list、update、enable/disable
+pnpm --filter @sparkkeeper/database maintenance -- template create --name "Test Template" --provider STATIC --message "Hello"
+pnpm --filter @sparkkeeper/database maintenance -- template create --name "Test Random Template" --provider RANDOM --message "Message A" --message "Message B"
+pnpm --filter @sparkkeeper/database maintenance -- template list
+pnpm --filter @sparkkeeper/database maintenance -- template update --id <template-id> --provider RANDOM --message "Message A" --message "Message B"
+pnpm --filter @sparkkeeper/database maintenance -- template set-enabled --id <template-id> --enabled false
+
+# Schedule：必须显式 Account；不会自动选择第一条 Account
+pnpm --filter @sparkkeeper/database maintenance -- schedule configure --account-id <account-id> --start-time 09:00 --end-time 10:00 --timezone Asia/Shanghai --enabled true --max-attempts 3 --retry-interval-seconds 60
+```
+
+普通 Template list 只输出 `id`、`name`、`providerType`、`enabled` 和 `messageCount`，不输出消息内容。Friend list 只输出本地运维所需的 internal ID、displayName、matchField 和 enabled，不 dump raw entity、matchKey 或可选稳定标识。所有命令都不会显示 Cookie、Token、Browser Profile 或认证材料。
+
+在正式本地环境配置 `DATA_DIR`、`BROWSER_PROFILE_DIR`、显式 Account/Template ID，并保持两个发送安全开关关闭后，执行只读 Phase A preflight：
+
+```bash
+SCHEDULER_ENABLED=false \
+SCHEDULER_ALLOW_REAL_SEND=false \
+SCHEDULER_ACCOUNT_ID=<account-id> \
+SCHEDULER_MESSAGE_TEMPLATE_ID=<template-id> \
+pnpm --filter @sparkkeeper/server v1:preflight
+```
+
+Preflight 只检查数据库/七段 migration/PRAGMA、配置、Account、Schedule、Template、enabled Friend 数量、Profile 目录存在性、安全开关和 observability 配置。它不执行 migration、不修改业务状态、不打开 Browser、不读取 Profile 内容，也不输出 Friend 列表或模板内容；任何前置条件不满足都会返回非零退出码。
+
+Phase B 每个 BusinessDate 结束后执行只读 Audit：
+
+```bash
+pnpm --filter @sparkkeeper/server v1:audit -- --date 2026-08-23
+pnpm --filter @sparkkeeper/server v1:audit -- --from 2026-08-21 --to 2026-08-23
+```
+
+Audit 只输出 DailyRun 状态、enabled Friend 数量、各 SendRecord 状态计数、duplicate SendRecord/SUCCESS 违规数、SystemEvent/关键事件/evidence 数量，以及结构化日志是否存在、条目数和 JSONL 解析错误数。它不输出 Friend 身份、messageText、模板内容或内部实体 dump，也不创建 DailyRun、claim SendRecord、安排 Retry、启动 Browser 或调用 MessageSender。
+
+Phase B 每日验收要求：Scheduler 在窗口内自动触发、Auth 为 READY、至少 2 个 enabled Friends、每个 Friend 使用明确 Template、全部 SendRecord 最终可解释、duplicate SendRecord/SUCCESS 均为 0、`DELIVERY_UNKNOWN=0`、日终无 `RUNNING`/`RETRY_WAIT`、日志存在且可解析、关键 SystemEvent 可定位，触发证据时相对路径实际存在。Retry 只能发生在确定未执行外部发送的 pre-send failure。
+
+若出现代码/幂等缺陷、重复发送、不可解释 `DELIVERY_UNKNOWN` 或状态损坏，Gate 立即失败，修复后重新开始 3 个连续 BusinessDate。用户主动停服或明确取消的日期不计入 streak。真实 `AUTH_EXPIRED` 若能安全停止、正确记录 Run/SystemEvent/evidence 且无重复发送，证明保护行为有效，但该日不计作正常连续成功日；人工恢复登录后按 Gate B 记录重新计算连续期，SparkKeeper 不会自动登录或绕过平台验证。
+
+执行完全离线、自动清理且仅含虚构数据的 Phase A 验收 Smoke：
+
+```bash
+pnpm --filter @sparkkeeper/server v1:gate:smoke
+```
+
+该 Smoke 不启动 Scheduler、Playwright 或真实发送，不访问 Douyin，也不读取任何真实 Browser Profile。
+
 ## Roadmap
 
 - **Phase 0 — Project Foundation（已完成）**：建立 Monorepo、应用与 packages 骨架及统一工程命令。
@@ -363,7 +434,8 @@ Logger、SystemEvent、Screenshot、Trace 或 Retention 失败均为观察失败
 - **V1-5 Scheduler（已完成）**：Schedule 持久化、同日时区窗口、进程内轮询、防重入、DailyTaskRunner 恢复边界与离线验证。
 - **V1-6 Retry & Failure State（已完成）**：有界固定间隔重试、持久化 Attempt/等待状态、原子到期 claim、执行窗口约束和外部发送不确定性保护。
 - **V1-7 Observability（已完成）**：Pino 结构化日志、隐私 allowlist/redaction、SystemEvent、失败截图、可选 Trace、日志轮转和 evidence retention。
-- **V1 Release Gate（尚未完成）**：连续受控验证、无重复发送和可定位失败原因的正式验收；尚未创建 `v1.0.0`。
+- **V1 Release Gate Phase A（Release Readiness）**：工程 preflight、CLI maintenance、只读 Audit 和离线 Gate smoke 已建立；仍需完成受控连续验证。
+- **V1 Release Gate Phase B（待进行）**：至少 3 个连续 BusinessDate 的受控 Scheduler 验证、无重复发送和可定位失败原因；尚未创建 `v1.0.0`。
 - **V2**：增加正式 API、管理后台、实时状态、失败通知和完整自托管部署体验。
 
 各阶段必须通过验收后再进入下一阶段，避免提前引入尚未被真实需求验证的复杂度。

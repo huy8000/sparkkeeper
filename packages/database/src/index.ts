@@ -4,6 +4,8 @@ export {
   DATABASE_BUSY_TIMEOUT_MS,
   DATABASE_SYNCHRONOUS_MODE,
   DEFAULT_MIGRATIONS_DIRECTORY,
+  openDatabaseReadOnly,
+  ReadOnlyDatabaseClient,
   type CreateDatabaseOptions,
   type DatabaseColumnState,
   type DatabaseInspection,
@@ -33,6 +35,27 @@ export {
   type FriendMatch,
   type NormalizedFriendIdentity,
 } from './identity/index.js';
+export {
+  executeMaintenanceCommand,
+  MaintenanceCommandError,
+  type AccountListMaintenanceOutput,
+  type AccountMaintenanceOutput,
+  type FriendListMaintenanceOutput,
+  type FriendMaintenanceOutput,
+  type MaintenanceOutput,
+  type MessageTemplateListMaintenanceOutput,
+  type MessageTemplateMaintenanceOutput,
+  type ScheduleMaintenanceOutput,
+} from './maintenance/MaintenanceCli.js';
+export {
+  V1ReleaseReadModel,
+  type PreflightAccountState,
+  type PreflightScheduleState,
+  type PreflightTemplateState,
+  type V1AuditDayData,
+  type V1AuditSendRecordState,
+  type V1AuditSystemEventState,
+} from './readiness/V1ReleaseReadModel.js';
 export {
   AccountRepository,
   AccountRepositoryError,
