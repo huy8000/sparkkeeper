@@ -1,2 +1,74 @@
-// Public package entry point. Shared contracts will be added only when consumers require them.
-export {};
+/** Login-state metadata shared by automation and persistence boundaries. */
+export type LoginStatus = 'READY' | 'AUTH_EXPIRED' | 'UNKNOWN';
+
+/** Identity metadata that can be shared without database or browser dependencies. */
+export interface FriendIdentity {
+  readonly displayName: string;
+  readonly remarkName?: string | null;
+  readonly shortId?: string | null;
+  readonly uniqueId?: string | null;
+  readonly secUid?: string | null;
+}
+
+/** The single normalized identity field currently used to bind a Friend. */
+export type FriendMatchField = 'displayName' | 'remarkName' | 'shortId' | 'uniqueId' | 'secUid';
+
+/** Message provider kinds supported by the V1 template engine. */
+export type MessageProviderType = 'STATIC' | 'RANDOM';
+
+/** Persisted message template domain object shared by persistence and generation boundaries. */
+export interface MessageTemplate {
+  readonly id: string;
+  readonly name: string;
+  readonly providerType: MessageProviderType;
+  readonly messages: readonly string[];
+  readonly enabled: boolean;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
+
+export {
+  BusinessDateError,
+  DEFAULT_APP_TIMEZONE,
+  parseBusinessDate,
+  resolveBusinessDate,
+  resolveBusinessTimeZone,
+  type BusinessDate,
+  type BusinessDateErrorCode,
+} from './BusinessDate.js';
+
+export type DailyRunStatus = 'READY' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'AUTH_EXPIRED';
+
+export type SendRecordStatus =
+  'READY' | 'RUNNING' | 'RETRY_WAIT' | 'SUCCESS' | 'FAILED' | 'DELIVERY_UNKNOWN';
+
+export {
+  DEFAULT_MAX_ATTEMPTS,
+  DEFAULT_RETRY_INTERVAL_SECONDS,
+  MAX_MAX_ATTEMPTS,
+  MAX_RETRY_INTERVAL_SECONDS,
+  MIN_MAX_ATTEMPTS,
+  MIN_RETRY_INTERVAL_SECONDS,
+  RetryConfigurationError,
+  validateMaxAttempts,
+  validateRetryIntervalSeconds,
+  type ExternalActionState,
+  type RetryFailureCode,
+} from './Retry.js';
+
+export {
+  parseScheduleTime,
+  ScheduleTimeError,
+  scheduleTimeToMinutes,
+  validateScheduleWindow,
+  type ScheduleTime,
+} from './ScheduleTime.js';
+
+export {
+  isRuntimeEventType,
+  isSystemEventLevel,
+  RUNTIME_EVENT_TYPES,
+  SYSTEM_EVENT_LEVELS,
+  type RuntimeEventType,
+  type SystemEventLevel,
+} from './RuntimeEvent.js';

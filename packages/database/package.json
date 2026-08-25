@@ -2,16 +2,34 @@
   "name": "@sparkkeeper/database",
   "version": "0.0.0",
   "private": true,
-  "description": "SparkKeeper database package foundation",
+  "description": "SparkKeeper SQLite persistence and repositories",
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "import": "./dist/index.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "domain:build": "pnpm --filter @sparkkeeper/shared build && pnpm --filter @sparkkeeper/message-engine build",
+    "db:check": "pnpm domain:build && tsx scripts/database-cli.ts check",
+    "db:generate": "drizzle-kit generate --config drizzle.config.ts",
+    "db:migrate": "pnpm domain:build && tsx scripts/database-cli.ts migrate",
+    "db:smoke": "pnpm domain:build && tsx scripts/database-smoke.ts",
+    "maintenance": "pnpm domain:build && tsx scripts/maintenance-cli.ts",
+    "schedule:configure": "pnpm domain:build && tsx scripts/schedule-configure.ts",
+    "test": "pnpm domain:build && tsx --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@sparkkeeper/message-engine": "workspace:*",
+    "@sparkkeeper/shared": "workspace:*",
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "drizzle-kit": "^0.31.10"
   }
 }
