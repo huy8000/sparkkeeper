@@ -358,10 +358,12 @@ V1-1 至 V1-7 的功能实现已经完成，但 **V1 仍未发布**。正式进�
 
 1. Phase A 工程与配置 preflight；
 2. 在本地 SQLite 中显式维护 Account、至少 2 个 enabled Friends、MessageTemplate 和 Schedule；
-3. Phase B 在受控环境中由 Scheduler 完成至少 3 个连续 BusinessDate 的真实运行；
+3. Phase B 在受控环境中由 Scheduler 完成至少 2 个连续 BusinessDate 的真实运行，并完成同日重启幂等、`AUTH_EXPIRED` 安全停止和失败证据链验证；
 4. 每个 BusinessDate 执行只读 Audit 并保存验收结论；
 5. 最终 Release Audit；
 6. 只有全部证据通过后才允许合并到 `main` 并创建 `v1.0.0`。
+
+上述“两日受控运行 + 同日重启幂等 + `AUTH_EXPIRED` 安全停止 + 失败证据链”是当前 V1 的正式验收标准，不是临时豁免。
 
 V1 无需 Web UI 即可通过脚本化 CLI 完成最小维护。以下示例只使用虚构名称和占位 ID：
 
@@ -413,7 +415,7 @@ Audit 只输出 DailyRun 状态、enabled Friend 数量、各 SendRecord 状态�
 
 Phase B 每日验收要求：Scheduler 在窗口内自动触发、Auth 为 READY、至少 2 个 enabled Friends、每个 Friend 使用明确 Template、全部 SendRecord 最终可解释、duplicate SendRecord/SUCCESS 均为 0、`DELIVERY_UNKNOWN=0`、日终无 `RUNNING`/`RETRY_WAIT`、日志存在且可解析、关键 SystemEvent 可定位，触发证据时相对路径实际存在。Retry 只能发生在确定未执行外部发送的 pre-send failure。
 
-若出现代码/幂等缺陷、重复发送、不可解释 `DELIVERY_UNKNOWN` 或状态损坏，Gate 立即失败，修复后重新开始 3 个连续 BusinessDate。用户主动停服或明确取消的日期不计入 streak。真实 `AUTH_EXPIRED` 若能安全停止、正确记录 Run/SystemEvent/evidence 且无重复发送，证明保护行为有效，但该日不计作正常连续成功日；人工恢复登录后按 Gate B 记录重新计算连续期，SparkKeeper 不会自动登录或绕过平台验证。
+若出现代码/幂等缺陷、重复发送、不可解释 `DELIVERY_UNKNOWN` 或状态损坏，Gate 立即失败，修复后重新开始 2 个连续 BusinessDate。用户主动停服或明确取消的日期不计入 streak。真实 `AUTH_EXPIRED` 若能安全停止、正确记录 Run/SystemEvent/evidence 且无重复发送，证明保护行为有效，但该日不计作正常连续成功日；人工恢复登录后按 Gate B 记录重新计算连续期，SparkKeeper 不会自动登录或绕过平台验证。
 
 执行完全离线、自动清理且仅含虚构数据的 Phase A 验收 Smoke：
 
@@ -435,7 +437,7 @@ pnpm --filter @sparkkeeper/server v1:gate:smoke
 - **V1-6 Retry & Failure State（已完成）**：有界固定间隔重试、持久化 Attempt/等待状态、原子到期 claim、执行窗口约束和外部发送不确定性保护。
 - **V1-7 Observability（已完成）**：Pino 结构化日志、隐私 allowlist/redaction、SystemEvent、失败截图、可选 Trace、日志轮转和 evidence retention。
 - **V1 Release Gate Phase A（Release Readiness）**：工程 preflight、CLI maintenance、只读 Audit 和离线 Gate smoke 已建立；仍需完成受控连续验证。
-- **V1 Release Gate Phase B（待进行）**：至少 3 个连续 BusinessDate 的受控 Scheduler 验证、无重复发送和可定位失败原因；尚未创建 `v1.0.0`。
+- **V1 Release Gate Phase B（待进行）**：至少 2 个连续 BusinessDate 的受控 Scheduler 验证，以及同日重启幂等、`AUTH_EXPIRED` 安全停止和失败证据链验证；尚未创建 `v1.0.0`。
 - **V2**：增加正式 API、管理后台、实时状态、失败通知和完整自托管部署体验。
 
 各阶段必须通过验收后再进入下一阶段，避免提前引入尚未被真实需求验证的复杂度。
