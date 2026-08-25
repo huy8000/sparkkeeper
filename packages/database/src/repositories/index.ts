@@ -6,12 +6,15 @@ export {
   type UpdateAccountInput,
 } from './AccountRepository.js';
 export {
+  DEFAULT_DAILY_RUN_LIMIT,
+  MAX_DAILY_RUN_LIMIT,
   DailyRunRepository,
   DailyRunRepositoryError,
   type CreateOrGetDailyRunInput,
   type ClaimDailyRunResult,
   type DailyRun,
   type DailyRunRepositoryErrorCode,
+  type ListDailyRunsInput,
 } from './DailyRunRepository.js';
 export {
   FriendRepository,

@@ -79,6 +79,10 @@ interface SqliteNameRow {
   readonly name: string;
 }
 
+interface SqliteHealthRow {
+  readonly ready: number;
+}
+
 interface SqliteTableInfoRow {
   readonly name: string;
   readonly type: string;
@@ -293,6 +297,21 @@ export class DatabaseClient {
     return !this.closed && this.sqlite.open;
   }
 
+  ping(): true {
+    this.assertOpen();
+
+    try {
+      const row = this.sqlite.prepare('select 1 as ready').get() as SqliteHealthRow | undefined;
+      if (row?.ready !== 1) {
+        throw new DatabaseClientError('Database health query returned an unexpected result.');
+      }
+      return true;
+    } catch (error) {
+      if (error instanceof DatabaseClientError) throw error;
+      throw new DatabaseClientError('Database health query failed.', error);
+    }
+  }
+
   private assertOpen(): void {
     if (!this.isOpen()) {
       throw new DatabaseClientError('Database client is closed.');
@@ -396,6 +415,10 @@ export class ReadOnlyDatabaseClient {
 
   isOpen(): boolean {
     return this.client.isOpen();
+  }
+
+  ping(): true {
+    return this.client.ping();
   }
 }
 
