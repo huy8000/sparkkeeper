@@ -11,6 +11,7 @@ import LoadingState from '../components/LoadingState.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { useRequest } from '../composables/useRequest';
 import { useMutation } from '../composables/useMutation';
+import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { formatTimestamp } from '../utils/format';
 import type { CreateAccountInput } from '../types/api';
 
@@ -25,6 +26,11 @@ const {
   clearError,
 } = useMutation();
 watch(app.refreshVersion, () => void accounts.load());
+useRealtimeRefresh(
+  app.realtime,
+  (event) => event.type === 'CONFIG_CHANGED' && event.data.entityType === 'ACCOUNT',
+  () => void accounts.load(),
+);
 
 async function createAccount(input: CreateAccountInput): Promise<void> {
   await execute(

@@ -1,9 +1,10 @@
 import { flushPromises } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { ACCOUNT_ID, accountFixture, friendFixture } from '../test/fixtures';
 import { failure, installApiFetch, success } from '../test/http';
 import { mountAdmin } from '../test/mountAdmin';
+import { FakeEventSource, configEvent, installEventSource } from '../test/realtime';
 
 describe('Accounts', () => {
   it('renders the account list and links to detail', async () => {
@@ -162,6 +163,27 @@ describe('Accounts', () => {
     expect(wrapper.text()).toContain('Account not found');
     expect(wrapper.text()).toContain('This account is not available.');
     expect(wrapper.text()).not.toContain('Internal account lookup failed.');
+    wrapper.unmount();
+  });
+
+  it('refreshes the mounted Account view after a debounced ACCOUNT invalidation', async () => {
+    const fetchMock = installApiFetch();
+    installEventSource();
+    const wrapper = await mountAdmin('/accounts');
+    const source = FakeEventSource.instances[0]!;
+    const accountLoads = () =>
+      fetchMock.mock.calls.filter(
+        ([url, init]) => String(url).endsWith('/api/accounts') && (init?.method ?? 'GET') === 'GET',
+      ).length;
+    expect(accountLoads()).toBe(1);
+
+    vi.useFakeTimers();
+    source.emit('config-changed', configEvent('ACCOUNT', ACCOUNT_ID));
+    source.emit('config-changed', configEvent('ACCOUNT', ACCOUNT_ID, undefined, '4'));
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    vi.useRealTimers();
+    expect(accountLoads()).toBe(2);
     wrapper.unmount();
   });
 });

@@ -1,9 +1,10 @@
 import { flushPromises } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { ACCOUNT_ID, RUN_ID, sendRecordFixture, systemEventFixture } from '../test/fixtures';
 import { installApiFetch, success } from '../test/http';
 import { mountAdmin } from '../test/mountAdmin';
+import { FakeEventSource, installEventSource, readyEvent, runtimeEvent } from '../test/realtime';
 
 describe('Runs', () => {
   it('renders run status, account name, business date, and detail link', async () => {
@@ -107,6 +108,91 @@ describe('Runs', () => {
 
     expect(wrapper.text()).toContain('Run not found');
     expect(wrapper.text()).not.toContain('Internal lookup detail.');
+    wrapper.unmount();
+  });
+
+  it('filters noisy runtime phases, debounces live refresh, and recovers the current query on reconnect', async () => {
+    const fetchMock = installApiFetch();
+    installEventSource();
+    const wrapper = await mountAdmin('/runs');
+    const selects = wrapper.findAll('select');
+    await selects[0]!.setValue(ACCOUNT_ID);
+    await wrapper.find('input[type="date"]').setValue('2026-01-02');
+    await selects[1]!.setValue('FAILED');
+    await selects[2]!.setValue('100');
+    await wrapper.find('form').trigger('submit');
+    await flushPromises();
+
+    const source = FakeEventSource.instances[0]!;
+    vi.useFakeTimers();
+    source.emit('runtime', runtimeEvent(RUN_ID, 'FRIEND_RESOLVING'));
+    await vi.advanceTimersByTimeAsync(600);
+    await flushPromises();
+    let filteredCalls = fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes(
+        `/api/runs?accountId=${ACCOUNT_ID}&businessDate=2026-01-02&status=FAILED&limit=100`,
+      ),
+    );
+    expect(filteredCalls.length).toBe(1);
+
+    source.emit('runtime', runtimeEvent(RUN_ID));
+    source.emit('runtime', runtimeEvent(RUN_ID, 'RUN_FINISHED', '3'));
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    filteredCalls = fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes(
+        `/api/runs?accountId=${ACCOUNT_ID}&businessDate=2026-01-02&status=FAILED&limit=100`,
+      ),
+    );
+    expect(filteredCalls.length).toBe(2);
+
+    source.emit('error');
+    source.emit('open');
+    source.emit('ready', readyEvent('4'));
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    vi.useRealTimers();
+    filteredCalls = fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes(
+        `/api/runs?accountId=${ACCOUNT_ID}&businessDate=2026-01-02&status=FAILED&limit=100`,
+      ),
+    );
+    expect(filteredCalls.length).toBe(3);
+    wrapper.unmount();
+  });
+
+  it('refreshes Run Detail once for matching events and ignores other run IDs', async () => {
+    const fetchMock = installApiFetch();
+    installEventSource();
+    const wrapper = await mountAdmin(`/runs/${RUN_ID}`);
+    const source = FakeEventSource.instances[0]!;
+    const runCalls = () =>
+      fetchMock.mock.calls.filter(([input]) => String(input).endsWith(`/api/runs/${RUN_ID}`))
+        .length;
+    expect(runCalls()).toBe(1);
+
+    vi.useFakeTimers();
+    source.emit('runtime', runtimeEvent('00000000-0000-4000-8000-000000000099'));
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    expect(runCalls()).toBe(1);
+    source.emit('runtime', runtimeEvent(RUN_ID, 'FRIEND_RESOLVING'));
+    await vi.advanceTimersByTimeAsync(600);
+    await flushPromises();
+    expect(runCalls()).toBe(1);
+    source.emit('runtime', runtimeEvent(RUN_ID));
+    source.emit('runtime', runtimeEvent(RUN_ID, 'RUN_FINISHED', '4'));
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    expect(runCalls()).toBe(2);
+
+    source.emit('error');
+    source.emit('open');
+    source.emit('ready', readyEvent('5'));
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    vi.useRealTimers();
+    expect(runCalls()).toBe(3);
     wrapper.unmount();
   });
 });

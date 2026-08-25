@@ -10,6 +10,7 @@ import StatusBadge from '../components/StatusBadge.vue';
 import ScheduleForm from '../components/ScheduleForm.vue';
 import { useRequest } from '../composables/useRequest';
 import { useMutation } from '../composables/useMutation';
+import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import type { ConfigureScheduleInput, Schedule } from '../types/api';
 
 const app = useAdminApp();
@@ -29,6 +30,13 @@ const runtimeSchedulerLabel = computed(() =>
   app.runtime.data.value?.schedulerEnabled ? 'ENABLED' : 'DISABLED',
 );
 watch(app.refreshVersion, () => void result.load());
+useRealtimeRefresh(
+  app.realtime,
+  (event) =>
+    event.type === 'CONFIG_CHANGED' &&
+    (event.data.entityType === 'SCHEDULE' || event.data.entityType === 'ACCOUNT'),
+  () => void result.load(),
+);
 const editingSchedule = ref<Schedule | null>(null);
 const {
   submitting,

@@ -1,9 +1,10 @@
 import { flushPromises } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { ACCOUNT_ID } from '../test/fixtures';
 import { failure, installApiFetch, success } from '../test/http';
 import { mountAdmin } from '../test/mountAdmin';
+import { FakeEventSource, configEvent, installEventSource } from '../test/realtime';
 
 describe('Schedules', () => {
   it('aggregates account-scoped schedules and distinguishes runtime control', async () => {
@@ -86,6 +87,28 @@ describe('Schedules', () => {
     expect(wrapper.html()).not.toMatch(
       /private_stack_sentinel|database path|browser profile|fixture-only-token/iu,
     );
+    wrapper.unmount();
+  });
+
+  it('refreshes the mounted Schedule view after SCHEDULE invalidation', async () => {
+    const fetchMock = installApiFetch();
+    installEventSource();
+    const wrapper = await mountAdmin('/schedules');
+    const source = FakeEventSource.instances[0]!;
+    const scheduleLoads = () =>
+      fetchMock.mock.calls.filter(([url]) =>
+        String(url).endsWith(`/api/accounts/${ACCOUNT_ID}/schedules`),
+      ).length;
+    expect(scheduleLoads()).toBe(1);
+    vi.useFakeTimers();
+    source.emit(
+      'config-changed',
+      configEvent('SCHEDULE', '00000000-0000-4000-8000-000000000003', ACCOUNT_ID),
+    );
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    vi.useRealTimers();
+    expect(scheduleLoads()).toBe(2);
     wrapper.unmount();
   });
 });

@@ -3,12 +3,14 @@ import { watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { useAdminApp } from '../appContext';
+import { invalidatesRunDetail } from '../api/realtimeInvalidation';
 import EmptyState from '../components/EmptyState.vue';
 import ErrorState from '../components/ErrorState.vue';
 import IdentifierValue from '../components/IdentifierValue.vue';
 import LoadingState from '../components/LoadingState.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { useRequest } from '../composables/useRequest';
+import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { formatTimestamp } from '../utils/format';
 
 const app = useAdminApp();
@@ -24,6 +26,11 @@ const detail = useRequest(async (signal) => {
   return { run, account, sendRecords, events };
 });
 watch(app.refreshVersion, () => void detail.load());
+useRealtimeRefresh(
+  app.realtime,
+  (event) => invalidatesRunDetail(event, runId),
+  () => void detail.load(),
+);
 </script>
 
 <template>

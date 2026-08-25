@@ -45,6 +45,18 @@ const pageTitle = computed(() => String(route.meta.title ?? 'SparkKeeper'));
             label="Runtime unavailable"
           />
           <span v-else class="topbar__loading" role="status">Checking runtime…</span>
+          <span class="live-status" role="status">
+            Live updates:
+            {{
+              app.realtime.connectionState.value === 'CONNECTED'
+                ? 'Connected'
+                : app.realtime.connectionState.value === 'RECONNECTING'
+                  ? 'Reconnecting'
+                  : app.realtime.connectionState.value === 'CONNECTING'
+                    ? 'Connecting'
+                    : 'Offline'
+            }}
+          </span>
           <button class="button button--secondary" type="button" @click="app.refresh">
             Refresh
           </button>

@@ -27,6 +27,7 @@ import {
 } from '../src/http/plugins/MutationGuard.js';
 import { ApiError } from '../src/http/errors/ApiError.js';
 import { ApiConfigurationService } from '../src/http/services/ApiConfigurationService.js';
+import type { RealtimeEvent } from '../src/realtime/RealtimeEvent.js';
 
 const FIXED_NOW = new Date('2026-02-03T04:05:06.000Z');
 const UNKNOWN_UUID = '00000000-0000-4000-8000-000000000000';
@@ -491,6 +492,65 @@ test('Schedule configuration API and forbidden capability boundary', async (cont
         error instanceof ApiError && error.statusCode === 409 && error.code === 'CONFLICT',
     );
   });
+});
+
+test('successful configuration mutations emit only safe CONFIG_CHANGED invalidations', async (context) => {
+  const fixture = createFixture(context);
+  const events: RealtimeEvent[] = [];
+  const unsubscribe = fixture.application.realtime.subscribe((event) => events.push(event));
+  context.after(unsubscribe);
+
+  const account = await mutate(fixture.application.server, 'POST', '/api/accounts', {
+    name: 'Realtime Demo Account',
+  });
+  const friend = await mutate(
+    fixture.application.server,
+    'POST',
+    `/api/accounts/${fixture.account.id}/friends`,
+    { displayName: 'Realtime Demo Contact', shortId: 'realtime-demo', matchField: 'shortId' },
+  );
+  const template = await mutate(fixture.application.server, 'POST', '/api/templates', {
+    name: 'Realtime Demo Template',
+    providerType: 'STATIC',
+    messages: ['PRIVATE_TEMPLATE_BODY_SENTINEL'],
+  });
+  const schedule = await mutate(
+    fixture.application.server,
+    'PUT',
+    `/api/accounts/${fixture.account.id}/schedule`,
+    scheduleBody({ enabled: false }),
+  );
+  for (const response of [account, friend, template, schedule]) {
+    assert.ok(response.statusCode === 200 || response.statusCode === 201);
+  }
+
+  assert.deepEqual(
+    events.map((event) =>
+      event.type === 'CONFIG_CHANGED'
+        ? { type: event.type, entityType: event.data.entityType }
+        : { type: event.type },
+    ),
+    [
+      { type: 'CONFIG_CHANGED', entityType: 'ACCOUNT' },
+      { type: 'CONFIG_CHANGED', entityType: 'FRIEND' },
+      { type: 'CONFIG_CHANGED', entityType: 'TEMPLATE' },
+      { type: 'CONFIG_CHANGED', entityType: 'SCHEDULE' },
+    ],
+  );
+  const serialized = JSON.stringify(events);
+  assert.doesNotMatch(
+    serialized,
+    /PRIVATE_TEMPLATE_BODY_SENTINEL|Realtime Demo Contact|messages|displayName|mutation/u,
+  );
+
+  const eventCount = events.length;
+  const failed = await mutate(fixture.application.server, 'POST', '/api/templates', {
+    name: 'Invalid Realtime Template',
+    providerType: 'STATIC',
+    messages: [],
+  });
+  assertError(failed, 400, 'VALIDATION_ERROR');
+  assert.equal(events.length, eventCount);
 });
 
 function createFixture(context: TestContext): Fixture {

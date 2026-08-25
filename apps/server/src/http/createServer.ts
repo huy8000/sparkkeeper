@@ -8,6 +8,7 @@ import {
 } from './plugins/MutationGuard.js';
 import { registerAccountRoutes } from './routes/accountRoutes.js';
 import { registerConfigurationRoutes } from './routes/configurationRoutes.js';
+import { registerRealtimeRoutes, type RealtimeRouteOptions } from './routes/realtimeRoutes.js';
 import { registerRunRoutes } from './routes/runRoutes.js';
 import { registerStatusRoutes } from './routes/statusRoutes.js';
 import { failure } from './serializers/envelope.js';
@@ -17,6 +18,7 @@ export interface CreateServerOptions {
   readonly services: ApiServices;
   readonly logger?: FastifyServerOptions['logger'];
   readonly mutationGuard?: MutationGuardOptions;
+  readonly realtime?: RealtimeRouteOptions;
 }
 
 export function createServer(options: CreateServerOptions): FastifyInstance {
@@ -60,6 +62,7 @@ export function createServer(options: CreateServerOptions): FastifyInstance {
   registerAccountRoutes(server, options.services);
   registerConfigurationRoutes(server, options.services);
   registerRunRoutes(server, options.services);
+  if (options.realtime !== undefined) registerRealtimeRoutes(server, options.realtime);
   return server;
 }
 

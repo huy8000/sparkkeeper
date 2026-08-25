@@ -3,11 +3,13 @@ import { reactive, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { useAdminApp } from '../appContext';
+import { invalidatesRunList } from '../api/realtimeInvalidation';
 import EmptyState from '../components/EmptyState.vue';
 import ErrorState from '../components/ErrorState.vue';
 import LoadingState from '../components/LoadingState.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { useRequest } from '../composables/useRequest';
+import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import type { DailyRunStatus, RunFilters } from '../types/api';
 import { formatTimestamp, shortId } from '../utils/format';
 
@@ -44,6 +46,7 @@ const result = useRequest(async (signal) => {
   return { accounts, runs };
 });
 watch(app.refreshVersion, () => void result.load());
+useRealtimeRefresh(app.realtime, invalidatesRunList, () => void result.load());
 
 async function applyFilters(): Promise<void> {
   await router.replace({

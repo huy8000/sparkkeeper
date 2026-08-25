@@ -17,6 +17,7 @@ import {
 } from '@sparkkeeper/message-engine';
 import type { FriendMatchField, MessageProviderType, MessageTemplate } from '@sparkkeeper/shared';
 
+import type { ConfigEntityType, RealtimeEventPublisher } from '../../realtime/RealtimeEvent.js';
 import { ApiError, entityNotFound } from '../errors/ApiError.js';
 import {
   type AccountDto,
@@ -99,16 +100,19 @@ export class ApiConfigurationService {
   constructor(
     private readonly repositories: ApiConfigurationRepositories,
     private readonly clock: () => Date = () => new Date(),
+    private readonly realtime?: RealtimeEventPublisher,
   ) {}
 
   createAccount(input: CreateAccountConfigInput): AccountDto {
     const name = validatedName(input.name, 'Account');
-    return toAccountDto(
+    const account = toAccountDto(
       this.repositories.accounts.create({
         name,
         ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
       }),
     );
+    this.publishConfigChanged('ACCOUNT', account.id);
+    return account;
   }
 
   updateAccount(accountId: string, input: UpdateAccountConfigInput): AccountDto {
@@ -118,14 +122,18 @@ export class ApiConfigurationService {
     };
     const account = this.repositories.accounts.update(accountId, update);
     if (account === undefined) throw entityNotFound('ACCOUNT_NOT_FOUND', 'Account');
-    return toAccountDto(account);
+    const dto = toAccountDto(account);
+    this.publishConfigChanged('ACCOUNT', dto.id);
+    return dto;
   }
 
   createFriend(accountId: string, input: FriendConfigInput): FriendDto {
     this.requireAccount(accountId);
     validateFriendConfiguration(input, input.matchField);
     const create: CreateFriendInput = { accountId, ...input };
-    return toFriendDto(this.repositories.friends.create(create));
+    const friend = toFriendDto(this.repositories.friends.create(create));
+    this.publishConfigChanged('FRIEND', friend.id, friend.accountId);
+    return friend;
   }
 
   updateFriend(friendId: string, input: UpdateFriendConfigInput): FriendDto {
@@ -149,7 +157,9 @@ export class ApiConfigurationService {
     };
     const friend = this.repositories.friends.update(friendId, repositoryInput);
     if (friend === undefined) throw entityNotFound('FRIEND_NOT_FOUND', 'Friend');
-    return toFriendDto(friend);
+    const dto = toFriendDto(friend);
+    this.publishConfigChanged('FRIEND', dto.id, dto.accountId);
+    return dto;
   }
 
   listTemplates(): MessageTemplateSummaryDto[] {
@@ -164,7 +174,9 @@ export class ApiConfigurationService {
 
   createTemplate(input: TemplateConfigInput): MessageTemplateDetailDto {
     validateTemplateConfiguration(input.name, input.providerType, input.messages);
-    return toTemplateDetailDto(this.repositories.templates.create(input));
+    const template = toTemplateDetailDto(this.repositories.templates.create(input));
+    this.publishConfigChanged('TEMPLATE', template.id);
+    return template;
   }
 
   updateTemplate(templateId: string, input: UpdateTemplateConfigInput): MessageTemplateDetailDto {
@@ -177,7 +189,9 @@ export class ApiConfigurationService {
     );
     const template = this.repositories.templates.update(templateId, input);
     if (template === undefined) throw entityNotFound('TEMPLATE_NOT_FOUND', 'Message template');
-    return toTemplateDetailDto(template);
+    const dto = toTemplateDetailDto(template);
+    this.publishConfigChanged('TEMPLATE', dto.id);
+    return dto;
   }
 
   configureSchedule(accountId: string, input: ConfigureScheduleInput): ScheduleDto {
@@ -189,7 +203,9 @@ export class ApiConfigurationService {
           ? this.repositories.schedules.create({ accountId, ...input, now: this.clock() })
           : this.repositories.schedules.update(existing.id, { ...input, now: this.clock() });
       if (schedule === undefined) throw entityNotFound('SCHEDULE_NOT_FOUND', 'Schedule');
-      return toScheduleDto(schedule);
+      const dto = toScheduleDto(schedule);
+      this.publishConfigChanged('SCHEDULE', dto.id, dto.accountId);
+      return dto;
     } catch (error) {
       throw mapScheduleError(error);
     }
@@ -198,6 +214,25 @@ export class ApiConfigurationService {
   private requireAccount(accountId: string): void {
     if (this.repositories.accounts.findById(accountId) === undefined) {
       throw entityNotFound('ACCOUNT_NOT_FOUND', 'Account');
+    }
+  }
+
+  private publishConfigChanged(
+    entityType: ConfigEntityType,
+    entityId: string,
+    accountId?: string,
+  ): void {
+    try {
+      this.realtime?.publish({
+        type: 'CONFIG_CHANGED',
+        data: {
+          entityType,
+          entityId,
+          ...(accountId === undefined ? {} : { accountId }),
+        },
+      });
+    } catch {
+      // Realtime invalidation is optional and cannot make a persisted mutation fail.
     }
   }
 }
