@@ -1,13 +1,25 @@
 <script setup lang="ts">
-const phase = 'Phase 0 · Project Foundation';
+import { provide, readonly, ref } from 'vue';
+
+import { createSparkKeeperApi } from './api/sparkkeeperApi';
+import { appContextKey } from './appContext';
+import { useRequest } from './composables/useRequest';
+
+const api = createSparkKeeperApi();
+const refreshVersion = ref(0);
+const runtime = useRequest((signal) => api.getRuntimeStatus(signal));
+
+provide(appContextKey, {
+  api,
+  refreshVersion: readonly(refreshVersion),
+  runtime,
+  refresh() {
+    refreshVersion.value += 1;
+    void runtime.load();
+  },
+});
 </script>
 
 <template>
-  <main class="foundation" aria-labelledby="page-title">
-    <section class="foundation__card">
-      <p class="foundation__eyebrow">{{ phase }}</p>
-      <h1 id="page-title">SparkKeeper</h1>
-      <p class="foundation__description">管理端基础应用已就绪，业务功能将在后续阶段实现。</p>
-    </section>
-  </main>
+  <RouterView />
 </template>

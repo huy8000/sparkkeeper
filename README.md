@@ -111,7 +111,7 @@ pnpm install
 pnpm dev
 ```
 
-管理端默认地址为 `http://localhost:5173`。服务端可单独运行：
+管理端开发服务器默认仅绑定 `127.0.0.1`，地址为 `http://127.0.0.1:5173`。服务端可单独运行：
 
 ```bash
 pnpm --filter @sparkkeeper/server dev
@@ -137,6 +137,19 @@ pnpm --filter @sparkkeeper/server dev
 - `GET /api/runs/:runId/events`
 
 API 与 Scheduler 使用独立的安全控制。启动 HTTP 服务不会授权真实发送；Scheduler 仍由 `SCHEDULER_ENABLED` 和 `SCHEDULER_ALLOW_REAL_SEND` 等原有开关控制，默认保持关闭。本阶段没有任何 Web real-send endpoint、文件下载 endpoint、CORS 通配配置或真实平台访问逻辑。
+
+### V2 Read-only Admin Web Foundation
+
+Vue 3 + TypeScript 管理端现已提供 Dashboard、Accounts、Account Detail（Friends 与 Schedules）、Schedules、Runs 和 Run Detail（SendRecords 与 SystemEvents）页面。可分别启动本机 API 与管理端：
+
+```bash
+pnpm --filter @sparkkeeper/server dev
+pnpm --filter @sparkkeeper/admin-web dev
+```
+
+管理端默认使用 same-origin `/api`，Vite 在开发环境将其代理到本机 `http://127.0.0.1:8080`，因此无需为 Fastify 开启 CORS。若部署拓扑另有需要，可显式设置 `VITE_API_BASE_URL`，但默认配置仍保持仅供本机访问。
+
+当前管理端严格只读：没有 Web 写操作、发送或手动运行入口、远程认证、SSE、通知、evidence 下载或文件路径拼接。Screenshot/Trace 只显示是否可用，未来 Vue 管理功能将在明确的安全边界下逐步加入。
 
 工程检查：
 
