@@ -21,9 +21,10 @@ const pageTitle = computed(() => String(route.meta.title ?? 'SparkKeeper'));
         <RouterLink to="/" exact-active-class="navigation__link--active">Dashboard</RouterLink>
         <RouterLink to="/accounts" active-class="navigation__link--active">Accounts</RouterLink>
         <RouterLink to="/schedules" active-class="navigation__link--active">Schedules</RouterLink>
+        <RouterLink to="/templates" active-class="navigation__link--active">Templates</RouterLink>
         <RouterLink to="/runs" active-class="navigation__link--active">Runs</RouterLink>
       </nav>
-      <p class="sidebar__note">Read-only administration</p>
+      <p class="sidebar__note">Local configuration administration</p>
     </aside>
 
     <div class="workspace">

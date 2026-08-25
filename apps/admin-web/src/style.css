@@ -38,7 +38,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   color: inherit;
   font: inherit;
 }
@@ -247,6 +248,152 @@ a {
 
 .button--secondary:hover {
   background: #f6f8fb;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.button--compact {
+  min-height: 30px;
+  padding: 5px 9px;
+}
+
+.page-actions,
+.section-actions,
+.card-actions,
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.form-panel {
+  padding: 20px;
+  border: 1px solid #bac8e5;
+  border-radius: 12px;
+  background: #f9fbff;
+  box-shadow: var(--shadow);
+}
+
+.form-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.form-panel__header h3,
+.form-panel__header p {
+  margin: 0;
+}
+
+.form-panel__header p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.config-form {
+  display: grid;
+  gap: 15px;
+}
+
+.config-form--grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.config-form label:not(.checkbox-field) {
+  display: grid;
+  gap: 6px;
+  color: #46546b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.config-form input:not([type='checkbox']),
+.config-form select,
+.config-form textarea {
+  width: 100%;
+  min-height: 39px;
+  padding: 8px 10px;
+  border: 1px solid #bec8d8;
+  border-radius: 7px;
+  background: #fff;
+  font-size: 0.88rem;
+}
+
+.config-form textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.config-form label small,
+.form-note {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #46546b;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.form-error,
+.success-message {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 7px;
+  font-size: 0.83rem;
+}
+
+.form-error {
+  color: #781d15;
+  background: #fff0ef;
+}
+
+.success-message {
+  color: #155f3e;
+  background: #e8f5ee;
+}
+
+.form-actions--full {
+  grid-column: 1 / -1;
+}
+
+.message-fields {
+  display: grid;
+  gap: 13px;
+  margin: 0;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.message-fields legend {
+  padding: 0 6px;
+  color: #46546b;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.message-field {
+  display: grid;
+  gap: 7px;
+}
+
+.template-privacy-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .dashboard-grid {
@@ -691,7 +838,8 @@ td small {
   }
 
   .definition-grid,
-  .filter-bar {
+  .filter-bar,
+  .config-form--grid {
     grid-template-columns: 1fr;
   }
 

@@ -1,18 +1,46 @@
 <script setup lang="ts">
-import { watch } from 'vue';
+import { ref, watch } from 'vue';
 
 import { useAdminApp } from '../appContext';
+import AccountForm from '../components/AccountForm.vue';
 import EmptyState from '../components/EmptyState.vue';
 import ErrorState from '../components/ErrorState.vue';
+import FormPanel from '../components/FormPanel.vue';
 import IdentifierValue from '../components/IdentifierValue.vue';
 import LoadingState from '../components/LoadingState.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { useRequest } from '../composables/useRequest';
+import { useMutation } from '../composables/useMutation';
 import { formatTimestamp } from '../utils/format';
+import type { CreateAccountInput } from '../types/api';
 
 const app = useAdminApp();
 const accounts = useRequest((signal) => app.api.listAccounts(signal));
+const creating = ref(false);
+const {
+  submitting,
+  error: formError,
+  success: successMessage,
+  execute,
+  clearError,
+} = useMutation();
 watch(app.refreshVersion, () => void accounts.load());
+
+async function createAccount(input: CreateAccountInput): Promise<void> {
+  await execute(
+    () => app.api.createAccount(input),
+    async () => {
+      creating.value = false;
+      await accounts.load();
+    },
+    'Account configuration saved.',
+  );
+}
+
+function closeForm(): void {
+  creating.value = false;
+  clearError();
+}
 </script>
 
 <template>
@@ -23,8 +51,29 @@ watch(app.refreshVersion, () => void accounts.load());
         <h2>Configured accounts</h2>
         <p>View account metadata and login state.</p>
       </div>
-      <button class="button button--secondary" type="button" @click="accounts.load">Refresh</button>
+      <div class="page-actions">
+        <button class="button button--primary" type="button" @click="creating = true">
+          Create account
+        </button>
+        <button class="button button--secondary" type="button" @click="accounts.load">
+          Refresh
+        </button>
+      </div>
     </header>
+    <p v-if="successMessage" class="success-message" role="status">{{ successMessage }}</p>
+    <FormPanel
+      v-if="creating"
+      title="Create account"
+      description="Configure a local account record."
+      @cancel="closeForm"
+    >
+      <AccountForm
+        :submitting="submitting"
+        :server-error="formError"
+        @submit="createAccount"
+        @cancel="closeForm"
+      />
+    </FormPanel>
     <LoadingState v-if="accounts.loading.value && !accounts.data.value" label="Loading accounts…" />
     <ErrorState
       v-else-if="accounts.error.value"

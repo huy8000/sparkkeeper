@@ -10,6 +10,7 @@ describe('admin routing', () => {
     ['/accounts', 'Configured accounts'],
     [`/accounts/${ACCOUNT_ID}`, 'Account detail'],
     ['/schedules', 'Account schedule windows'],
+    ['/templates', 'Message templates'],
     ['/runs', 'Daily run history'],
     [`/runs/${RUN_ID}`, 'Run summary'],
   ])('renders %s', async (path, expected) => {

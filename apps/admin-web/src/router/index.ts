@@ -8,6 +8,7 @@ import NotFoundPage from '../pages/NotFoundPage.vue';
 import RunDetailPage from '../pages/RunDetailPage.vue';
 import RunsPage from '../pages/RunsPage.vue';
 import SchedulesPage from '../pages/SchedulesPage.vue';
+import TemplatesPage from '../pages/TemplatesPage.vue';
 
 export function createAdminRouter(): Router {
   return createRouter({
@@ -25,6 +26,7 @@ export function createAdminRouter(): Router {
             meta: { title: 'Account detail' },
           },
           { path: 'schedules', component: SchedulesPage, meta: { title: 'Schedules' } },
+          { path: 'templates', component: TemplatesPage, meta: { title: 'Templates' } },
           { path: 'runs', component: RunsPage, meta: { title: 'Runs' } },
           { path: 'runs/:runId', component: RunDetailPage, meta: { title: 'Run detail' } },
           { path: ':pathMatch(.*)*', component: NotFoundPage, meta: { title: 'Not found' } },

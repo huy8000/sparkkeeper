@@ -1,3 +1,4 @@
+import { flushPromises } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 
 import { ACCOUNT_ID, accountFixture, friendFixture } from '../test/fixtures';
@@ -47,9 +48,106 @@ describe('Accounts', () => {
     expect(wrapper.text()).toContain('DISABLED');
     expect(wrapper.text()).toContain('09:00–10:30');
     expect(wrapper.text()).toContain('30 sec');
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Edit account')).toBe(true);
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Add friend')).toBe(true);
     expect(
-      wrapper.findAll('button').some((button) => /edit|delete|send|resolve/i.test(button.text())),
+      wrapper.findAll('button').some((button) => /delete|send|resolve/i.test(button.text())),
     ).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('creates an Account with a centralized mutation request', async () => {
+    const fetchMock = installApiFetch();
+    const wrapper = await mountAdmin('/accounts');
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Create account')!
+      .trigger('click');
+    await wrapper.get('input[name="accountName"]').setValue('New Demo Account');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    const call = fetchMock.mock.calls.find(
+      ([url, init]) => String(url).endsWith('/api/accounts') && init?.method === 'POST',
+    );
+    expect(call).toBeDefined();
+    expect(JSON.parse(String(call![1]?.body))).toMatchObject({ name: 'New Demo Account' });
+    expect(wrapper.text()).toContain('Account configuration saved.');
+    wrapper.unmount();
+  });
+
+  it('validates Account creation and renders a safe server error', async () => {
+    installApiFetch((url, init) =>
+      url.pathname === '/api/accounts' && init?.method === 'POST'
+        ? failure('CONFLICT', 'Account configuration conflicts with existing data.', 409)
+        : undefined,
+    );
+    const wrapper = await mountAdmin('/accounts');
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Create account')!
+      .trigger('click');
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.get('[role="alert"]').text()).toContain('Account name is required.');
+    await wrapper.get('input[name="accountName"]').setValue('Demo Conflict');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain('Account configuration conflicts');
+    wrapper.unmount();
+  });
+
+  it('edits Account configuration while keeping loginStatus read-only', async () => {
+    const fetchMock = installApiFetch();
+    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}`);
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Edit account')!
+      .trigger('click');
+    expect(wrapper.text()).toContain('Runtime state; not editable here.');
+    expect(wrapper.find('select[name="loginStatus"]').exists()).toBe(false);
+    await wrapper.get('input[name="accountName"]').setValue('Edited Demo Account');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    const call = fetchMock.mock.calls.find(
+      ([url, init]) =>
+        String(url).includes(`/api/accounts/${ACCOUNT_ID}`) && init?.method === 'PATCH',
+    );
+    expect(JSON.parse(String(call![1]?.body))).not.toHaveProperty('loginStatus');
+    wrapper.unmount();
+  });
+
+  it('creates and edits Friends with match-field validation and enabled state', async () => {
+    const fetchMock = installApiFetch();
+    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}`);
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add friend')!
+      .trigger('click');
+    await wrapper.get('input[name="displayName"]').setValue('Demo Contact Beta');
+    await wrapper.get('select[name="matchField"]').setValue('uniqueId');
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.get('[role="alert"]').text()).toContain('selected uniqueId');
+    await wrapper.get('input[name="uniqueId"]').setValue('demo-contact-beta');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) =>
+          String(url).endsWith(`/api/accounts/${ACCOUNT_ID}/friends`) && init?.method === 'POST',
+      ),
+    ).toBe(true);
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Edit')!
+      .trigger('click');
+    await wrapper.get('input[name="friendEnabled"]').setValue(true);
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    const update = fetchMock.mock.calls.find(
+      ([url, init]) => String(url).includes('/api/friends/') && init?.method === 'PATCH',
+    );
+    expect(JSON.parse(String(update![1]?.body))).toMatchObject({ enabled: true });
     wrapper.unmount();
   });
 
