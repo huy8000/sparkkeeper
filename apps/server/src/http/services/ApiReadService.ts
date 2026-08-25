@@ -1,11 +1,8 @@
 import {
-  type Account,
   type AccountRepository,
   type DailyRun,
   type DailyRunRepository,
-  type Friend,
   type FriendRepository,
-  type Schedule,
   type ScheduleRepository,
   type SendRecord,
   type SendRecordRepository,
@@ -16,8 +13,6 @@ import {
   parseBusinessDate,
   type BusinessDate,
   type DailyRunStatus,
-  type FriendMatchField,
-  type LoginStatus,
   type RuntimeEventType,
   type SendRecordStatus,
   type SystemEventLevel,
@@ -25,41 +20,16 @@ import {
 
 import { safeEventMessage } from '../../observability/RuntimeLogger.js';
 import { ApiError, entityNotFound } from '../errors/ApiError.js';
+import {
+  type AccountDto,
+  type FriendDto,
+  type ScheduleDto,
+  toAccountDto,
+  toFriendDto,
+  toScheduleDto,
+} from './ApiEntityDtos.js';
 
-export interface AccountDto {
-  readonly id: string;
-  readonly name: string;
-  readonly enabled: boolean;
-  readonly loginStatus: LoginStatus;
-  readonly createdAt: string;
-  readonly updatedAt: string;
-}
-
-export interface FriendDto {
-  readonly id: string;
-  readonly accountId: string;
-  readonly displayName: string;
-  readonly remarkName: string | null;
-  readonly shortId: string | null;
-  readonly uniqueId: string | null;
-  readonly matchField: FriendMatchField;
-  readonly enabled: boolean;
-  readonly createdAt: string;
-  readonly updatedAt: string;
-}
-
-export interface ScheduleDto {
-  readonly id: string;
-  readonly accountId: string;
-  readonly startTime: string;
-  readonly endTime: string;
-  readonly timezone: string;
-  readonly enabled: boolean;
-  readonly maxAttempts: number;
-  readonly retryIntervalSeconds: number;
-  readonly createdAt: string;
-  readonly updatedAt: string;
-}
+export type { AccountDto, FriendDto, ScheduleDto } from './ApiEntityDtos.js';
 
 export interface DailyRunDto {
   readonly id: string;
@@ -188,47 +158,6 @@ export class ApiReadService {
     if (run === undefined) throw entityNotFound('RUN_NOT_FOUND', 'DailyRun');
     return run;
   }
-}
-
-function toAccountDto(account: Account): AccountDto {
-  return {
-    id: account.id,
-    name: account.name,
-    enabled: account.enabled,
-    loginStatus: account.loginStatus,
-    createdAt: account.createdAt.toISOString(),
-    updatedAt: account.updatedAt.toISOString(),
-  };
-}
-
-function toFriendDto(friend: Friend): FriendDto {
-  return {
-    id: friend.id,
-    accountId: friend.accountId,
-    displayName: friend.displayName,
-    remarkName: friend.remarkName,
-    shortId: friend.shortId,
-    uniqueId: friend.uniqueId,
-    matchField: friend.matchField,
-    enabled: friend.enabled,
-    createdAt: friend.createdAt.toISOString(),
-    updatedAt: friend.updatedAt.toISOString(),
-  };
-}
-
-function toScheduleDto(schedule: Schedule): ScheduleDto {
-  return {
-    id: schedule.id,
-    accountId: schedule.accountId,
-    startTime: schedule.startTime,
-    endTime: schedule.endTime,
-    timezone: schedule.timezone,
-    enabled: schedule.enabled,
-    maxAttempts: schedule.maxAttempts,
-    retryIntervalSeconds: schedule.retryIntervalSeconds,
-    createdAt: schedule.createdAt.toISOString(),
-    updatedAt: schedule.updatedAt.toISOString(),
-  };
 }
 
 function toDailyRunDto(run: DailyRun): DailyRunDto {

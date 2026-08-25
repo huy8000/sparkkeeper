@@ -152,7 +152,7 @@ test('V2 read-only API foundation', async (context) => {
     assert.equal(disabled.enabled, false);
     assert.equal(disabled.remarkName, null);
     assert.equal('matchKey' in disabled, false);
-    assert.equal('secUid' in disabled, false);
+    assert.equal(disabled.secUid, null);
 
     const detail = await server.inject({
       method: 'GET',
@@ -333,6 +333,7 @@ test('health explicitly reports database and migration degradation', async (cont
         clock: () => FIXED_NOW,
       }),
       read: emptyReadService(),
+      configuration: unavailableConfigurationService(),
     },
   });
   context.after(() => server.close());
@@ -356,6 +357,7 @@ test('unexpected exceptions return a safe 500 without raw diagnostics', async (c
     services: {
       status: readyStatusService(),
       read,
+      configuration: unavailableConfigurationService(),
     },
   });
   context.after(() => server.close());
@@ -550,6 +552,23 @@ function emptyReadService(overrides: Partial<ApiServices['read']> = {}): ApiServ
     listSendRecords: () => [],
     listSystemEvents: () => [],
     ...overrides,
+  };
+}
+
+function unavailableConfigurationService(): ApiServices['configuration'] {
+  const unavailable = (): never => {
+    throw new Error('Fixture configuration service is unavailable.');
+  };
+  return {
+    createAccount: unavailable,
+    updateAccount: unavailable,
+    createFriend: unavailable,
+    updateFriend: unavailable,
+    listTemplates: () => [],
+    getTemplate: unavailable,
+    createTemplate: unavailable,
+    updateTemplate: unavailable,
+    configureSchedule: unavailable,
   };
 }
 

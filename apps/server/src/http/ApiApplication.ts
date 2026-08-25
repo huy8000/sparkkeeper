@@ -3,6 +3,7 @@ import {
   createDatabase,
   DailyRunRepository,
   FriendRepository,
+  MessageTemplateRepository,
   ScheduleRepository,
   SendRecordRepository,
   SystemEventRepository,
@@ -19,6 +20,8 @@ import { resolveSchedulerConfig, type SchedulerEnvironment } from '../config/Sch
 import { PINO_REDACT_PATHS } from '../observability/RuntimeLogger.js';
 import { resolveHttpConfig, type HttpConfig, type HttpEnvironment } from './config/HttpConfig.js';
 import { createServer } from './createServer.js';
+import { localMutationGuardOptions } from './plugins/MutationGuard.js';
+import { ApiConfigurationService } from './services/ApiConfigurationService.js';
 import { ApiReadService } from './services/ApiReadService.js';
 import { StatusService } from './services/StatusService.js';
 
@@ -63,6 +66,10 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
 
   try {
     const migration = database.migrate();
+    const accounts = new AccountRepository(database);
+    const friends = new FriendRepository(database);
+    const schedules = new ScheduleRepository(database);
+    const templates = new MessageTemplateRepository(database);
     const services = {
       status: new StatusService({
         database,
@@ -88,13 +95,17 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
         ...(options.clock === undefined ? {} : { clock: options.clock }),
       }),
       read: new ApiReadService({
-        accounts: new AccountRepository(database),
-        friends: new FriendRepository(database),
-        schedules: new ScheduleRepository(database),
+        accounts,
+        friends,
+        schedules,
         dailyRuns: new DailyRunRepository(database),
         sendRecords: new SendRecordRepository(database),
         systemEvents: new SystemEventRepository(database),
       }),
+      configuration: new ApiConfigurationService(
+        { accounts, friends, schedules, templates },
+        options.clock,
+      ),
     };
     const server = createServer({
       services,
@@ -104,6 +115,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
           level: observabilityConfig.logLevel,
           redact: { paths: [...HTTP_REDACT_PATHS], censor: '[REDACTED]' },
         } satisfies FastifyServerOptions['logger']),
+      mutationGuard: localMutationGuardOptions(config.port),
     });
 
     let httpClosed = false;

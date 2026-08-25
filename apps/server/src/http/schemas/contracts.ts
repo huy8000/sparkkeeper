@@ -4,7 +4,15 @@ import {
   LOGIN_STATUSES,
   SEND_RECORD_STATUSES,
 } from '@sparkkeeper/database';
-import { RUNTIME_EVENT_TYPES, SYSTEM_EVENT_LEVELS } from '@sparkkeeper/shared';
+import { MESSAGE_PROVIDER_TYPES } from '@sparkkeeper/message-engine';
+import {
+  MAX_MAX_ATTEMPTS,
+  MAX_RETRY_INTERVAL_SECONDS,
+  MIN_MAX_ATTEMPTS,
+  MIN_RETRY_INTERVAL_SECONDS,
+  RUNTIME_EVENT_TYPES,
+  SYSTEM_EVENT_LEVELS,
+} from '@sparkkeeper/shared';
 
 const isoTimestampSchema = { type: 'string', format: 'date-time' } as const;
 const nullableTimestampSchema = { ...isoTimestampSchema, nullable: true } as const;
@@ -31,6 +39,15 @@ export const errorEnvelopeSchema = {
 export const standardErrorResponses = {
   400: errorEnvelopeSchema,
   404: errorEnvelopeSchema,
+  500: errorEnvelopeSchema,
+} as const;
+
+export const mutationErrorResponses = {
+  400: errorEnvelopeSchema,
+  403: errorEnvelopeSchema,
+  404: errorEnvelopeSchema,
+  409: errorEnvelopeSchema,
+  415: errorEnvelopeSchema,
   500: errorEnvelopeSchema,
 } as const;
 
@@ -134,6 +151,7 @@ export const friendSchema = {
     'remarkName',
     'shortId',
     'uniqueId',
+    'secUid',
     'matchField',
     'enabled',
     'createdAt',
@@ -146,10 +164,116 @@ export const friendSchema = {
     remarkName: nullableStringSchema,
     shortId: nullableStringSchema,
     uniqueId: nullableStringSchema,
+    secUid: nullableStringSchema,
     matchField: { type: 'string', enum: [...FRIEND_MATCH_FIELDS] },
     enabled: { type: 'boolean' },
     createdAt: isoTimestampSchema,
     updatedAt: isoTimestampSchema,
+  },
+} as const;
+
+const nonblankStringSchema = { type: 'string', minLength: 1 } as const;
+const optionalIdentityProperties = {
+  remarkName: nullableStringSchema,
+  shortId: nullableStringSchema,
+  uniqueId: nullableStringSchema,
+  secUid: nullableStringSchema,
+  matchField: { type: 'string', enum: [...FRIEND_MATCH_FIELDS] },
+  enabled: { type: 'boolean' },
+} as const;
+
+export const createAccountBodySchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['name'],
+  properties: { name: nonblankStringSchema, enabled: { type: 'boolean' } },
+} as const;
+
+export const updateAccountBodySchema = {
+  type: 'object',
+  additionalProperties: false,
+  minProperties: 1,
+  properties: { name: nonblankStringSchema, enabled: { type: 'boolean' } },
+} as const;
+
+export const createFriendBodySchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['displayName'],
+  properties: { displayName: nonblankStringSchema, ...optionalIdentityProperties },
+} as const;
+
+export const updateFriendBodySchema = {
+  type: 'object',
+  additionalProperties: false,
+  minProperties: 1,
+  properties: { displayName: nonblankStringSchema, ...optionalIdentityProperties },
+} as const;
+
+export const templateSummarySchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['id', 'name', 'providerType', 'messageCount', 'enabled', 'createdAt', 'updatedAt'],
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    name: { type: 'string' },
+    providerType: { type: 'string', enum: [...MESSAGE_PROVIDER_TYPES] },
+    messageCount: { type: 'integer', minimum: 1 },
+    enabled: { type: 'boolean' },
+    createdAt: isoTimestampSchema,
+    updatedAt: isoTimestampSchema,
+  },
+} as const;
+
+export const templateDetailSchema = {
+  ...templateSummarySchema,
+  required: [...templateSummarySchema.required, 'messages'],
+  properties: {
+    ...templateSummarySchema.properties,
+    messages: { type: 'array', minItems: 1, items: nonblankStringSchema },
+  },
+} as const;
+
+const templateInputProperties = {
+  name: nonblankStringSchema,
+  providerType: { type: 'string', enum: [...MESSAGE_PROVIDER_TYPES] },
+  messages: { type: 'array', minItems: 1, items: nonblankStringSchema },
+  enabled: { type: 'boolean' },
+} as const;
+
+export const createTemplateBodySchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['name', 'providerType', 'messages'],
+  properties: templateInputProperties,
+} as const;
+
+export const updateTemplateBodySchema = {
+  type: 'object',
+  additionalProperties: false,
+  minProperties: 1,
+  properties: templateInputProperties,
+} as const;
+
+export const configureScheduleBodySchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['startTime', 'endTime', 'timezone', 'enabled', 'maxAttempts', 'retryIntervalSeconds'],
+  properties: {
+    startTime: { type: 'string', pattern: '^(?:[01]\\d|2[0-3]):[0-5]\\d$' },
+    endTime: { type: 'string', pattern: '^(?:[01]\\d|2[0-3]):[0-5]\\d$' },
+    timezone: nonblankStringSchema,
+    enabled: { type: 'boolean' },
+    maxAttempts: {
+      type: 'integer',
+      minimum: MIN_MAX_ATTEMPTS,
+      maximum: MAX_MAX_ATTEMPTS,
+    },
+    retryIntervalSeconds: {
+      type: 'integer',
+      minimum: MIN_RETRY_INTERVAL_SECONDS,
+      maximum: MAX_RETRY_INTERVAL_SECONDS,
+    },
   },
 } as const;
 

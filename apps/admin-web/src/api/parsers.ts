@@ -3,6 +3,8 @@ import type {
   DailyRun,
   Friend,
   Health,
+  MessageTemplateDetail,
+  MessageTemplateSummary,
   RuntimeStatus,
   Schedule,
   SendRecord,
@@ -13,6 +15,7 @@ export type Parser<T> = (value: unknown) => T | undefined;
 
 const LOGIN_STATUSES = ['READY', 'AUTH_EXPIRED', 'UNKNOWN'] as const;
 const MATCH_FIELDS = ['displayName', 'remarkName', 'shortId', 'uniqueId', 'secUid'] as const;
+const MESSAGE_PROVIDER_TYPES = ['STATIC', 'RANDOM'] as const;
 const RUN_STATUSES = ['READY', 'RUNNING', 'SUCCESS', 'FAILED', 'AUTH_EXPIRED'] as const;
 const SEND_STATUSES = [
   'READY',
@@ -189,6 +192,7 @@ export const parseFriend: Parser<Friend> = (value) => {
   const remarkName = nullableString(data?.remarkName);
   const shortId = nullableString(data?.shortId);
   const uniqueId = nullableString(data?.uniqueId);
+  const secUid = nullableString(data?.secUid);
   const matchField = oneOf(data?.matchField, MATCH_FIELDS);
   const enabled = boolean(data?.enabled);
   const createdAt = string(data?.createdAt);
@@ -201,6 +205,7 @@ export const parseFriend: Parser<Friend> = (value) => {
       remarkName,
       shortId,
       uniqueId,
+      secUid,
       matchField,
       enabled,
       createdAt,
@@ -215,11 +220,46 @@ export const parseFriend: Parser<Friend> = (value) => {
     remarkName: remarkName!,
     shortId: shortId!,
     uniqueId: uniqueId!,
+    secUid: secUid!,
     matchField: matchField!,
     enabled: enabled!,
     createdAt: createdAt!,
     updatedAt: updatedAt!,
   };
+};
+
+export const parseMessageTemplateSummary: Parser<MessageTemplateSummary> = (value) => {
+  const data = record(value);
+  const id = string(data?.id);
+  const name = string(data?.name);
+  const providerType = oneOf(data?.providerType, MESSAGE_PROVIDER_TYPES);
+  const messageCount = number(data?.messageCount);
+  const enabled = boolean(data?.enabled);
+  const createdAt = string(data?.createdAt);
+  const updatedAt = string(data?.updatedAt);
+  if (
+    [id, name, providerType, messageCount, enabled, createdAt, updatedAt].some(
+      (item) => item === undefined,
+    )
+  )
+    return undefined;
+  return {
+    id: id!,
+    name: name!,
+    providerType: providerType!,
+    messageCount: messageCount!,
+    enabled: enabled!,
+    createdAt: createdAt!,
+    updatedAt: updatedAt!,
+  };
+};
+
+export const parseMessageTemplateDetail: Parser<MessageTemplateDetail> = (value) => {
+  const summary = parseMessageTemplateSummary(value);
+  const data = record(value);
+  const messages = arrayOf(data?.messages, string);
+  if (summary === undefined || messages === undefined) return undefined;
+  return { ...summary, messages };
 };
 
 export const parseSchedule: Parser<Schedule> = (value) => {
@@ -379,6 +419,8 @@ export const parseSystemEvent: Parser<SystemEvent> = (value) => {
 export const parseAccounts: Parser<Account[]> = (value) => arrayOf(value, parseAccount);
 export const parseFriends: Parser<Friend[]> = (value) => arrayOf(value, parseFriend);
 export const parseSchedules: Parser<Schedule[]> = (value) => arrayOf(value, parseSchedule);
+export const parseMessageTemplateSummaries: Parser<MessageTemplateSummary[]> = (value) =>
+  arrayOf(value, parseMessageTemplateSummary);
 export const parseDailyRuns: Parser<DailyRun[]> = (value) => arrayOf(value, parseDailyRun);
 export const parseSendRecords: Parser<SendRecord[]> = (value) => arrayOf(value, parseSendRecord);
 export const parseSystemEvents: Parser<SystemEvent[]> = (value) => arrayOf(value, parseSystemEvent);

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { accountFixture } from '../test/fixtures';
-import { ApiClient, ApiError } from './client';
+import { ADMIN_MUTATION_HEADER, ADMIN_MUTATION_HEADER_VALUE, ApiClient, ApiError } from './client';
 import { parseAccount } from './parsers';
 import { createSparkKeeperApi } from './sparkkeeperApi';
 
@@ -103,5 +103,51 @@ describe('ApiClient', () => {
   it('uses the safe same-origin API prefix by default', () => {
     const error = new ApiError('TEST', 'test', 0, 'API');
     expect(error).toMatchObject({ name: 'ApiError', code: 'TEST' });
+  });
+
+  it('centralizes JSON mutation bodies and the local Admin request header', async () => {
+    const fetcher = vi.fn(() =>
+      Promise.resolve(jsonResponse({ success: true, data: accountFixture }, 201)),
+    );
+    const client = new ApiClient('/api', fetcher);
+    const controller = new AbortController();
+    await client.mutate(
+      'POST',
+      '/accounts',
+      { name: 'Demo Account' },
+      parseAccount,
+      controller.signal,
+    );
+
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/accounts',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ name: 'Demo Account' }),
+        signal: controller.signal,
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          [ADMIN_MUTATION_HEADER]: ADMIN_MUTATION_HEADER_VALUE,
+        }),
+      }),
+    );
+  });
+
+  it('preserves typed safe API errors for mutations', async () => {
+    const fetcher = vi.fn(() =>
+      Promise.resolve(
+        jsonResponse(
+          {
+            success: false,
+            error: { code: 'VALIDATION_ERROR', message: 'Invalid configuration.' },
+          },
+          400,
+        ),
+      ),
+    );
+    const client = new ApiClient('/api', fetcher);
+    await expect(
+      client.mutate('PATCH', '/accounts/test', { enabled: false }, parseAccount),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR', httpStatus: 400, kind: 'API' });
   });
 });

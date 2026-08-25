@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { watch } from 'vue';
+import { ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { useAdminApp } from '../appContext';
+import AccountForm from '../components/AccountForm.vue';
 import EmptyState from '../components/EmptyState.vue';
 import ErrorState from '../components/ErrorState.vue';
+import FormPanel from '../components/FormPanel.vue';
+import FriendForm from '../components/FriendForm.vue';
 import IdentifierValue from '../components/IdentifierValue.vue';
 import LoadingState from '../components/LoadingState.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { useRequest } from '../composables/useRequest';
+import { useMutation } from '../composables/useMutation';
 import { formatTimestamp } from '../utils/format';
+import type { CreateAccountInput, Friend, FriendConfigurationInput } from '../types/api';
 
 const app = useAdminApp();
 const route = useRoute();
@@ -23,6 +28,56 @@ const detail = useRequest(async (signal) => {
   return { account, friends, schedules };
 });
 watch(app.refreshVersion, () => void detail.load());
+const editingAccount = ref(false);
+const editingFriend = ref<Friend | null>(null);
+const creatingFriend = ref(false);
+const {
+  submitting,
+  error: formError,
+  success: successMessage,
+  execute,
+  clearError,
+} = useMutation();
+
+async function saveAccount(input: CreateAccountInput): Promise<void> {
+  await execute(
+    () => app.api.updateAccount(accountId, input),
+    async () => {
+      editingAccount.value = false;
+      await detail.load();
+    },
+    'Account configuration updated.',
+  );
+}
+
+async function saveFriend(input: FriendConfigurationInput): Promise<void> {
+  const friendId = editingFriend.value?.id;
+  await execute(
+    () =>
+      friendId === undefined
+        ? app.api.createFriend(accountId, input)
+        : app.api.updateFriend(friendId, input),
+    async () => {
+      closeForms();
+      await detail.load();
+    },
+    'Friend configuration saved.',
+  );
+}
+
+function beginFriendEdit(friend: Friend): void {
+  editingFriend.value = friend;
+  creatingFriend.value = false;
+  editingAccount.value = false;
+  clearError();
+}
+
+function closeForms(): void {
+  editingAccount.value = false;
+  creatingFriend.value = false;
+  editingFriend.value = null;
+  clearError();
+}
 </script>
 
 <template>
@@ -52,6 +107,7 @@ watch(app.refreshVersion, () => void detail.load());
       @retry="detail.load"
     />
     <template v-else-if="detail.data.value">
+      <p v-if="successMessage" class="success-message" role="status">{{ successMessage }}</p>
       <section class="card">
         <div class="card__header">
           <div>
@@ -60,6 +116,18 @@ watch(app.refreshVersion, () => void detail.load());
           </div>
           <StatusBadge :status="detail.data.value.account.enabled ? 'ENABLED' : 'DISABLED'" />
         </div>
+        <div class="card-actions">
+          <button
+            class="button button--secondary"
+            type="button"
+            @click="
+              editingAccount = true;
+              formError = '';
+            "
+          >
+            Edit account
+          </button>
+        </div>
         <dl class="definition-grid">
           <div>
             <dt>Identifier</dt>
@@ -67,7 +135,10 @@ watch(app.refreshVersion, () => void detail.load());
           </div>
           <div>
             <dt>Login status</dt>
-            <dd><StatusBadge :status="detail.data.value.account.loginStatus" /></dd>
+            <dd>
+              <StatusBadge :status="detail.data.value.account.loginStatus" />
+              <small>Runtime state; not editable here.</small>
+            </dd>
           </div>
           <div>
             <dt>Created</dt>
@@ -80,14 +151,57 @@ watch(app.refreshVersion, () => void detail.load());
         </dl>
       </section>
 
+      <FormPanel
+        v-if="editingAccount"
+        title="Edit account"
+        description="Only name and configured enabled state can be changed."
+        @cancel="closeForms"
+      >
+        <AccountForm
+          :account="detail.data.value.account"
+          :submitting="submitting"
+          :server-error="formError"
+          @submit="saveAccount"
+          @cancel="closeForms"
+        />
+      </FormPanel>
+
       <section class="section-stack" aria-labelledby="friends-title">
         <header class="section-heading">
           <div>
             <p class="eyebrow">Friends</p>
             <h3 id="friends-title">Contacts</h3>
           </div>
-          <span class="count">{{ detail.data.value.friends.length }}</span>
+          <div class="section-actions">
+            <span class="count">{{ detail.data.value.friends.length }}</span>
+            <button
+              class="button button--primary"
+              type="button"
+              @click="
+                creatingFriend = true;
+                editingFriend = null;
+                editingAccount = false;
+                formError = '';
+              "
+            >
+              Add friend
+            </button>
+          </div>
         </header>
+        <FormPanel
+          v-if="creatingFriend || editingFriend"
+          :title="editingFriend ? 'Edit friend' : 'Add friend'"
+          description="This stores contact identity configuration only and never contacts the platform."
+          @cancel="closeForms"
+        >
+          <FriendForm
+            :friend="editingFriend ?? undefined"
+            :submitting="submitting"
+            :server-error="formError"
+            @submit="saveFriend"
+            @cancel="closeForms"
+          />
+        </FormPanel>
         <EmptyState
           v-if="detail.data.value.friends.length === 0"
           title="No friends"
@@ -103,6 +217,7 @@ watch(app.refreshVersion, () => void detail.load());
                 <th>Unique ID</th>
                 <th>Match field</th>
                 <th>Enabled</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -122,6 +237,15 @@ watch(app.refreshVersion, () => void detail.load());
                 <td>{{ friend.uniqueId ?? '—' }}</td>
                 <td><StatusBadge :status="friend.matchField" :label="friend.matchField" /></td>
                 <td><StatusBadge :status="friend.enabled ? 'ENABLED' : 'DISABLED'" /></td>
+                <td>
+                  <button
+                    class="button button--secondary button--compact"
+                    type="button"
+                    @click="beginFriendEdit(friend)"
+                  >
+                    Edit
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>

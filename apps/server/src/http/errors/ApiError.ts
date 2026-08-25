@@ -2,6 +2,11 @@ export type ApiErrorCode =
   | 'ACCOUNT_NOT_FOUND'
   | 'FRIEND_NOT_FOUND'
   | 'SCHEDULE_NOT_FOUND'
+  | 'TEMPLATE_NOT_FOUND'
+  | 'ADMIN_REQUEST_REQUIRED'
+  | 'ADMIN_REQUEST_REJECTED'
+  | 'UNSUPPORTED_MEDIA_TYPE'
+  | 'CONFLICT'
   | 'RUN_NOT_FOUND'
   | 'VALIDATION_ERROR'
   | 'ROUTE_NOT_FOUND'
@@ -21,7 +26,11 @@ export class ApiError extends Error {
 export function entityNotFound(
   code: Extract<
     ApiErrorCode,
-    'ACCOUNT_NOT_FOUND' | 'FRIEND_NOT_FOUND' | 'SCHEDULE_NOT_FOUND' | 'RUN_NOT_FOUND'
+    | 'ACCOUNT_NOT_FOUND'
+    | 'FRIEND_NOT_FOUND'
+    | 'SCHEDULE_NOT_FOUND'
+    | 'TEMPLATE_NOT_FOUND'
+    | 'RUN_NOT_FOUND'
   >,
   entityName: string,
 ): ApiError {

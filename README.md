@@ -119,9 +119,9 @@ pnpm --filter @sparkkeeper/server dev
 
 构建后也可通过 `pnpm --filter @sparkkeeper/server start` 启动。V2 API foundation 默认绑定 `127.0.0.1:8080`，仅供本机访问；只有显式配置 `HOST` 才会改变绑定地址。后续远程访问必须先采用明确的 authentication、reverse proxy 或 trusted network 方案，不能把当前未认证 API 直接暴露到公网。
 
-### V2 Read-only API Foundation
+### V2 API and Local Configuration Foundation
 
-当前 HTTP API 仅提供以下只读端点，供未来 Vue 3 管理端消费：
+当前 HTTP API 提供运行状态、历史查询和本地配置管理。已有只读端点包括：
 
 - `GET /api/health`
 - `GET /api/runtime/status`
@@ -135,12 +135,26 @@ pnpm --filter @sparkkeeper/server dev
 - `GET /api/runs/:runId`
 - `GET /api/runs/:runId/send-records`
 - `GET /api/runs/:runId/events`
+- `GET /api/templates`
+- `GET /api/templates/:templateId`
 
-API 与 Scheduler 使用独立的安全控制。启动 HTTP 服务不会授权真实发送；Scheduler 仍由 `SCHEDULER_ENABLED` 和 `SCHEDULER_ALLOW_REAL_SEND` 等原有开关控制，默认保持关闭。本阶段没有任何 Web real-send endpoint、文件下载 endpoint、CORS 通配配置或真实平台访问逻辑。
+本地配置写端点包括：
 
-### V2 Read-only Admin Web Foundation
+- `POST /api/accounts`
+- `PATCH /api/accounts/:accountId`
+- `POST /api/accounts/:accountId/friends`
+- `PATCH /api/friends/:friendId`
+- `POST /api/templates`
+- `PATCH /api/templates/:templateId`
+- `PUT /api/accounts/:accountId/schedule`
 
-Vue 3 + TypeScript 管理端现已提供 Dashboard、Accounts、Account Detail（Friends 与 Schedules）、Schedules、Runs 和 Run Detail（SendRecords 与 SystemEvents）页面。可分别启动本机 API 与管理端：
+配置 mutation 统一要求 `application/json`、`X-SparkKeeper-Admin-Request: 1`、精确的本机 Host，并在浏览器提供 Origin 时校验为允许的本机 Admin origin。服务仍默认只绑定 `127.0.0.1`，且没有 wildcard CORS。这是 **local-only + same-origin Admin protection**，用于降低跨站浏览器写请求风险，不是完整的 remote authentication；远程部署前仍必须另行设计身份认证、反向代理和可信网络边界。
+
+API 与 Scheduler 使用独立的安全控制。配置写入不会 trigger scheduler tick、manual run、BrowserSession 或真实发送；Scheduler 仍由 `SCHEDULER_ENABLED` 和 `SCHEDULER_ALLOW_REAL_SEND` 等原有环境开关控制，默认保持关闭，且这些开关不能通过 Web/API 修改。本阶段没有 DELETE、Web real-send、manual-run、browser login、evidence 下载、CORS 通配配置或真实平台访问逻辑。
+
+### V2 Local Admin Web Foundation
+
+Vue 3 + TypeScript 管理端现已提供 Dashboard、Accounts、Account Detail（Friends 与 Schedules）、Templates、Schedules、Runs 和 Run Detail（SendRecords 与 SystemEvents）页面。Accounts、Friends、Message Templates 和 Schedules 支持本地配置创建/编辑；运行状态与历史数据保持只读。可分别启动本机 API 与管理端：
 
 ```bash
 pnpm --filter @sparkkeeper/server dev
@@ -149,7 +163,7 @@ pnpm --filter @sparkkeeper/admin-web dev
 
 管理端默认使用 same-origin `/api`，Vite 在开发环境将其代理到本机 `http://127.0.0.1:8080`，因此无需为 Fastify 开启 CORS。若部署拓扑另有需要，可显式设置 `VITE_API_BASE_URL`，但默认配置仍保持仅供本机访问。
 
-当前管理端严格只读：没有 Web 写操作、发送或手动运行入口、远程认证、SSE、通知、evidence 下载或文件路径拼接。Screenshot/Trace 只显示是否可用，未来 Vue 管理功能将在明确的安全边界下逐步加入。
+当前管理端没有 manual run、real-send toggle、浏览器登录、远程认证、SSE、通知、evidence 下载或文件路径拼接。模板正文只在本地详情/编辑请求中使用，不写入 URL、浏览器存储或日志；Screenshot/Trace 仍只显示是否可用。真正的远程身份认证将在后续 V2 任务中设计。
 
 工程检查：
 

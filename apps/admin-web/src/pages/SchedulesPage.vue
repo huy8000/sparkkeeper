@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import { useAdminApp } from '../appContext';
 import EmptyState from '../components/EmptyState.vue';
 import ErrorState from '../components/ErrorState.vue';
+import FormPanel from '../components/FormPanel.vue';
 import LoadingState from '../components/LoadingState.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import ScheduleForm from '../components/ScheduleForm.vue';
 import { useRequest } from '../composables/useRequest';
+import { useMutation } from '../composables/useMutation';
+import type { ConfigureScheduleInput, Schedule } from '../types/api';
 
 const app = useAdminApp();
 const result = useRequest(async (signal) => {
@@ -25,6 +29,32 @@ const runtimeSchedulerLabel = computed(() =>
   app.runtime.data.value?.schedulerEnabled ? 'ENABLED' : 'DISABLED',
 );
 watch(app.refreshVersion, () => void result.load());
+const editingSchedule = ref<Schedule | null>(null);
+const {
+  submitting,
+  error: formError,
+  success: successMessage,
+  execute,
+  clearError,
+} = useMutation();
+
+async function saveSchedule(input: ConfigureScheduleInput): Promise<void> {
+  const accountId = editingSchedule.value?.accountId;
+  if (accountId === undefined) return;
+  await execute(
+    () => app.api.configureSchedule(accountId, input),
+    async () => {
+      editingSchedule.value = null;
+      await result.load();
+    },
+    'Schedule configuration saved.',
+  );
+}
+
+function closeForm(): void {
+  editingSchedule.value = null;
+  clearError();
+}
 </script>
 
 <template>
@@ -43,6 +73,21 @@ watch(app.refreshVersion, () => void result.load());
       <span v-else>Unavailable</span>
       <small>Each row below independently reports whether that schedule is enabled.</small>
     </section>
+    <p v-if="successMessage" class="success-message" role="status">{{ successMessage }}</p>
+    <FormPanel
+      v-if="editingSchedule"
+      title="Edit schedule"
+      description="Saving updates configuration only; it does not run the scheduler."
+      @cancel="closeForm"
+    >
+      <ScheduleForm
+        :schedule="editingSchedule"
+        :submitting="submitting"
+        :server-error="formError"
+        @submit="saveSchedule"
+        @cancel="closeForm"
+      />
+    </FormPanel>
     <LoadingState v-if="result.loading.value && !result.data.value" label="Loading schedules…" />
     <ErrorState
       v-else-if="result.error.value"
@@ -64,6 +109,7 @@ watch(app.refreshVersion, () => void result.load());
             <th>Schedule enabled</th>
             <th>Max attempts</th>
             <th>Retry interval</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -78,6 +124,18 @@ watch(app.refreshVersion, () => void result.load());
             <td><StatusBadge :status="item.schedule.enabled ? 'ENABLED' : 'DISABLED'" /></td>
             <td>{{ item.schedule.maxAttempts }}</td>
             <td>{{ item.schedule.retryIntervalSeconds }} sec</td>
+            <td>
+              <button
+                class="button button--secondary button--compact"
+                type="button"
+                @click="
+                  editingSchedule = item.schedule;
+                  formError = '';
+                "
+              >
+                Edit
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>

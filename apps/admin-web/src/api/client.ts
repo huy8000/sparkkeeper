@@ -22,6 +22,9 @@ export type FetchImplementation = (
   init?: RequestInit,
 ) => Promise<Response>;
 
+export const ADMIN_MUTATION_HEADER = 'X-SparkKeeper-Admin-Request';
+export const ADMIN_MUTATION_HEADER_VALUE = '1';
+
 function normalizeBaseUrl(value: string | undefined): string {
   const trimmed = value?.trim();
   return (trimmed === undefined || trimmed === '' ? '/api' : trimmed).replace(/\/$/, '');
@@ -56,11 +59,39 @@ export class ApiClient {
   }
 
   async get<T>(path: string, parser: Parser<T>, signal?: AbortSignal): Promise<T> {
+    return this.request('GET', path, parser, signal);
+  }
+
+  async mutate<T, TBody>(
+    method: 'POST' | 'PATCH' | 'PUT',
+    path: string,
+    body: TBody,
+    parser: Parser<T>,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    return this.request(method, path, parser, signal, body);
+  }
+
+  private async request<T>(
+    method: 'GET' | 'POST' | 'PATCH' | 'PUT',
+    path: string,
+    parser: Parser<T>,
+    signal?: AbortSignal,
+    body?: unknown,
+  ): Promise<T> {
     let response: Response;
     try {
       response = await this.fetchImplementation(`${this.baseUrl}${path}`, {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
+        method,
+        headers:
+          method === 'GET'
+            ? { Accept: 'application/json' }
+            : {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                [ADMIN_MUTATION_HEADER]: ADMIN_MUTATION_HEADER_VALUE,
+              },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         ...(signal === undefined ? {} : { signal }),
       });
     } catch (error) {

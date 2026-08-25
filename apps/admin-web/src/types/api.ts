@@ -5,6 +5,7 @@ import type {
   RuntimeEventType,
   SendRecordStatus,
   SystemEventLevel,
+  MessageProviderType,
 } from '@sparkkeeper/shared';
 
 export interface ApiSuccess<T> {
@@ -58,6 +59,7 @@ export interface Friend {
   readonly remarkName: string | null;
   readonly shortId: string | null;
   readonly uniqueId: string | null;
+  readonly secUid: string | null;
   readonly matchField: FriendMatchField;
   readonly enabled: boolean;
   readonly createdAt: string;
@@ -75,6 +77,60 @@ export interface Schedule {
   readonly retryIntervalSeconds: number;
   readonly createdAt: string;
   readonly updatedAt: string;
+}
+
+export interface MessageTemplateSummary {
+  readonly id: string;
+  readonly name: string;
+  readonly providerType: MessageProviderType;
+  readonly messageCount: number;
+  readonly enabled: boolean;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface MessageTemplateDetail extends MessageTemplateSummary {
+  readonly messages: readonly string[];
+}
+
+export interface CreateAccountInput {
+  readonly name: string;
+  readonly enabled?: boolean;
+}
+
+export interface UpdateAccountInput {
+  readonly name?: string;
+  readonly enabled?: boolean;
+}
+
+export interface FriendConfigurationInput {
+  readonly displayName: string;
+  readonly remarkName?: string | null;
+  readonly shortId?: string | null;
+  readonly uniqueId?: string | null;
+  readonly secUid?: string | null;
+  readonly matchField?: FriendMatchField;
+  readonly enabled?: boolean;
+}
+
+export type UpdateFriendInput = Partial<FriendConfigurationInput>;
+
+export interface MessageTemplateInput {
+  readonly name: string;
+  readonly providerType: MessageProviderType;
+  readonly messages: readonly string[];
+  readonly enabled?: boolean;
+}
+
+export type UpdateMessageTemplateInput = Partial<MessageTemplateInput>;
+
+export interface ConfigureScheduleInput {
+  readonly startTime: string;
+  readonly endTime: string;
+  readonly timezone: string;
+  readonly enabled: boolean;
+  readonly maxAttempts: number;
+  readonly retryIntervalSeconds: number;
 }
 
 export interface DailyRun {
@@ -126,6 +182,7 @@ export type {
   DailyRunStatus,
   FriendMatchField,
   LoginStatus,
+  MessageProviderType,
   RuntimeEventType,
   SendRecordStatus,
   SystemEventLevel,

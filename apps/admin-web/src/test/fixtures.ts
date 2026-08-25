@@ -3,6 +3,8 @@ import type {
   DailyRun,
   Friend,
   Health,
+  MessageTemplateDetail,
+  MessageTemplateSummary,
   RuntimeStatus,
   Schedule,
   SendRecord,
@@ -14,6 +16,7 @@ export const FRIEND_ID = '00000000-0000-4000-8000-000000000002';
 export const SCHEDULE_ID = '00000000-0000-4000-8000-000000000003';
 export const RUN_ID = '00000000-0000-4000-8000-000000000004';
 export const RECORD_ID = '00000000-0000-4000-8000-000000000005';
+export const TEMPLATE_ID = '00000000-0000-4000-8000-000000000006';
 const CREATED_AT = '2026-01-02T03:04:05.000Z';
 
 export const healthFixture: Health = {
@@ -54,6 +57,7 @@ export const friendFixture: Friend = {
   remarkName: null,
   shortId: 'demo-alpha',
   uniqueId: null,
+  secUid: null,
   matchField: 'shortId',
   enabled: false,
   createdAt: CREATED_AT,
@@ -71,6 +75,21 @@ export const scheduleFixture: Schedule = {
   retryIntervalSeconds: 30,
   createdAt: CREATED_AT,
   updatedAt: CREATED_AT,
+};
+
+export const templateSummaryFixture: MessageTemplateSummary = {
+  id: TEMPLATE_ID,
+  name: 'Demo Template',
+  providerType: 'STATIC',
+  messageCount: 1,
+  enabled: true,
+  createdAt: CREATED_AT,
+  updatedAt: CREATED_AT,
+};
+
+export const templateDetailFixture: MessageTemplateDetail = {
+  ...templateSummaryFixture,
+  messages: ['Fictional template editor content.'],
 };
 
 export const runFixture: DailyRun = {
