@@ -12,7 +12,7 @@ SparkKeeper 是一套面向固定 Linux 服务器的自托管抖音火花维护�
 
 ## 当前开发阶段
 
-Project Foundation 以及 **MVP Task M1–M5** 均已完成，当前状态为 **MVP Core Flow Complete**。V1 的 **V1-1 Database Foundation**、**V1-2 Friend Identity**、**V1-3 Message Engine**、**V1-4 Daily Run & Idempotency**、**V1-5 Scheduler**、**V1-6 Retry & Failure State** 和 **V1-7 Observability** 功能开发均已完成。V1 尚未发布；最终 Release Gate 和连续受控验证期仍需单独完成。
+Project Foundation 以及 **MVP Task M1–M5** 均已完成，当前状态为 **MVP Core Flow Complete**。V1 的 **V1-1 Database Foundation**、**V1-2 Friend Identity**、**V1-3 Message Engine**、**V1-4 Daily Run & Idempotency**、**V1-5 Scheduler**、**V1-6 Retry & Failure State**、**V1-7 Observability** 和正式 Release Gate 均已完成；当前稳定版本为 **SparkKeeper v1.0.0**。
 
 `packages/automation` 现在提供基于 Playwright Chromium 的持久化浏览器会话基础：
 
@@ -350,11 +350,11 @@ pnpm --filter @sparkkeeper/server observability:smoke
 
 该 Smoke 使用临时 SQLite、虚构 Account/Friend、临时日志目录和受控本地 Playwright 页面，真实生成 Screenshot 与 Trace，并验证 structured logging、敏感值 0 命中、SystemEvent、相对路径、重开/重复 migration 和 retention。它不访问 Douyin、不读取真实 Browser Profile，也不发送消息。
 
-Logger、SystemEvent、Screenshot、Trace 或 Retention 失败均为观察失败：不会增加 Send Attempt，不会改变 SUCCESS，不会把 DELIVERY_UNKNOWN 变为可重试状态。V1 功能开发已完成，但尚未通过 V1 Release Gate 或连续受控验证期，也尚未发布 `v1.0.0`。
+Logger、SystemEvent、Screenshot、Trace 或 Retention 失败均为观察失败：不会增加 Send Attempt，不会改变 SUCCESS，不会把 DELIVERY_UNKNOWN 变为可重试状态。V1 功能开发与正式 Release Gate 均已完成，`v1.0.0` 是首个长期自用稳定版本。
 
-### V1 Release Gate（NOT RELEASED）
+### V1 Release Gate（PASSED）
 
-V1-1 至 V1-7 的功能实现已经完成，但 **V1 仍未发布**。正式进入 `v1.0.0` 前必须依次完成：
+V1-1 至 V1-7 的功能实现与正式 Release Gate 均已完成。SparkKeeper V1 采用以下正式验收流程：
 
 1. Phase A 工程与配置 preflight；
 2. 在本地 SQLite 中显式维护 Account、至少 2 个 enabled Friends、MessageTemplate 和 Schedule；
@@ -425,6 +425,19 @@ pnpm --filter @sparkkeeper/server v1:gate:smoke
 
 该 Smoke 不启动 Scheduler、Playwright 或真实发送，不访问 Douyin，也不读取任何真实 Browser Profile。
 
+### SparkKeeper v1.0.0
+
+SparkKeeper v1.0.0 是一套 self-hosted Douyin automation，不依赖或暗示官方 Douyin API / 官方集成。本版本包括：
+
+- Playwright Persistent Browser Profile、认证检测、Douyin Chat adapter、安全联系人解析和发出消息 Bubble 验证；
+- SQLite + Drizzle 持久化、versioned migrations，以及 Account、Friend、MessageTemplate 和 Schedule 的 CLI 维护；
+- DailyRun / SendRecord 幂等、Scheduler、服务重启恢复、有界重试和保守的 `DELIVERY_UNKNOWN` 处理；
+- `AUTH_EXPIRED` 在消息动作前安全停止；
+- 结构化日志、SystemEvent、失败 Screenshot、Trace policy、日志/证据 retention；
+- V1 Preflight、只读 Audit、离线 Gate smoke，以及至少 2 个连续 BusinessDate、同日重启幂等和失败证据链的受控验证。
+
+V1 Release 任务本身不访问真实平台，也不执行任何真实消息发送。
+
 ## Roadmap
 
 - **Phase 0 — Project Foundation（已完成）**：建立 Monorepo、应用与 packages 骨架及统一工程命令。
@@ -436,8 +449,9 @@ pnpm --filter @sparkkeeper/server v1:gate:smoke
 - **V1-5 Scheduler（已完成）**：Schedule 持久化、同日时区窗口、进程内轮询、防重入、DailyTaskRunner 恢复边界与离线验证。
 - **V1-6 Retry & Failure State（已完成）**：有界固定间隔重试、持久化 Attempt/等待状态、原子到期 claim、执行窗口约束和外部发送不确定性保护。
 - **V1-7 Observability（已完成）**：Pino 结构化日志、隐私 allowlist/redaction、SystemEvent、失败截图、可选 Trace、日志轮转和 evidence retention。
-- **V1 Release Gate Phase A（Release Readiness）**：工程 preflight、CLI maintenance、只读 Audit 和离线 Gate smoke 已建立；仍需完成受控连续验证。
-- **V1 Release Gate Phase B（待进行）**：至少 2 个连续 BusinessDate 的受控 Scheduler 验证，以及同日重启幂等、`AUTH_EXPIRED` 安全停止和失败证据链验证；尚未创建 `v1.0.0`。
+- **V1 Release Gate Phase A（已完成）**：工程 preflight、CLI maintenance、只读 Audit 和离线 Gate smoke 已建立并通过。
+- **V1 Release Gate Phase B（已完成）**：至少 2 个连续 BusinessDate 的受控 Scheduler 验证，以及同日重启幂等、`AUTH_EXPIRED` 安全停止和失败证据链验证均已通过。
+- **SparkKeeper v1.0.0（已发布）**：V1 长期自用稳定版本。
 - **V2**：增加正式 API、管理后台、实时状态、失败通知和完整自托管部署体验。
 
 各阶段必须通过验收后再进入下一阶段，避免提前引入尚未被真实需求验证的复杂度。
