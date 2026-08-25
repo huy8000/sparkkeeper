@@ -1,7 +1,14 @@
 import { flushPromises } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ACCOUNT_ID, accountFixture, friendFixture } from '../test/fixtures';
+import {
+  ACCOUNT_ID,
+  TEMPLATE_ID,
+  accountFixture,
+  friendFixture,
+  manualRunPreflightFixture,
+  runtimeFixture,
+} from '../test/fixtures';
 import { failure, installApiFetch, success } from '../test/http';
 import { mountAdmin } from '../test/mountAdmin';
 import { FakeEventSource, configEvent, installEventSource } from '../test/realtime';
@@ -54,6 +61,213 @@ describe('Accounts', () => {
     expect(
       wrapper.findAll('button').some((button) => /delete|send|resolve/i.test(button.text())),
     ).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('keeps Manual Run visible but disabled by the default server gate', async () => {
+    installApiFetch();
+    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}`);
+    const button = wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'Manual Run')!;
+    expect(button.attributes('disabled')).toBeDefined();
+    expect(wrapper.text()).toContain('Manual Run is disabled by server configuration.');
+    expect(wrapper.text()).not.toContain('Enable Manual Run');
+    expect(wrapper.text()).not.toContain('Enable Real Send');
+    wrapper.unmount();
+  });
+
+  it('disables Manual Run when real-send authorization is off', async () => {
+    installApiFetch((url) =>
+      url.pathname === '/api/runtime/status'
+        ? success({ ...runtimeFixture, manualRunEnabled: true })
+        : undefined,
+    );
+    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}`);
+    expect(wrapper.text()).toContain('Real send authorization is disabled.');
+    expect(
+      wrapper
+        .findAll('button')
+        .find((candidate) => candidate.text() === 'Manual Run')
+        ?.attributes('disabled'),
+    ).toBeDefined();
+    wrapper.unmount();
+  });
+
+  it('preflights, explicitly confirms, sends acknowledgement once, and navigates on 202', async () => {
+    const fetchMock = installApiFetch((url) =>
+      url.pathname === '/api/runtime/status'
+        ? success({
+            ...runtimeFixture,
+            manualRunEnabled: true,
+            realSendAuthorizationEnabled: true,
+          })
+        : undefined,
+    );
+    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}`);
+    await wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'Manual Run')!
+      .trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Real external side effect');
+    await wrapper.get('#manual-template').setValue(TEMPLATE_ID);
+    await wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'Review preflight')!
+      .trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('2026-01-02');
+    expect(wrapper.text()).toContain('Enabled contacts');
+    expect(wrapper.text()).toContain('Manual Run gate');
+    expect(wrapper.text()).toContain('Real send authorization');
+    expect(wrapper.text()).toContain('This action may send real messages');
+    const accept = wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'Accept Manual Run')!;
+    expect(accept.attributes('disabled')).toBeDefined();
+    await wrapper.get('.confirmation-row input').setValue(true);
+    await accept.trigger('click');
+    await flushPromises();
+
+    const calls = fetchMock.mock.calls.filter(
+      ([url, init]) =>
+        String(url).endsWith(`/api/accounts/${ACCOUNT_ID}/manual-runs`) && init?.method === 'POST',
+    );
+    expect(calls).toHaveLength(1);
+    expect(JSON.parse(String(calls[0]![1]?.body))).toEqual({
+      templateId: TEMPLATE_ID,
+      acknowledgeRealSend: true,
+    });
+    expect(new Headers(calls[0]![1]?.headers).get('X-SparkKeeper-Admin-Request')).toBe('1');
+    expect(window.location.pathname).toContain('/runs/');
+    expect(wrapper.text()).toContain(
+      'Manual Run request accepted. The final outcome appears below.',
+    );
+    expect(wrapper.text()).not.toContain('sent successfully');
+    wrapper.unmount();
+  });
+
+  it('shows stable blocked reasons and does not submit a blocked preflight', async () => {
+    const fetchMock = installApiFetch((url) => {
+      if (url.pathname === '/api/runtime/status') {
+        return success({
+          ...runtimeFixture,
+          manualRunEnabled: true,
+          realSendAuthorizationEnabled: true,
+        });
+      }
+      if (url.pathname.endsWith('/manual-run/preflight')) {
+        return success({
+          ...manualRunPreflightFixture,
+          canRun: false,
+          currentDailyRunStatus: 'SUCCESS',
+          blockedReasons: ['RUN_ALREADY_COMPLETE'],
+        });
+      }
+      return undefined;
+    });
+    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}`);
+    await wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'Manual Run')!
+      .trigger('click');
+    await flushPromises();
+    await wrapper.get('#manual-template').setValue(TEMPLATE_ID);
+    await wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'Review preflight')!
+      .trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain('already complete');
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/manual-runs'))).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('reports conflicts safely and treats a network failure as uncertain without retry', async () => {
+    let postCount = 0;
+    const fetchMock = installApiFetch((url, init) => {
+      if (url.pathname === '/api/runtime/status') {
+        return success({
+          ...runtimeFixture,
+          manualRunEnabled: true,
+          realSendAuthorizationEnabled: true,
+        });
+      }
+      if (url.pathname.endsWith('/manual-runs') && init?.method === 'POST') {
+        postCount++;
+        return Promise.reject(new TypeError('Private network diagnostic'));
+      }
+      return undefined;
+    });
+    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}`);
+    await wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'Manual Run')!
+      .trigger('click');
+    await flushPromises();
+    await wrapper.get('#manual-template').setValue(TEMPLATE_ID);
+    await wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'Review preflight')!
+      .trigger('click');
+    await flushPromises();
+    await wrapper.get('.confirmation-row input').setValue(true);
+    await wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'Accept Manual Run')!
+      .trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain('status is uncertain');
+    expect(wrapper.text()).not.toContain('Private network diagnostic');
+    expect(postCount).toBe(1);
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/manual-runs')),
+    ).toHaveLength(1);
+    expect(wrapper.text()).toContain('Check Runs');
+    expect(
+      wrapper
+        .findAll('button')
+        .find((candidate) => candidate.text() === 'Accept Manual Run')
+        ?.attributes('disabled'),
+    ).toBeDefined();
+    wrapper.unmount();
+  });
+
+  it('renders a safe 409 in the confirmation dialog', async () => {
+    installApiFetch((url, init) => {
+      if (url.pathname === '/api/runtime/status') {
+        return success({
+          ...runtimeFixture,
+          manualRunEnabled: true,
+          realSendAuthorizationEnabled: true,
+        });
+      }
+      if (url.pathname.endsWith('/manual-runs') && init?.method === 'POST') {
+        return failure('RUN_ALREADY_IN_PROGRESS', 'A run is already in progress.', 409);
+      }
+      return undefined;
+    });
+    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}`);
+    await wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'Manual Run')!
+      .trigger('click');
+    await flushPromises();
+    await wrapper.get('#manual-template').setValue(TEMPLATE_ID);
+    await wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'Review preflight')!
+      .trigger('click');
+    await flushPromises();
+    await wrapper.get('.confirmation-row input').setValue(true);
+    await wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'Accept Manual Run')!
+      .trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain('already in progress');
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true);
     wrapper.unmount();
   });
 

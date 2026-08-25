@@ -100,6 +100,7 @@ test('V2 read-only API foundation', async (context) => {
         serverStatus: 'READY',
         schedulerEnabled: false,
         realSendAuthorizationEnabled: false,
+        manualRunEnabled: false,
         timezone: 'UTC',
         databaseReady: true,
         migrationReady: true,

@@ -12,6 +12,8 @@ import {
 } from '@sparkkeeper/database';
 import type { FastifyInstance, FastifyServerOptions } from 'fastify';
 
+import { RunExecutionCoordinator } from '../application/RunExecutionCoordinator.js';
+import { resolveManualRunConfig, type ManualRunEnvironment } from '../config/ManualRunConfig.js';
 import {
   resolveObservabilityConfig,
   type ObservabilityEnvironment,
@@ -25,8 +27,17 @@ import { localMutationGuardOptions } from './plugins/MutationGuard.js';
 import { ApiConfigurationService } from './services/ApiConfigurationService.js';
 import { ApiReadService } from './services/ApiReadService.js';
 import { StatusService } from './services/StatusService.js';
+import {
+  ManualRunService,
+  type ManualRunRunnerFactory,
+  type ManualRunServiceOptions,
+} from './services/ManualRunService.js';
+import { ProductionManualRunRunnerFactory } from './services/ProductionManualRunRunnerFactory.js';
 
-export type ServerEnvironment = HttpEnvironment & SchedulerEnvironment & ObservabilityEnvironment;
+export type ServerEnvironment = HttpEnvironment &
+  SchedulerEnvironment &
+  ObservabilityEnvironment &
+  ManualRunEnvironment;
 
 export interface CreateApiApplicationOptions {
   readonly environment?: ServerEnvironment;
@@ -37,6 +48,11 @@ export interface CreateApiApplicationOptions {
   readonly realtime?: RuntimeEventHub;
   readonly sseHeartbeatMs?: number;
   readonly sseRetryMs?: number;
+  readonly coordinator?: RunExecutionCoordinator;
+  readonly manualRunRunnerFactory?: ManualRunRunnerFactory;
+  readonly onManualRunBackgroundFailure?: NonNullable<
+    ManualRunServiceOptions['onBackgroundFailure']
+  >;
 }
 
 export interface ApiApplication {
@@ -44,7 +60,9 @@ export interface ApiApplication {
   readonly database: DatabaseClient;
   readonly config: HttpConfig;
   readonly realtime: RuntimeEventHub;
+  readonly manualRun: ManualRunService;
   closeHttp(): Promise<void>;
+  stopManualRuns(): Promise<void>;
   closeDatabase(): void;
   close(): Promise<void>;
 }
@@ -61,6 +79,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
   const environment = options.environment ?? process.env;
   const config = resolveHttpConfig(environment);
   const schedulerConfig = resolveSchedulerConfig(environment);
+  const manualRunConfig = resolveManualRunConfig(environment);
   const observabilityConfig = resolveObservabilityConfig(environment, options.cwd);
   const databaseEnvironment: DatabaseEnvironment = { DATA_DIR: environment.DATA_DIR };
   const database = createDatabase({
@@ -71,11 +90,75 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
 
   try {
     const realtime = options.realtime ?? new RuntimeEventHub(options.clock);
+    const backgroundDiagnostics: { server?: FastifyInstance } = {};
     const migration = database.migrate();
     const accounts = new AccountRepository(database);
     const friends = new FriendRepository(database);
     const schedules = new ScheduleRepository(database);
     const templates = new MessageTemplateRepository(database);
+    const systemEvents = new SystemEventRepository(database);
+    const coordinator = options.coordinator ?? new RunExecutionCoordinator();
+    const manualRun = new ManualRunService({
+      repositories: {
+        accounts,
+        schedules,
+        friends,
+        templates,
+        dailyRuns: new DailyRunRepository(database),
+        sendRecords: new SendRecordRepository(database),
+      },
+      manualRunEnabled: manualRunConfig.enabled,
+      realSendAuthorizationEnabled: schedulerConfig.allowRealSend,
+      coordinator,
+      runnerFactory:
+        options.manualRunRunnerFactory ??
+        new ProductionManualRunRunnerFactory({
+          database,
+          observability: observabilityConfig,
+          realtime,
+          ...(options.clock === undefined ? {} : { clock: options.clock }),
+        }),
+      ...(options.clock === undefined ? {} : { clock: options.clock }),
+      ...(options.onManualRunBackgroundFailure === undefined
+        ? {
+            onBackgroundFailure: (context) => {
+              try {
+                systemEvents.create({
+                  eventType: 'TASK_FAILED',
+                  level: 'ERROR',
+                  accountId: context.accountId,
+                  runId: context.runId,
+                  errorCode: 'MANUAL_RUN_BACKGROUND_FAILED',
+                  message: 'Manual Run stopped after an unexpected background failure.',
+                });
+              } catch {
+                // Persistence failure cannot change the conservative terminal state.
+              }
+              try {
+                realtime.publish({
+                  type: 'RUNTIME_EVENT',
+                  data: {
+                    eventType: 'RUN_FINISHED',
+                    level: 'error',
+                    message: 'Daily run finished',
+                    accountId: context.accountId,
+                    runId: context.runId,
+                    businessDate: context.businessDate,
+                    errorCode: 'MANUAL_RUN_BACKGROUND_FAILED',
+                    runResult: 'FAILED',
+                  },
+                });
+              } catch {
+                // Realtime is a non-critical side channel.
+              }
+              backgroundDiagnostics.server?.log.error(
+                { eventType: 'MANUAL_RUN_BACKGROUND_FAILED' },
+                'Manual Run background execution failed; inspect persisted run state.',
+              );
+            },
+          }
+        : { onBackgroundFailure: options.onManualRunBackgroundFailure }),
+    });
     const services = {
       status: new StatusService({
         database,
@@ -94,6 +177,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
         },
         schedulerEnabled: schedulerConfig.enabled,
         realSendAuthorizationEnabled: schedulerConfig.allowRealSend,
+        manualRunEnabled: manualRunConfig.enabled,
         timezone: config.timezone,
         observabilityReady: true,
         browserProfileConfigured: config.browserProfileConfigured,
@@ -106,13 +190,14 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
         schedules,
         dailyRuns: new DailyRunRepository(database),
         sendRecords: new SendRecordRepository(database),
-        systemEvents: new SystemEventRepository(database),
+        systemEvents,
       }),
       configuration: new ApiConfigurationService(
         { accounts, friends, schedules, templates },
         options.clock,
         realtime,
       ),
+      manualRun,
     };
     const server = createServer({
       services,
@@ -130,9 +215,11 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
         ...(options.sseRetryMs === undefined ? {} : { retryMs: options.sseRetryMs }),
       },
     });
+    backgroundDiagnostics.server = server;
 
     let httpClosed = false;
     let databaseClosed = false;
+    let manualRunsStopped = false;
     const closeHttp = async (): Promise<void> => {
       if (httpClosed) return;
       await server.close();
@@ -143,18 +230,29 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
       database.close();
       databaseClosed = true;
     };
+    const stopManualRuns = async (): Promise<void> => {
+      if (manualRunsStopped) return;
+      await manualRun.stop();
+      manualRunsStopped = true;
+    };
     return {
       server,
       database,
       config,
       realtime,
+      manualRun,
       closeHttp,
+      stopManualRuns,
       closeDatabase,
       async close(): Promise<void> {
         try {
           await closeHttp();
         } finally {
-          closeDatabase();
+          try {
+            await stopManualRuns();
+          } finally {
+            closeDatabase();
+          }
         }
       },
     };

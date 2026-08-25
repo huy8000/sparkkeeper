@@ -359,6 +359,39 @@ test('DailyTaskRunner rejects unauthorized execution before browser startup', as
   assert.equal(fixture.automation.starts, 0);
 });
 
+test('DailyTaskRunner manual mode bypasses only Schedule enabled and the initial time window', async (context) => {
+  const fixture = runnerFixture(context, 1);
+  const schedule = fixture.schedules.findByAccountId(fixture.account.id)!;
+  fixture.schedules.update(schedule.id, { enabled: false, now: fixedNow });
+  const manualRunner = new DailyTaskRunner({
+    accountId: fixture.account.id,
+    messageTemplateId: fixture.template.id,
+    allowRealSend: true,
+    automation: fixture.automation,
+    accounts: fixture.accounts,
+    schedules: fixture.schedules,
+    friends: fixture.friends,
+    templates: fixture.templates,
+    dailyRuns: fixture.dailyRuns,
+    sendRecords: fixture.sendRecords,
+    now: () => new Date('2026-08-23T04:00:00.000Z'),
+  });
+  assert.equal(await manualRunner.run(fixture.account.id, businessDate, 'MANUAL'), 'SUCCESS');
+  assert.equal(fixture.automation.starts, 1);
+  assert.equal(fixture.automation.sends.length, 1);
+});
+
+test('DailyTaskRunner manual mode rejects a client-independent BusinessDate mismatch', async (context) => {
+  const fixture = runnerFixture(context, 1);
+  const wrongDate = parseBusinessDate('2026-08-22');
+  assert.equal(await fixture.runner.run(fixture.account.id, wrongDate, 'MANUAL'), 'SKIPPED');
+  assert.equal(fixture.automation.starts, 0);
+  assert.equal(
+    fixture.dailyRuns.findByAccountAndBusinessDate(fixture.account.id, wrongDate),
+    undefined,
+  );
+});
+
 test('AUTH_EXPIRED updates Account and DailyRun and closes browser', async (context) => {
   const fixture = runnerFixture(context);
   fixture.automation.auth = 'AUTH_EXPIRED';

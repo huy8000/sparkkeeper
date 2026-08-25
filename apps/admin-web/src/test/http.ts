@@ -15,6 +15,8 @@ import {
   systemEventFixture,
   templateDetailFixture,
   templateSummaryFixture,
+  manualRunAcceptedFixture,
+  manualRunPreflightFixture,
 } from './fixtures';
 
 export function success(data: unknown, status = 200): Response {
@@ -61,6 +63,10 @@ export function installApiFetch(override?: TestHandler): ReturnType<typeof vi.fn
         return success(friendFixture, method === 'POST' ? 201 : 200);
       case `GET /api/accounts/${ACCOUNT_ID}/schedules`:
         return success([scheduleFixture]);
+      case `GET /api/accounts/${ACCOUNT_ID}/manual-run/preflight`:
+        return success(manualRunPreflightFixture);
+      case `POST /api/accounts/${ACCOUNT_ID}/manual-runs`:
+        return success(manualRunAcceptedFixture, 202);
       case `PUT /api/accounts/${ACCOUNT_ID}/schedule`:
         return success(scheduleFixture);
       case 'GET /api/templates':

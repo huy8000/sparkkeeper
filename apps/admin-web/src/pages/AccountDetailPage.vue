@@ -10,6 +10,7 @@ import FormPanel from '../components/FormPanel.vue';
 import FriendForm from '../components/FriendForm.vue';
 import IdentifierValue from '../components/IdentifierValue.vue';
 import LoadingState from '../components/LoadingState.vue';
+import ManualRunPanel from '../components/ManualRunPanel.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { useRequest } from '../composables/useRequest';
 import { useMutation } from '../composables/useMutation';
@@ -137,6 +138,13 @@ function closeForms(): void {
           >
             Edit account
           </button>
+          <ManualRunPanel
+            :account="detail.data.value.account"
+            :manual-run-enabled="app.runtime.data.value?.manualRunEnabled ?? false"
+            :real-send-authorization-enabled="
+              app.runtime.data.value?.realSendAuthorizationEnabled ?? false
+            "
+          />
         </div>
         <dl class="definition-grid">
           <div>

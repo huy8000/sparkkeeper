@@ -1,39 +1,28 @@
-import {
-  AccountRepository,
-  createDatabase,
-  DailyRunRepository,
-  FriendRepository,
-  MessageTemplateRepository,
-  ScheduleRepository,
-  SendRecordRepository,
-  SystemEventRepository,
-  type DatabaseClient,
-} from '@sparkkeeper/database';
+import { createDatabase, type DatabaseClient } from '@sparkkeeper/database';
 
-import { DailyTaskRunner } from '../application/DailyTaskRunner.js';
-import { ProductionDailyTaskAutomation } from '../automation/ProductionDailyTaskAutomation.js';
+import { RunExecutionCoordinator } from '../application/RunExecutionCoordinator.js';
 import { resolveSchedulerConfig, type SchedulerEnvironment } from '../config/SchedulerConfig.js';
 import {
   resolveObservabilityConfig,
   type ObservabilityEnvironment,
 } from '../config/ObservabilityConfig.js';
-import { ProductionRuntimeObserver } from '../observability/ProductionRuntimeObserver.js';
-import { RetentionManager } from '../observability/RetentionManager.js';
 import {
   createProductionRuntimeLogger,
   type RuntimeLogger,
 } from '../observability/RuntimeLogger.js';
-import { ScreenshotManager } from '../observability/ScreenshotManager.js';
-import { TraceManager } from '../observability/TraceManager.js';
 import type { RealtimeEventPublisher } from '../realtime/RealtimeEvent.js';
 import { TaskScheduler } from '../scheduler/TaskScheduler.js';
+import { createProductionDailyTaskRunner } from './createProductionDailyTaskRunner.js';
 
 export class SchedulerService {
   private client: DatabaseClient | undefined;
   private scheduler: TaskScheduler | undefined;
   private logger: RuntimeLogger | undefined;
 
-  constructor(private readonly realtime?: RealtimeEventPublisher) {}
+  constructor(
+    private readonly realtime?: RealtimeEventPublisher,
+    private readonly coordinator = new RunExecutionCoordinator(),
+  ) {}
 
   async start(
     environment: SchedulerEnvironment & ObservabilityEnvironment = process.env,
@@ -51,40 +40,15 @@ export class SchedulerService {
     try {
       client = createDatabase();
       client.migrate();
-      const schedules = new ScheduleRepository(client);
-      const automation = new ProductionDailyTaskAutomation();
-      const observer = new ProductionRuntimeObserver({
+      const { runner, observer, schedules } = createProductionDailyTaskRunner({
+        database: client,
+        accountId: config.accountId,
+        templateId: config.messageTemplateId,
+        observability: observabilityConfig,
         logger,
-        systemEvents: new SystemEventRepository(client),
-        screenshots: new ScreenshotManager(observabilityConfig.screenshotRoot, {
-          capture: (absolutePath) => automation.captureScreenshot(absolutePath),
-        }),
-        traces: new TraceManager(observabilityConfig.traceMode, observabilityConfig.traceRoot, {
-          start: () => automation.startTrace(),
-          stop: (absolutePath) => automation.stopTrace(absolutePath),
-        }),
-        retention: new RetentionManager({
-          screenshotRoot: observabilityConfig.screenshotRoot,
-          traceRoot: observabilityConfig.traceRoot,
-          screenshotRetentionDays: observabilityConfig.screenshotRetentionDays,
-          traceRetentionDays: observabilityConfig.traceRetentionDays,
-        }),
         ...(this.realtime === undefined ? {} : { realtime: this.realtime }),
       });
       await observer.cleanup();
-      const runner = new DailyTaskRunner({
-        accountId: config.accountId,
-        messageTemplateId: config.messageTemplateId,
-        allowRealSend: true,
-        automation,
-        accounts: new AccountRepository(client),
-        schedules,
-        friends: new FriendRepository(client),
-        templates: new MessageTemplateRepository(client),
-        dailyRuns: new DailyRunRepository(client),
-        sendRecords: new SendRecordRepository(client),
-        observer,
-      });
       this.client = client;
       this.scheduler = new TaskScheduler(
         config.accountId,
@@ -101,6 +65,7 @@ export class SchedulerService {
           void error;
         },
         observer,
+        this.coordinator,
       );
       this.scheduler.start();
       return 'STARTED';

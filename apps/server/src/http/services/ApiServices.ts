@@ -1,6 +1,7 @@
 import type { ApiReadService } from './ApiReadService.js';
 import type { ApiConfigurationService } from './ApiConfigurationService.js';
 import type { StatusService } from './StatusService.js';
+import type { ManualRunService } from './ManualRunService.js';
 
 export interface ApiServices {
   readonly status: Pick<StatusService, 'health' | 'runtime'>;
@@ -29,4 +30,5 @@ export interface ApiServices {
     | 'updateTemplate'
     | 'configureSchedule'
   >;
+  readonly manualRun?: Pick<ManualRunService, 'preflight' | 'start'>;
 }

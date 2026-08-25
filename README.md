@@ -138,6 +138,7 @@ pnpm --filter @sparkkeeper/server dev
 - `GET /api/runs/:runId/events`
 - `GET /api/templates`
 - `GET /api/templates/:templateId`
+- `GET /api/accounts/:accountId/manual-run/preflight?templateId=<template-id>`（read-only）
 
 本地配置写端点包括：
 
@@ -148,10 +149,17 @@ pnpm --filter @sparkkeeper/server dev
 - `POST /api/templates`
 - `PATCH /api/templates/:templateId`
 - `PUT /api/accounts/:accountId/schedule`
+- `POST /api/accounts/:accountId/manual-runs`（explicitly gated, `202 Accepted`）
 
 配置 mutation 统一要求 `application/json`、`X-SparkKeeper-Admin-Request: 1`、精确的本机 Host，并在浏览器提供 Origin 时校验为允许的本机 Admin origin。服务仍默认只绑定 `127.0.0.1`，且没有 wildcard CORS。这是 **local-only + same-origin Admin protection**，用于降低跨站浏览器写请求风险，不是完整的 remote authentication；远程部署前仍必须另行设计身份认证、反向代理和可信网络边界。
 
-API 与 Scheduler 使用独立的安全控制。配置写入不会 trigger scheduler tick、manual run、BrowserSession 或真实发送；Scheduler 仍由 `SCHEDULER_ENABLED` 和 `SCHEDULER_ALLOW_REAL_SEND` 等原有环境开关控制，默认保持关闭，且这些开关不能通过 Web/API 修改。本阶段没有 DELETE、Web real-send、manual-run、browser login、evidence 下载、CORS 通配配置或真实平台访问逻辑。
+API 与 Scheduler 使用独立的安全控制。配置写入不会 trigger scheduler tick、Manual Run、BrowserSession 或真实发送；Scheduler 仍由 `SCHEDULER_ENABLED` 和 `SCHEDULER_ALLOW_REAL_SEND` 等原有环境开关控制，默认保持关闭，且这些开关不能通过 Web/API 修改。本阶段没有 DELETE、real-send toggle、browser login、evidence 下载、CORS 通配配置或任意 recipient/message 发送入口。
+
+Manual Run 是本机 Admin 的 Account-level 能力，默认由 `MANUAL_RUN_ENABLED=false` 关闭。只有 server operator 同时显式设置 `MANUAL_RUN_ENABLED=true` 与现有 real-send authorization，POST 才可能被接受；Web/API 只能读取这两个 boolean，不能启用它们。请求只允许选择已保存且 enabled 的 MessageTemplate，并要求显式确认；不接受 BusinessDate、recipient 列表、临时消息、retry 或 browser 参数。
+
+预检完全只读。真正的 POST 会重新计算 Schedule timezone 下的当前 BusinessDate 并完整复检，随后通过 Scheduler 与 Manual Run 共享的执行协调器进入原 `DailyTaskRunner`。因为 production execution 共用同一个 persistent Browser profile，同一进程中的自动与手动执行会全局串行；Account/BusinessDate 仍作为运行上下文并由 DailyRun/SendRecord 提供持久幂等。Manual Run 只绕过 Schedule 的 enabled 状态与初始时间窗口；Account、Template、Friend enabled、auth、retry、`AUTH_EXPIRED`、`DELIVERY_UNKNOWN` 和终态规则均保持不变。既有 SUCCESS 不会 resend，也没有 force-send 或历史补跑。
+
+成功响应为 `202 Accepted` 并返回现有 DailyRun ID；accepted 不代表 delivery success。执行归属于 server lifecycle，不随 HTTP 连接中断取消，最终结果通过 Run Detail、REST snapshot 和既有 SSE 观察。客户端不会自动重试 Manual Run POST；网络失败会要求先检查 Runs，避免不确定请求造成重复触发。
 
 SSE endpoint 采用与 Admin Web 相同的 local-only / same-origin Host 和 Origin 精确校验，不要求 mutation 专用 header，也不会为 EventSource 放宽 CORS。连接会发送 ready、process-local monotonic event ID、约 20 秒 heartbeat，并建议浏览器以 3 秒间隔自动重连。Runtime 与配置事件均为严格白名单 DTO：配置事件只用于提示相关 REST 资源需要刷新，不包含 mutation payload、联系人显示信息或模板正文。
 
@@ -159,7 +167,7 @@ SSE 是非持久化的实时信号，不提供 durable replay。断线或服务�
 
 ### V2 Local Admin Web Foundation
 
-Vue 3 + TypeScript 管理端现已提供 Dashboard、Accounts、Account Detail（Friends 与 Schedules）、Templates、Schedules、Runs 和 Run Detail（SendRecords 与 SystemEvents）页面。Accounts、Friends、Message Templates 和 Schedules 支持本地配置创建/编辑；运行状态与历史数据保持只读。可分别启动本机 API 与管理端：
+Vue 3 + TypeScript 管理端现已提供 Dashboard、Accounts、Account Detail（Friends、Schedules 与 Manual Run）、Templates、Schedules、Runs 和 Run Detail（SendRecords 与 SystemEvents）页面。Accounts、Friends、Message Templates 和 Schedules 支持本地配置创建/编辑；Manual Run 通过模板选择、read-only preflight 和明确确认调用已有执行链。可分别启动本机 API 与管理端：
 
 ```bash
 pnpm --filter @sparkkeeper/server dev
@@ -170,7 +178,7 @@ pnpm --filter @sparkkeeper/admin-web dev
 
 管理端通过单一 same-origin EventSource 显示 Live Connected/Reconnecting/Offline 状态，并对 Dashboard、Runs、Run Detail 和当前配置页面执行 debounced REST refresh。Runs 筛选保持不变，Run Detail 只响应同一 run ID 的事件；页面不会将事件永久存入浏览器内存或存储。
 
-当前管理端仍没有 manual run、real-send toggle、浏览器登录、远程认证、通知、evidence 下载或文件路径拼接。模板正文只在本地详情/编辑请求中使用，不写入 URL、浏览器存储、SSE 或日志；Screenshot/Trace 仍只显示是否可用。真正的远程身份认证与通知系统将在后续 V2 任务中设计。
+当前管理端仍没有 real-send gate toggle、Manual Run gate toggle、任意收件人/消息发送、浏览器登录、远程认证、通知、evidence 下载或文件路径拼接。模板正文只在本地详情/编辑请求中使用，不写入 URL、浏览器存储、SSE 或日志；Manual Run dialog 只读取模板 summary，不显示正文；Screenshot/Trace 仍只显示是否可用。真正的远程身份认证与通知系统将在后续 V2 任务中设计。
 
 工程检查：
 
