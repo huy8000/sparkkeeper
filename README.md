@@ -125,6 +125,7 @@ pnpm --filter @sparkkeeper/server dev
 
 - `GET /api/health`
 - `GET /api/runtime/status`
+- `GET /api/events/stream`（SSE live status/invalidation stream）
 - `GET /api/accounts`
 - `GET /api/accounts/:accountId`
 - `GET /api/accounts/:accountId/friends`
@@ -152,6 +153,10 @@ pnpm --filter @sparkkeeper/server dev
 
 API 与 Scheduler 使用独立的安全控制。配置写入不会 trigger scheduler tick、manual run、BrowserSession 或真实发送；Scheduler 仍由 `SCHEDULER_ENABLED` 和 `SCHEDULER_ALLOW_REAL_SEND` 等原有环境开关控制，默认保持关闭，且这些开关不能通过 Web/API 修改。本阶段没有 DELETE、Web real-send、manual-run、browser login、evidence 下载、CORS 通配配置或真实平台访问逻辑。
 
+SSE endpoint 采用与 Admin Web 相同的 local-only / same-origin Host 和 Origin 精确校验，不要求 mutation 专用 header，也不会为 EventSource 放宽 CORS。连接会发送 ready、process-local monotonic event ID、约 20 秒 heartbeat，并建议浏览器以 3 秒间隔自动重连。Runtime 与配置事件均为严格白名单 DTO：配置事件只用于提示相关 REST 资源需要刷新，不包含 mutation payload、联系人显示信息或模板正文。
+
+SSE 是非持久化的实时信号，不提供 durable replay。断线或服务重启期间可能错过事件；Admin Web 重连并收到 ready 后会重新读取现有 REST snapshot，REST API 与持久化 SystemEvent 仍是当前状态和审计记录的权威来源。该通道同样不是 remote authentication，不能在没有额外身份认证和网络边界的情况下直接公网暴露。
+
 ### V2 Local Admin Web Foundation
 
 Vue 3 + TypeScript 管理端现已提供 Dashboard、Accounts、Account Detail（Friends 与 Schedules）、Templates、Schedules、Runs 和 Run Detail（SendRecords 与 SystemEvents）页面。Accounts、Friends、Message Templates 和 Schedules 支持本地配置创建/编辑；运行状态与历史数据保持只读。可分别启动本机 API 与管理端：
@@ -163,7 +168,9 @@ pnpm --filter @sparkkeeper/admin-web dev
 
 管理端默认使用 same-origin `/api`，Vite 在开发环境将其代理到本机 `http://127.0.0.1:8080`，因此无需为 Fastify 开启 CORS。若部署拓扑另有需要，可显式设置 `VITE_API_BASE_URL`，但默认配置仍保持仅供本机访问。
 
-当前管理端没有 manual run、real-send toggle、浏览器登录、远程认证、SSE、通知、evidence 下载或文件路径拼接。模板正文只在本地详情/编辑请求中使用，不写入 URL、浏览器存储或日志；Screenshot/Trace 仍只显示是否可用。真正的远程身份认证将在后续 V2 任务中设计。
+管理端通过单一 same-origin EventSource 显示 Live Connected/Reconnecting/Offline 状态，并对 Dashboard、Runs、Run Detail 和当前配置页面执行 debounced REST refresh。Runs 筛选保持不变，Run Detail 只响应同一 run ID 的事件；页面不会将事件永久存入浏览器内存或存储。
+
+当前管理端仍没有 manual run、real-send toggle、浏览器登录、远程认证、通知、evidence 下载或文件路径拼接。模板正文只在本地详情/编辑请求中使用，不写入 URL、浏览器存储、SSE 或日志；Screenshot/Trace 仍只显示是否可用。真正的远程身份认证与通知系统将在后续 V2 任务中设计。
 
 工程检查：
 

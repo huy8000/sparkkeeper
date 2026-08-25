@@ -4,6 +4,7 @@ import {
   type ApiApplication,
   type ServerEnvironment,
 } from '../http/ApiApplication.js';
+import { RuntimeEventHub } from '../realtime/RuntimeEventHub.js';
 import { SchedulerService } from './SchedulerService.js';
 
 export interface SparkKeeperStartResult {
@@ -14,15 +15,20 @@ export interface SparkKeeperStartResult {
 export class SparkKeeperService {
   private application: ApiApplication | undefined;
   private stopping: Promise<void> | undefined;
+  private readonly scheduler: SchedulerService;
+  private readonly realtime: RuntimeEventHub;
 
-  constructor(private readonly scheduler = new SchedulerService()) {}
+  constructor(scheduler?: SchedulerService, realtime = new RuntimeEventHub()) {
+    this.realtime = realtime;
+    this.scheduler = scheduler ?? new SchedulerService(realtime);
+  }
 
   async start(environment: ServerEnvironment = process.env): Promise<SparkKeeperStartResult> {
     if (this.application !== undefined) {
       throw new Error('SparkKeeper service is already started.');
     }
 
-    const application = createApiApplication({ environment });
+    const application = createApiApplication({ environment, realtime: this.realtime });
     this.application = application;
     try {
       const address = await listenApiApplication(application);

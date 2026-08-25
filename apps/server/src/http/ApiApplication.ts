@@ -18,6 +18,7 @@ import {
 } from '../config/ObservabilityConfig.js';
 import { resolveSchedulerConfig, type SchedulerEnvironment } from '../config/SchedulerConfig.js';
 import { PINO_REDACT_PATHS } from '../observability/RuntimeLogger.js';
+import { RuntimeEventHub } from '../realtime/RuntimeEventHub.js';
 import { resolveHttpConfig, type HttpConfig, type HttpEnvironment } from './config/HttpConfig.js';
 import { createServer } from './createServer.js';
 import { localMutationGuardOptions } from './plugins/MutationGuard.js';
@@ -33,12 +34,16 @@ export interface CreateApiApplicationOptions {
   readonly databasePath?: string;
   readonly logger?: FastifyServerOptions['logger'];
   readonly clock?: () => Date;
+  readonly realtime?: RuntimeEventHub;
+  readonly sseHeartbeatMs?: number;
+  readonly sseRetryMs?: number;
 }
 
 export interface ApiApplication {
   readonly server: FastifyInstance;
   readonly database: DatabaseClient;
   readonly config: HttpConfig;
+  readonly realtime: RuntimeEventHub;
   closeHttp(): Promise<void>;
   closeDatabase(): void;
   close(): Promise<void>;
@@ -65,6 +70,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
   });
 
   try {
+    const realtime = options.realtime ?? new RuntimeEventHub(options.clock);
     const migration = database.migrate();
     const accounts = new AccountRepository(database);
     const friends = new FriendRepository(database);
@@ -105,6 +111,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
       configuration: new ApiConfigurationService(
         { accounts, friends, schedules, templates },
         options.clock,
+        realtime,
       ),
     };
     const server = createServer({
@@ -116,6 +123,12 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
           redact: { paths: [...HTTP_REDACT_PATHS], censor: '[REDACTED]' },
         } satisfies FastifyServerOptions['logger']),
       mutationGuard: localMutationGuardOptions(config.port),
+      realtime: {
+        events: realtime,
+        access: localMutationGuardOptions(config.port),
+        ...(options.sseHeartbeatMs === undefined ? {} : { heartbeatMs: options.sseHeartbeatMs }),
+        ...(options.sseRetryMs === undefined ? {} : { retryMs: options.sseRetryMs }),
+      },
     });
 
     let httpClosed = false;
@@ -134,6 +147,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
       server,
       database,
       config,
+      realtime,
       closeHttp,
       closeDatabase,
       async close(): Promise<void> {

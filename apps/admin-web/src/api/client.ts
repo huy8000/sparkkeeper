@@ -25,7 +25,7 @@ export type FetchImplementation = (
 export const ADMIN_MUTATION_HEADER = 'X-SparkKeeper-Admin-Request';
 export const ADMIN_MUTATION_HEADER_VALUE = '1';
 
-function normalizeBaseUrl(value: string | undefined): string {
+export function normalizeBaseUrl(value: string | undefined): string {
   const trimmed = value?.trim();
   return (trimmed === undefined || trimmed === '' ? '/api' : trimmed).replace(/\/$/, '');
 }

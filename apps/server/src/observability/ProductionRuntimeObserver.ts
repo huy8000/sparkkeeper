@@ -1,5 +1,6 @@
 import type { CreateSystemEventInput } from '@sparkkeeper/database';
 
+import type { RealtimeEventPublisher } from '../realtime/RealtimeEvent.js';
 import type { RuntimeLogEvent, RuntimeLogWriter } from './RuntimeLogger.js';
 import { safeEventMessage } from './RuntimeLogger.js';
 import {
@@ -45,6 +46,7 @@ export interface ProductionRuntimeObserverOptions {
   readonly screenshots: ScreenshotEvidence;
   readonly traces: TraceEvidence;
   readonly retention: EvidenceRetention | RetentionManager;
+  readonly realtime?: RealtimeEventPublisher;
   readonly fallback?: (safeMessage: string) => void;
 }
 
@@ -82,25 +84,27 @@ export class ProductionRuntimeObserver implements RuntimeObserver {
     }
 
     const shouldPersist = event.persist ?? defaultSystemEventPersistence(event.eventType);
-    if (!shouldPersist) return;
-    const tracePath = event.runId === undefined ? undefined : this.tracePaths.get(event.runId);
-    try {
-      this.options.systemEvents.create({
-        eventType: event.eventType,
-        level: systemEventLevel(event.level),
-        ...(event.runId === undefined ? {} : { runId: event.runId }),
-        ...(event.accountId === undefined ? {} : { accountId: event.accountId }),
-        ...(event.friendId === undefined ? {} : { friendId: event.friendId }),
-        ...(event.attempt === undefined ? {} : { attempt: event.attempt }),
-        ...(event.errorCode === undefined ? {} : { errorCode: event.errorCode }),
-        message: safeEventMessage(event.eventType),
-        ...(screenshotPath === undefined ? {} : { screenshotPath }),
-        ...(tracePath === undefined ? {} : { tracePath }),
-      });
-    } catch {
-      this.safeLog('error', observabilityFailureEvent('OBSERVABILITY_PERSIST_FAILED', event));
-      this.safeFallback('SparkKeeper observability persistence failed.');
+    if (shouldPersist) {
+      const tracePath = event.runId === undefined ? undefined : this.tracePaths.get(event.runId);
+      try {
+        this.options.systemEvents.create({
+          eventType: event.eventType,
+          level: systemEventLevel(event.level),
+          ...(event.runId === undefined ? {} : { runId: event.runId }),
+          ...(event.accountId === undefined ? {} : { accountId: event.accountId }),
+          ...(event.friendId === undefined ? {} : { friendId: event.friendId }),
+          ...(event.attempt === undefined ? {} : { attempt: event.attempt }),
+          ...(event.errorCode === undefined ? {} : { errorCode: event.errorCode }),
+          message: safeEventMessage(event.eventType),
+          ...(screenshotPath === undefined ? {} : { screenshotPath }),
+          ...(tracePath === undefined ? {} : { tracePath }),
+        });
+      } catch {
+        this.safeLog('error', observabilityFailureEvent('OBSERVABILITY_PERSIST_FAILED', event));
+        this.safeFallback('SparkKeeper observability persistence failed.');
+      }
     }
+    this.safeRealtimeBroadcast(event);
   }
 
   async startRun(context: RuntimeRunContext): Promise<void> {
@@ -167,6 +171,38 @@ export class ProductionRuntimeObserver implements RuntimeObserver {
       this.options.logger.emit(level, event);
     } catch {
       this.safeFallback('SparkKeeper structured logging failed.');
+    }
+  }
+
+  private safeRealtimeBroadcast(event: RuntimeObservation): void {
+    try {
+      this.options.realtime?.publish({
+        type: 'RUNTIME_EVENT',
+        data: {
+          eventType: event.eventType,
+          level: event.level,
+          message: safeEventMessage(event.eventType),
+          ...(event.runId === undefined ? {} : { runId: event.runId }),
+          ...(event.accountId === undefined ? {} : { accountId: event.accountId }),
+          ...(event.friendId === undefined ? {} : { friendId: event.friendId }),
+          ...(event.businessDate === undefined ? {} : { businessDate: event.businessDate }),
+          ...(event.attempt === undefined ? {} : { attempt: event.attempt }),
+          ...(event.errorCode === undefined ? {} : { errorCode: event.errorCode }),
+          ...(event.nextRetryAt === undefined
+            ? {}
+            : { nextRetryAt: event.nextRetryAt.toISOString() }),
+          ...(event.successCount === undefined ? {} : { successCount: event.successCount }),
+          ...(event.failedCount === undefined ? {} : { failedCount: event.failedCount }),
+          ...(event.retryWaitCount === undefined ? {} : { retryWaitCount: event.retryWaitCount }),
+          ...(event.idempotentSkipCount === undefined
+            ? {}
+            : { idempotentSkipCount: event.idempotentSkipCount }),
+          ...(event.runResult === undefined ? {} : { runResult: event.runResult }),
+        },
+      });
+    } catch {
+      this.safeLog('error', observabilityFailureEvent('REALTIME_BROADCAST_FAILED', event));
+      this.safeFallback('SparkKeeper realtime broadcast failed.');
     }
   }
 

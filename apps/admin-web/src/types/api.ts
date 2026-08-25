@@ -178,6 +178,53 @@ export interface RunFilters {
   readonly limit?: 25 | 50 | 100;
 }
 
+export type RealtimeConnectionState = 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED';
+
+export type ConfigEntityType = 'ACCOUNT' | 'FRIEND' | 'TEMPLATE' | 'SCHEDULE';
+
+export interface RealtimeReadyEvent {
+  readonly id: string;
+  readonly type: 'READY';
+  readonly timestamp: string;
+  readonly data: { readonly serviceStatus: 'READY' };
+}
+
+export interface RealtimeRuntimeEvent {
+  readonly id: string;
+  readonly type: 'RUNTIME_EVENT';
+  readonly timestamp: string;
+  readonly data: {
+    readonly eventType: RuntimeEventType;
+    readonly level: 'debug' | 'info' | 'warn' | 'error';
+    readonly message: string;
+    readonly runId?: string;
+    readonly accountId?: string;
+    readonly friendId?: string;
+    readonly businessDate?: string;
+    readonly attempt?: number;
+    readonly errorCode?: string;
+    readonly nextRetryAt?: string;
+    readonly successCount?: number;
+    readonly failedCount?: number;
+    readonly retryWaitCount?: number;
+    readonly idempotentSkipCount?: number;
+    readonly runResult?: 'SUCCESS' | 'FAILED' | 'AUTH_EXPIRED' | 'RETRY_WAIT' | 'SKIPPED';
+  };
+}
+
+export interface RealtimeConfigEvent {
+  readonly id: string;
+  readonly type: 'CONFIG_CHANGED';
+  readonly timestamp: string;
+  readonly data: {
+    readonly entityType: ConfigEntityType;
+    readonly entityId: string;
+    readonly accountId?: string;
+  };
+}
+
+export type RealtimeEvent = RealtimeReadyEvent | RealtimeRuntimeEvent | RealtimeConfigEvent;
+
 export type {
   DailyRunStatus,
   FriendMatchField,

@@ -29,6 +29,8 @@ import {
   type RuntimeRunResult,
 } from '../src/observability/RuntimeObserver.js';
 import { TaskScheduler } from '../src/scheduler/TaskScheduler.js';
+import type { RealtimeEvent } from '../src/realtime/RealtimeEvent.js';
+import { RuntimeEventHub } from '../src/realtime/RuntimeEventHub.js';
 
 test('ProductionRuntimeObserver contains logger failure with a safe fallback', async () => {
   let fallbackCount = 0;
@@ -120,6 +122,69 @@ test('ProductionRuntimeObserver contains retention failure', async () => {
 
   await observer.cleanup();
   assert.deepEqual(logged, ['RETENTION_CLEANUP_FAILED']);
+});
+
+test('ProductionRuntimeObserver broadcasts a whitelisted runtime DTO after persistence', async () => {
+  const order: string[] = [];
+  const realtimeEvents: RealtimeEvent[] = [];
+  const hub = new RuntimeEventHub(() => new Date('2026-08-23T12:00:00.000Z'));
+  hub.subscribe((event) => {
+    order.push('broadcast');
+    realtimeEvents.push(event);
+  });
+  const observer = observerFixture({
+    logger: { emit: () => order.push('log') },
+    systemEvents: { create: () => order.push('persist') },
+    realtime: hub,
+  });
+
+  await observer.observe({
+    eventType: 'AUTH_EXPIRED',
+    level: 'error',
+    persist: true,
+    accountId: 'fixture-account-id',
+    runId: 'fixture-run-id',
+    businessDate: parseBusinessDate('2026-08-23'),
+    errorCode: 'AUTH_EXPIRED',
+    captureScreenshot: false,
+    messageText: 'PRIVATE_MESSAGE_SENTINEL',
+    cookie: 'PRIVATE_COOKIE_SENTINEL',
+    stack: 'PRIVATE_STACK_SENTINEL',
+    screenshotPath: '/private/evidence.png',
+  } as RuntimeObservation & Record<string, unknown>);
+
+  assert.deepEqual(order, ['log', 'persist', 'broadcast']);
+  assert.equal(realtimeEvents.length, 1);
+  const serialized = JSON.stringify(realtimeEvents[0]);
+  assert.match(serialized, /AUTH_EXPIRED/u);
+  assert.doesNotMatch(
+    serialized,
+    /PRIVATE_|messageText|cookie|stack|screenshotPath|tracePath|databasePath|browserProfile|SQL/u,
+  );
+});
+
+test('ProductionRuntimeObserver contains realtime publisher failure without changing persistence', async () => {
+  let persisted = 0;
+  const logged: string[] = [];
+  const observer = observerFixture({
+    logger: { emit: (_level, event) => logged.push(event.errorCode ?? event.eventType) },
+    systemEvents: {
+      create: () => {
+        persisted += 1;
+      },
+    },
+    realtime: {
+      publish: () => {
+        throw new Error('fixture realtime failure');
+      },
+    },
+  });
+
+  await assert.doesNotReject(() =>
+    observer.observe({ eventType: 'TASK_FAILED', level: 'error', persist: true }),
+  );
+  assert.equal(persisted, 1);
+  assert.deepEqual(logged, ['TASK_FAILED', 'REALTIME_BROADCAST_FAILED']);
 });
 
 function observerFixture(

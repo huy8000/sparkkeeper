@@ -9,6 +9,7 @@ import LoadingState from '../components/LoadingState.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { useRequest } from '../composables/useRequest';
 import { useMutation } from '../composables/useMutation';
+import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import type {
   MessageProviderType,
   MessageTemplateDetail,
@@ -35,6 +36,11 @@ const form = reactive({
   enabled: true,
 });
 watch(app.refreshVersion, () => void templates.load());
+useRealtimeRefresh(
+  app.realtime,
+  (event) => event.type === 'CONFIG_CHANGED' && event.data.entityType === 'TEMPLATE',
+  () => void templates.load(),
+);
 
 function openCreate(): void {
   editing.value = null;

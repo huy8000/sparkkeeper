@@ -13,6 +13,7 @@ import LoadingState from '../components/LoadingState.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { useRequest } from '../composables/useRequest';
 import { useMutation } from '../composables/useMutation';
+import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { formatTimestamp } from '../utils/format';
 import type { CreateAccountInput, Friend, FriendConfigurationInput } from '../types/api';
 
@@ -28,6 +29,15 @@ const detail = useRequest(async (signal) => {
   return { account, friends, schedules };
 });
 watch(app.refreshVersion, () => void detail.load());
+useRealtimeRefresh(
+  app.realtime,
+  (event) =>
+    event.type === 'CONFIG_CHANGED' &&
+    ((event.data.entityType === 'ACCOUNT' && event.data.entityId === accountId) ||
+      ((event.data.entityType === 'FRIEND' || event.data.entityType === 'SCHEDULE') &&
+        event.data.accountId === accountId)),
+  () => void detail.load(),
+);
 const editingAccount = ref(false);
 const editingFriend = ref<Friend | null>(null);
 const creatingFriend = ref(false);

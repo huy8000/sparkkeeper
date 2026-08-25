@@ -165,6 +165,13 @@ a {
   font-size: 0.83rem;
 }
 
+.live-status {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
 .content {
   width: min(100%, 1480px);
   margin: 0 auto;
@@ -827,6 +834,11 @@ td small {
 
   .topbar__actions .status-badge {
     display: none;
+  }
+
+  .live-status {
+    max-width: 112px;
+    white-space: normal;
   }
 
   .content {

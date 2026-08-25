@@ -25,12 +25,15 @@ import {
 } from '../observability/RuntimeLogger.js';
 import { ScreenshotManager } from '../observability/ScreenshotManager.js';
 import { TraceManager } from '../observability/TraceManager.js';
+import type { RealtimeEventPublisher } from '../realtime/RealtimeEvent.js';
 import { TaskScheduler } from '../scheduler/TaskScheduler.js';
 
 export class SchedulerService {
   private client: DatabaseClient | undefined;
   private scheduler: TaskScheduler | undefined;
   private logger: RuntimeLogger | undefined;
+
+  constructor(private readonly realtime?: RealtimeEventPublisher) {}
 
   async start(
     environment: SchedulerEnvironment & ObservabilityEnvironment = process.env,
@@ -66,6 +69,7 @@ export class SchedulerService {
           screenshotRetentionDays: observabilityConfig.screenshotRetentionDays,
           traceRetentionDays: observabilityConfig.traceRetentionDays,
         }),
+        ...(this.realtime === undefined ? {} : { realtime: this.realtime }),
       });
       await observer.cleanup();
       const runner = new DailyTaskRunner({

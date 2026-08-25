@@ -40,16 +40,21 @@ export function registerMutationGuard(
       );
     }
 
-    const host = request.headers.host?.toLowerCase();
-    if (host === undefined || !options.allowedHosts.has(host)) {
-      throw rejectedAdminRequest();
-    }
-
-    const origin = request.headers.origin;
-    if (origin !== undefined && !isAllowedOrigin(origin, options.allowedOrigins)) {
+    if (!isAllowedLocalRequest(request, options)) {
       throw rejectedAdminRequest();
     }
   });
+}
+
+export function isAllowedLocalRequest(
+  request: FastifyRequest,
+  options: MutationGuardOptions,
+): boolean {
+  const host = request.headers.host?.toLowerCase();
+  if (host === undefined || !options.allowedHosts.has(host)) return false;
+
+  const origin = request.headers.origin;
+  return origin === undefined || isAllowedOrigin(origin, options.allowedOrigins);
 }
 
 function isApiMutation(request: FastifyRequest): boolean {

@@ -14,7 +14,7 @@
     "scheduler:smoke": "pnpm pretest && tsx scripts/scheduler-smoke.ts",
     "retry:smoke": "pnpm pretest && tsx scripts/retry-smoke.ts",
     "observability:smoke": "pnpm pretest && tsx scripts/observability-smoke.ts",
-    "api:smoke": "pnpm pretest && tsx --test test/ApiFoundation.test.ts test/ConfigurationApi.test.ts",
+    "api:smoke": "pnpm pretest && tsx --test test/ApiFoundation.test.ts test/ConfigurationApi.test.ts test/RealtimeApi.test.ts test/RuntimeEventHub.test.ts",
     "v1:preflight": "pnpm pretest && tsx scripts/v1-preflight.ts",
     "v1:audit": "pnpm pretest && tsx scripts/v1-audit.ts",
     "v1:gate:smoke": "pnpm pretest && tsx scripts/v1-gate-smoke.ts"

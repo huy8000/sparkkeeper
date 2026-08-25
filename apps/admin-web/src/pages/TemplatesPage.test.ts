@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { TEMPLATE_ID } from '../test/fixtures';
 import { failure, installApiFetch } from '../test/http';
 import { mountAdmin } from '../test/mountAdmin';
+import { FakeEventSource, configEvent, installEventSource } from '../test/realtime';
 
 describe('Templates', () => {
   it('renders safe summary data without loading message content', async () => {
@@ -90,6 +91,26 @@ describe('Templates', () => {
     await flushPromises();
     expect(wrapper.get('[role="alert"]').text()).toContain('Template configuration is invalid.');
     expect(wrapper.html()).not.toMatch(/cookie|browser profile|database path|stack trace/iu);
+    wrapper.unmount();
+  });
+
+  it('refreshes summaries for TEMPLATE invalidation without exposing message payloads', async () => {
+    const fetchMock = installApiFetch();
+    installEventSource();
+    const wrapper = await mountAdmin('/templates');
+    const source = FakeEventSource.instances[0]!;
+    vi.useFakeTimers();
+    source.emit('config-changed', {
+      ...configEvent('TEMPLATE', TEMPLATE_ID),
+      messageText: 'PRIVATE_MESSAGE_SENTINEL',
+    });
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    vi.useRealTimers();
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/templates')).length,
+    ).toBe(2);
+    expect(wrapper.text()).not.toContain('PRIVATE_MESSAGE_SENTINEL');
     wrapper.unmount();
   });
 });

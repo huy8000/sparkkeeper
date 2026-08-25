@@ -1,9 +1,10 @@
 import { flushPromises } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { healthFixture, runtimeFixture } from '../test/fixtures';
 import { installApiFetch, failure, success } from '../test/http';
 import { mountAdmin } from '../test/mountAdmin';
+import { FakeEventSource, installEventSource, readyEvent } from '../test/realtime';
 
 describe('Dashboard', () => {
   it('renders healthy services and treats a disabled scheduler as neutral', async () => {
@@ -99,5 +100,35 @@ describe('Dashboard', () => {
     const wrapper = await wrapperPromise;
     expect(wrapper.text()).toContain('Loading service health');
     wrapper.unmount();
+  });
+
+  it('shows connected/reconnecting state and debounces ready snapshot refresh', async () => {
+    const fetchMock = installApiFetch();
+    installEventSource();
+    const wrapper = await mountAdmin('/');
+    const source = FakeEventSource.instances[0]!;
+
+    source.emit('open');
+    await wrapper.vm.$nextTick();
+    expect(wrapper.text()).toContain('Live updates: Connected');
+    source.emit('error');
+    await wrapper.vm.$nextTick();
+    expect(wrapper.text()).toContain('Live updates: Reconnecting');
+
+    const before = fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes('/api/runtime/status'),
+    ).length;
+    vi.useFakeTimers();
+    source.emit('ready', readyEvent());
+    source.emit('ready', readyEvent('2'));
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    const after = fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes('/api/runtime/status'),
+    ).length;
+    expect(after - before).toBe(1);
+    vi.useRealTimers();
+    wrapper.unmount();
+    expect(source.closed).toBe(true);
   });
 });
