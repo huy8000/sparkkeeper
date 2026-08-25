@@ -6,10 +6,18 @@ import {
   type BusinessDate,
   type DailyRunStatus,
 } from '@sparkkeeper/shared';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 
 import type { DatabaseClient } from '../client/DatabaseClient.js';
-import { dailyRuns, type DailyRunRow, type NewDailyRunRow } from '../schema/index.js';
+import {
+  DAILY_RUN_STATUSES,
+  dailyRuns,
+  type DailyRunRow,
+  type NewDailyRunRow,
+} from '../schema/index.js';
+
+export const DEFAULT_DAILY_RUN_LIMIT = 50;
+export const MAX_DAILY_RUN_LIMIT = 100;
 
 export type DailyRun = DailyRunRow;
 
@@ -17,6 +25,13 @@ export interface CreateOrGetDailyRunInput {
   readonly accountId: string;
   readonly businessDate: BusinessDate;
   readonly now: Date;
+}
+
+export interface ListDailyRunsInput {
+  readonly accountId?: string;
+  readonly businessDate?: BusinessDate;
+  readonly status?: DailyRunStatus;
+  readonly limit?: number;
 }
 
 export type ClaimDailyRunResult =
@@ -38,6 +53,7 @@ export class DailyRunRepositoryError extends Error {
       | 'findById'
       | 'findByAccountAndBusinessDate'
       | 'listByAccountId'
+      | 'list'
       | 'markRunning'
       | 'claimForExecution'
       | 'markSuccess'
@@ -150,6 +166,44 @@ export class DailyRunRepository {
         'listByAccountId',
         'DATABASE_OPERATION_FAILED',
         'Failed to list daily runs for account.',
+        error,
+      );
+    }
+  }
+
+  list(input: ListDailyRunsInput = {}): DailyRun[] {
+    const operation = 'list' as const;
+    try {
+      const businessDate =
+        input.businessDate === undefined
+          ? undefined
+          : validateBusinessDate(input.businessDate, operation);
+      if (input.status !== undefined && !DAILY_RUN_STATUSES.includes(input.status)) {
+        throw new DailyRunRepositoryError(
+          operation,
+          'DATABASE_OPERATION_FAILED',
+          'Daily run status filter is unsupported.',
+        );
+      }
+      const limit = validateLimit(input.limit ?? DEFAULT_DAILY_RUN_LIMIT, operation);
+      return this.client.orm
+        .select()
+        .from(dailyRuns)
+        .where(
+          and(
+            input.accountId === undefined ? undefined : eq(dailyRuns.accountId, input.accountId),
+            businessDate === undefined ? undefined : eq(dailyRuns.businessDate, businessDate),
+            input.status === undefined ? undefined : eq(dailyRuns.status, input.status),
+          ),
+        )
+        .orderBy(desc(dailyRuns.businessDate), desc(dailyRuns.createdAt), desc(dailyRuns.id))
+        .limit(limit)
+        .all();
+    } catch (error) {
+      throw dailyRunError(
+        operation,
+        'DATABASE_OPERATION_FAILED',
+        'Failed to list daily runs.',
         error,
       );
     }
@@ -274,6 +328,17 @@ function validateTimestamp(value: Date, operation: DailyRunRepositoryError['oper
     );
   }
   return value;
+}
+
+function validateLimit(limit: number, operation: DailyRunRepositoryError['operation']): number {
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_DAILY_RUN_LIMIT) {
+    throw new DailyRunRepositoryError(
+      operation,
+      'DATABASE_OPERATION_FAILED',
+      `Daily run limit must be an integer between 1 and ${MAX_DAILY_RUN_LIMIT}.`,
+    );
+  }
+  return limit;
 }
 
 function dailyRunError(

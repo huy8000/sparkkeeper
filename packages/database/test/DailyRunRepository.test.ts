@@ -77,6 +77,48 @@ test('listByAccountId returns ordered DailyRuns for only that Account', (context
   );
 });
 
+test('list applies safe filters, newest-first ordering, and a bounded limit', (context) => {
+  const { client } = createTemporaryDatabase(context);
+  const accountsRepository = new AccountRepository(client);
+  const first = accountsRepository.create({ name: 'Test Account A' });
+  const second = accountsRepository.create({ name: 'Test Account B' });
+  const repository = new DailyRunRepository(client);
+  const older = repository.createOrGet({
+    accountId: first.id,
+    businessDate: BUSINESS_DATE,
+    now: CREATED_AT,
+  });
+  const newer = repository.createOrGet({
+    accountId: first.id,
+    businessDate: NEXT_BUSINESS_DATE,
+    now: CREATED_AT,
+  });
+  repository.createOrGet({
+    accountId: second.id,
+    businessDate: BUSINESS_DATE,
+    now: CREATED_AT,
+  });
+  repository.markAuthExpired(newer.id, FINISHED_AT);
+
+  assert.deepEqual(
+    repository.list({ accountId: first.id }).map((run) => run.id),
+    [newer.id, older.id],
+  );
+  assert.deepEqual(
+    repository.list({ businessDate: BUSINESS_DATE }).map((run) => run.businessDate),
+    [BUSINESS_DATE, BUSINESS_DATE],
+  );
+  assert.deepEqual(
+    repository.list({ status: 'AUTH_EXPIRED' }).map((run) => run.id),
+    [newer.id],
+  );
+  assert.deepEqual(
+    repository.list({ limit: 1 }).map((run) => run.id),
+    [newer.id],
+  );
+  assert.throws(() => repository.list({ limit: 101 }), DailyRunRepositoryError);
+});
+
 test('createOrGet twice for one Account/date returns one unchanged row', (context) => {
   const fixture = createDailyRunFixture(context);
   const second = fixture.repository.createOrGet({

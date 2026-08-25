@@ -105,13 +105,38 @@ sparkkeeper/
 pnpm install
 ```
 
-同时启动服务端基础进程和管理端开发服务器：
+同时启动服务端 API/Scheduler composition root 和管理端开发服务器：
 
 ```bash
 pnpm dev
 ```
 
-管理端默认地址为 `http://localhost:5173`。当前服务端承载 Scheduler、Task Runner 和本地运行证据链，尚未实现 V2 业务 API，也不监听业务端口。
+管理端默认地址为 `http://localhost:5173`。服务端可单独运行：
+
+```bash
+pnpm --filter @sparkkeeper/server dev
+```
+
+构建后也可通过 `pnpm --filter @sparkkeeper/server start` 启动。V2 API foundation 默认绑定 `127.0.0.1:8080`，仅供本机访问；只有显式配置 `HOST` 才会改变绑定地址。后续远程访问必须先采用明确的 authentication、reverse proxy 或 trusted network 方案，不能把当前未认证 API 直接暴露到公网。
+
+### V2 Read-only API Foundation
+
+当前 HTTP API 仅提供以下只读端点，供未来 Vue 3 管理端消费：
+
+- `GET /api/health`
+- `GET /api/runtime/status`
+- `GET /api/accounts`
+- `GET /api/accounts/:accountId`
+- `GET /api/accounts/:accountId/friends`
+- `GET /api/friends/:friendId`
+- `GET /api/accounts/:accountId/schedules`
+- `GET /api/schedules/:scheduleId`
+- `GET /api/runs`
+- `GET /api/runs/:runId`
+- `GET /api/runs/:runId/send-records`
+- `GET /api/runs/:runId/events`
+
+API 与 Scheduler 使用独立的安全控制。启动 HTTP 服务不会授权真实发送；Scheduler 仍由 `SCHEDULER_ENABLED` 和 `SCHEDULER_ALLOW_REAL_SEND` 等原有开关控制，默认保持关闭。本阶段没有任何 Web real-send endpoint、文件下载 endpoint、CORS 通配配置或真实平台访问逻辑。
 
 工程检查：
 

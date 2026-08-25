@@ -99,6 +99,13 @@ test('database initialization applies and verifies the required PRAGMAs', (conte
   });
 });
 
+test('database ping is a lightweight read and fails after close', (context) => {
+  const { client } = createTemporaryDatabase(context);
+  assert.equal(client.ping(), true);
+  client.close();
+  assert.throws(() => client.ping(), DatabaseClientError);
+});
+
 test('database close is idempotent and closed clients fail clearly', (context) => {
   const { client } = createTemporaryDatabase(context, { migrate: false });
 
