@@ -44,6 +44,7 @@ export interface DailyTaskRunnerOptions {
 }
 
 export type DailyTaskRunResult = 'SUCCESS' | 'FAILED' | 'AUTH_EXPIRED' | 'RETRY_WAIT' | 'SKIPPED';
+export type DailyTaskExecutionMode = 'SCHEDULED' | 'MANUAL';
 
 interface FailureApplicationResult {
   readonly decision: RetryDecision;
@@ -63,8 +64,12 @@ export class DailyTaskRunner {
     this.observer = options.observer ?? new NoopRuntimeObserver();
   }
 
-  async run(accountId: string, businessDate: BusinessDate): Promise<DailyTaskRunResult> {
-    const { account, schedule, template } = this.requireConfiguration(accountId);
+  async run(
+    accountId: string,
+    businessDate: BusinessDate,
+    mode: DailyTaskExecutionMode = 'SCHEDULED',
+  ): Promise<DailyTaskRunResult> {
+    const { account, schedule, template } = this.requireConfiguration(accountId, mode);
     const currentTime = this.now();
     const window = evaluateScheduleWindow(
       currentTime,
@@ -72,7 +77,10 @@ export class DailyTaskRunner {
       schedule.startTime,
       schedule.endTime,
     );
-    if (window.position !== 'IN_WINDOW' || window.businessDate !== businessDate) {
+    if (
+      window.businessDate !== businessDate ||
+      (mode === 'SCHEDULED' && window.position !== 'IN_WINDOW')
+    ) {
       await this.finalizeExpired(accountId, window.businessDate);
       return 'SKIPPED';
     }
@@ -391,7 +399,7 @@ export class DailyTaskRunner {
     }
   }
 
-  private requireConfiguration(accountId: string) {
+  private requireConfiguration(accountId: string, mode: DailyTaskExecutionMode) {
     if (!this.options.allowRealSend) throw new Error('Scheduler real sending is not authorized.');
     if (accountId !== this.options.accountId)
       throw new Error('Scheduler Account does not match explicit configuration.');
@@ -400,8 +408,8 @@ export class DailyTaskRunner {
     const template = this.options.templates.findById(this.options.messageTemplateId);
     if (account === undefined || !account.enabled)
       throw new Error('Configured Scheduler Account is unavailable or disabled.');
-    if (schedule === undefined || !schedule.enabled)
-      throw new Error('Configured Schedule is unavailable or disabled.');
+    if (schedule === undefined || (mode === 'SCHEDULED' && !schedule.enabled))
+      throw new Error('Configured Schedule is unavailable or disabled for this execution mode.');
     if (template === undefined || !template.enabled)
       throw new Error('Configured MessageTemplate is unavailable or disabled.');
     return { account, schedule, template };

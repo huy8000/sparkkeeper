@@ -35,6 +35,9 @@ useRealtimeRefresh(
 
 <template>
   <div class="page-stack">
+    <p v-if="route.query.accepted === 'manual-run'" class="success-message" role="status">
+      Manual Run request accepted. The final outcome appears below.
+    </p>
     <header class="page-heading">
       <div>
         <p class="eyebrow">Run detail</p>

@@ -9,6 +9,7 @@ export interface StatusServiceOptions {
   readonly migrationReady: boolean | (() => boolean);
   readonly schedulerEnabled: boolean;
   readonly realSendAuthorizationEnabled: boolean;
+  readonly manualRunEnabled?: boolean;
   readonly timezone: string;
   readonly observabilityReady: boolean;
   readonly browserProfileConfigured: boolean;
@@ -29,6 +30,7 @@ export interface RuntimeStatus {
   readonly serverStatus: 'READY' | 'DEGRADED';
   readonly schedulerEnabled: boolean;
   readonly realSendAuthorizationEnabled: boolean;
+  readonly manualRunEnabled: boolean;
   readonly timezone: string;
   readonly databaseReady: boolean;
   readonly migrationReady: boolean;
@@ -66,6 +68,7 @@ export class StatusService {
       serverStatus: databaseReady && migrationReady ? 'READY' : 'DEGRADED',
       schedulerEnabled: this.options.schedulerEnabled,
       realSendAuthorizationEnabled: this.options.realSendAuthorizationEnabled,
+      manualRunEnabled: this.options.manualRunEnabled ?? false,
       timezone: this.options.timezone,
       databaseReady,
       migrationReady,

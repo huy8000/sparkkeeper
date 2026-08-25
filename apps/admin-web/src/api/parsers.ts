@@ -5,6 +5,8 @@ import type {
   Health,
   MessageTemplateDetail,
   MessageTemplateSummary,
+  ManualRunAccepted,
+  ManualRunPreflight,
   RuntimeStatus,
   Schedule,
   SendRecord,
@@ -48,6 +50,17 @@ const EVENT_TYPES = [
   'SKIPPED_IDEMPOTENT',
   'CONSECUTIVE_RUN_FAILURE',
   'OBSERVABILITY_ERROR',
+] as const;
+const MANUAL_RUN_BLOCKED_REASONS = [
+  'MANUAL_RUN_DISABLED',
+  'REAL_SEND_NOT_AUTHORIZED',
+  'ACCOUNT_DISABLED',
+  'TEMPLATE_DISABLED',
+  'NO_ENABLED_FRIENDS',
+  'SCHEDULE_NOT_CONFIGURED',
+  'RUN_IN_PROGRESS',
+  'RUN_ALREADY_COMPLETE',
+  'RUN_TERMINAL',
 ] as const;
 
 function record(value: unknown): Record<string, unknown> | undefined {
@@ -129,6 +142,7 @@ export const parseRuntimeStatus: Parser<RuntimeStatus> = (value) => {
   const serverStatus = oneOf(data?.serverStatus, ['READY', 'DEGRADED'] as const);
   const schedulerEnabled = boolean(data?.schedulerEnabled);
   const realSendAuthorizationEnabled = boolean(data?.realSendAuthorizationEnabled);
+  const manualRunEnabled = boolean(data?.manualRunEnabled);
   const timezone = string(data?.timezone);
   const databaseReady = boolean(data?.databaseReady);
   const migrationReady = boolean(data?.migrationReady);
@@ -140,6 +154,7 @@ export const parseRuntimeStatus: Parser<RuntimeStatus> = (value) => {
     serverStatus === undefined ||
     schedulerEnabled === undefined ||
     realSendAuthorizationEnabled === undefined ||
+    manualRunEnabled === undefined ||
     timezone === undefined ||
     databaseReady === undefined ||
     migrationReady === undefined ||
@@ -153,6 +168,7 @@ export const parseRuntimeStatus: Parser<RuntimeStatus> = (value) => {
     serverStatus,
     schedulerEnabled,
     realSendAuthorizationEnabled,
+    manualRunEnabled,
     timezone,
     databaseReady,
     migrationReady,
@@ -161,6 +177,72 @@ export const parseRuntimeStatus: Parser<RuntimeStatus> = (value) => {
     version,
     timestamp,
   };
+};
+
+export const parseManualRunPreflight: Parser<ManualRunPreflight> = (value) => {
+  const data = record(value);
+  const accountId = string(data?.accountId);
+  const templateId = string(data?.templateId);
+  const businessDate = nullableString(data?.businessDate);
+  const manualRunEnabled = boolean(data?.manualRunEnabled);
+  const realSendAuthorizationEnabled = boolean(data?.realSendAuthorizationEnabled);
+  const accountEnabled = boolean(data?.accountEnabled);
+  const templateEnabled = boolean(data?.templateEnabled);
+  const enabledFriendCount = number(data?.enabledFriendCount);
+  const scheduleConfigured = boolean(data?.scheduleConfigured);
+  const currentDailyRunStatus =
+    data?.currentDailyRunStatus === null ? null : oneOf(data?.currentDailyRunStatus, RUN_STATUSES);
+  const successfulFriendCount = number(data?.successfulFriendCount);
+  const pendingFriendCount = number(data?.pendingFriendCount);
+  const canRun = boolean(data?.canRun);
+  const blockedReasons = arrayOf(data?.blockedReasons, (item) =>
+    oneOf(item, MANUAL_RUN_BLOCKED_REASONS),
+  );
+  if (
+    [
+      accountId,
+      templateId,
+      businessDate,
+      manualRunEnabled,
+      realSendAuthorizationEnabled,
+      accountEnabled,
+      templateEnabled,
+      enabledFriendCount,
+      scheduleConfigured,
+      currentDailyRunStatus,
+      successfulFriendCount,
+      pendingFriendCount,
+      canRun,
+      blockedReasons,
+    ].some((item) => item === undefined)
+  )
+    return undefined;
+  return {
+    accountId: accountId!,
+    templateId: templateId!,
+    businessDate: businessDate!,
+    manualRunEnabled: manualRunEnabled!,
+    realSendAuthorizationEnabled: realSendAuthorizationEnabled!,
+    accountEnabled: accountEnabled!,
+    templateEnabled: templateEnabled!,
+    enabledFriendCount: enabledFriendCount!,
+    scheduleConfigured: scheduleConfigured!,
+    currentDailyRunStatus: currentDailyRunStatus!,
+    successfulFriendCount: successfulFriendCount!,
+    pendingFriendCount: pendingFriendCount!,
+    canRun: canRun!,
+    blockedReasons: blockedReasons!,
+  };
+};
+
+export const parseManualRunAccepted: Parser<ManualRunAccepted> = (value) => {
+  const data = record(value);
+  const runId = string(data?.runId);
+  const businessDate = string(data?.businessDate);
+  if (runId === undefined || businessDate === undefined || data?.status !== 'ACCEPTED') {
+    return undefined;
+  }
+  return { runId, businessDate, status: 'ACCEPTED' };
 };
 
 export const parseAccount: Parser<Account> = (value) => {

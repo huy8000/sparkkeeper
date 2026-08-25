@@ -84,7 +84,7 @@ watch(app.refreshVersion, () => void health.load());
           role="alert"
         >
           <strong>Real send authorization enabled</strong>
-          <span>This dashboard remains read-only and provides no send action.</span>
+          <span>This dashboard cannot change authorization or execute a run.</span>
         </div>
         <dl class="definition-grid">
           <div>
@@ -102,6 +102,14 @@ watch(app.refreshVersion, () => void health.load());
                 :status="
                   app.runtime.data.value.realSendAuthorizationEnabled ? 'ENABLED' : 'DISABLED'
                 "
+              />
+            </dd>
+          </div>
+          <div>
+            <dt>Manual Run</dt>
+            <dd>
+              <StatusBadge
+                :status="app.runtime.data.value.manualRunEnabled ? 'ENABLED' : 'DISABLED'"
               />
             </dd>
           </div>

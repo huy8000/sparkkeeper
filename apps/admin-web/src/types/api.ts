@@ -34,6 +34,7 @@ export interface RuntimeStatus {
   readonly serverStatus: 'READY' | 'DEGRADED';
   readonly schedulerEnabled: boolean;
   readonly realSendAuthorizationEnabled: boolean;
+  readonly manualRunEnabled: boolean;
   readonly timezone: string;
   readonly databaseReady: boolean;
   readonly migrationReady: boolean;
@@ -176,6 +177,45 @@ export interface RunFilters {
   readonly businessDate?: string;
   readonly status?: DailyRunStatus;
   readonly limit?: 25 | 50 | 100;
+}
+
+export type ManualRunBlockedReason =
+  | 'MANUAL_RUN_DISABLED'
+  | 'REAL_SEND_NOT_AUTHORIZED'
+  | 'ACCOUNT_DISABLED'
+  | 'TEMPLATE_DISABLED'
+  | 'NO_ENABLED_FRIENDS'
+  | 'SCHEDULE_NOT_CONFIGURED'
+  | 'RUN_IN_PROGRESS'
+  | 'RUN_ALREADY_COMPLETE'
+  | 'RUN_TERMINAL';
+
+export interface ManualRunPreflight {
+  readonly accountId: string;
+  readonly templateId: string;
+  readonly businessDate: string | null;
+  readonly manualRunEnabled: boolean;
+  readonly realSendAuthorizationEnabled: boolean;
+  readonly accountEnabled: boolean;
+  readonly templateEnabled: boolean;
+  readonly enabledFriendCount: number;
+  readonly scheduleConfigured: boolean;
+  readonly currentDailyRunStatus: DailyRunStatus | null;
+  readonly successfulFriendCount: number;
+  readonly pendingFriendCount: number;
+  readonly canRun: boolean;
+  readonly blockedReasons: readonly ManualRunBlockedReason[];
+}
+
+export interface ManualRunAccepted {
+  readonly runId: string;
+  readonly businessDate: string;
+  readonly status: 'ACCEPTED';
+}
+
+export interface ManualRunRequest {
+  readonly templateId: string;
+  readonly acknowledgeRealSend: true;
 }
 
 export type RealtimeConnectionState = 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED';

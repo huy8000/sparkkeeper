@@ -15,6 +15,7 @@ describe('Dashboard', () => {
     expect(wrapper.text()).toContain('Database');
     expect(wrapper.text()).toContain('Migration');
     expect(wrapper.text()).toContain('Runtime scheduler');
+    expect(wrapper.text()).toContain('Manual Run');
     expect(wrapper.text()).toContain('DISABLED');
     expect(wrapper.find('.risk-banner').exists()).toBe(false);
     wrapper.unmount();

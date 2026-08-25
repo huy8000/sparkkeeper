@@ -3,6 +3,7 @@ import type { ScheduleRepository } from '@sparkkeeper/database';
 
 import { evaluateScheduleWindow } from './ScheduleWindow.js';
 import { NoopRuntimeObserver, type RuntimeObserver } from '../observability/RuntimeObserver.js';
+import { RunExecutionCoordinator } from '../application/RunExecutionCoordinator.js';
 
 export interface SchedulerClock {
   now(): Date;
@@ -34,6 +35,7 @@ export class TaskScheduler {
     private readonly pollIntervalMs = DEFAULT_SCHEDULER_POLL_INTERVAL_MS,
     private readonly onError: SchedulerErrorHandler = defaultErrorHandler,
     private readonly observer: Pick<RuntimeObserver, 'cleanup'> = new NoopRuntimeObserver(),
+    private readonly coordinator = new RunExecutionCoordinator(),
   ) {
     if (!Number.isInteger(pollIntervalMs) || pollIntervalMs < 1) {
       throw new Error('Scheduler poll interval must be a positive integer.');
@@ -89,12 +91,18 @@ export class TaskScheduler {
       }
       this.lastCleanupBusinessDate = evaluation.businessDate;
     }
-    if (evaluation.position !== 'IN_WINDOW') {
-      await this.runner.finalizeExpired?.(schedule.accountId, evaluation.businessDate);
-      return 'SKIPPED';
+    const lease = this.coordinator.tryAcquire(schedule.accountId, evaluation.businessDate);
+    if (lease === undefined) return 'SKIPPED';
+    try {
+      if (evaluation.position !== 'IN_WINDOW') {
+        await this.runner.finalizeExpired?.(schedule.accountId, evaluation.businessDate);
+        return 'SKIPPED';
+      }
+      const result = await this.runner.run(schedule.accountId, evaluation.businessDate);
+      return result === 'SKIPPED' ? 'SKIPPED' : 'TRIGGERED';
+    } finally {
+      lease.release();
     }
-    const result = await this.runner.run(schedule.accountId, evaluation.businessDate);
-    return result === 'SKIPPED' ? 'SKIPPED' : 'TRIGGERED';
   }
 }
 

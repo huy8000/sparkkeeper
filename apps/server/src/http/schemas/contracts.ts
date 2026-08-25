@@ -49,6 +49,7 @@ export const mutationErrorResponses = {
   409: errorEnvelopeSchema,
   415: errorEnvelopeSchema,
   500: errorEnvelopeSchema,
+  503: errorEnvelopeSchema,
 } as const;
 
 export function successEnvelopeSchema(data: object): object {
@@ -105,6 +106,7 @@ export const runtimeStatusSchema = {
     'serverStatus',
     'schedulerEnabled',
     'realSendAuthorizationEnabled',
+    'manualRunEnabled',
     'timezone',
     'databaseReady',
     'migrationReady',
@@ -117,6 +119,7 @@ export const runtimeStatusSchema = {
     serverStatus: { type: 'string', enum: ['READY', 'DEGRADED'] },
     schedulerEnabled: { type: 'boolean' },
     realSendAuthorizationEnabled: { type: 'boolean' },
+    manualRunEnabled: { type: 'boolean' },
     timezone: { type: 'string' },
     databaseReady: { type: 'boolean' },
     migrationReady: { type: 'boolean' },
@@ -124,6 +127,91 @@ export const runtimeStatusSchema = {
     browserProfileConfigured: { type: 'boolean' },
     version: { type: 'string' },
     timestamp: isoTimestampSchema,
+  },
+} as const;
+
+export const manualRunPreflightQuerySchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['templateId'],
+  properties: { templateId: { type: 'string', format: 'uuid' } },
+} as const;
+
+export const manualRunRequestBodySchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['templateId', 'acknowledgeRealSend'],
+  properties: {
+    templateId: { type: 'string', format: 'uuid' },
+    acknowledgeRealSend: { type: 'boolean' },
+  },
+} as const;
+
+export const manualRunPreflightSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'accountId',
+    'templateId',
+    'businessDate',
+    'manualRunEnabled',
+    'realSendAuthorizationEnabled',
+    'accountEnabled',
+    'templateEnabled',
+    'enabledFriendCount',
+    'scheduleConfigured',
+    'currentDailyRunStatus',
+    'successfulFriendCount',
+    'pendingFriendCount',
+    'canRun',
+    'blockedReasons',
+  ],
+  properties: {
+    accountId: { type: 'string', format: 'uuid' },
+    templateId: { type: 'string', format: 'uuid' },
+    businessDate: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$', nullable: true },
+    manualRunEnabled: { type: 'boolean' },
+    realSendAuthorizationEnabled: { type: 'boolean' },
+    accountEnabled: { type: 'boolean' },
+    templateEnabled: { type: 'boolean' },
+    enabledFriendCount: { type: 'integer', minimum: 0 },
+    scheduleConfigured: { type: 'boolean' },
+    currentDailyRunStatus: {
+      type: 'string',
+      enum: [...DAILY_RUN_STATUSES],
+      nullable: true,
+    },
+    successfulFriendCount: { type: 'integer', minimum: 0 },
+    pendingFriendCount: { type: 'integer', minimum: 0 },
+    canRun: { type: 'boolean' },
+    blockedReasons: {
+      type: 'array',
+      items: {
+        type: 'string',
+        enum: [
+          'MANUAL_RUN_DISABLED',
+          'REAL_SEND_NOT_AUTHORIZED',
+          'ACCOUNT_DISABLED',
+          'TEMPLATE_DISABLED',
+          'NO_ENABLED_FRIENDS',
+          'SCHEDULE_NOT_CONFIGURED',
+          'RUN_IN_PROGRESS',
+          'RUN_ALREADY_COMPLETE',
+          'RUN_TERMINAL',
+        ],
+      },
+    },
+  },
+} as const;
+
+export const manualRunAcceptedSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['runId', 'businessDate', 'status'],
+  properties: {
+    runId: { type: 'string', format: 'uuid' },
+    businessDate: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+    status: { const: 'ACCEPTED' },
   },
 } as const;
 

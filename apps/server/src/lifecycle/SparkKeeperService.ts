@@ -5,6 +5,7 @@ import {
   type ServerEnvironment,
 } from '../http/ApiApplication.js';
 import { RuntimeEventHub } from '../realtime/RuntimeEventHub.js';
+import { RunExecutionCoordinator } from '../application/RunExecutionCoordinator.js';
 import { SchedulerService } from './SchedulerService.js';
 
 export interface SparkKeeperStartResult {
@@ -17,10 +18,16 @@ export class SparkKeeperService {
   private stopping: Promise<void> | undefined;
   private readonly scheduler: SchedulerService;
   private readonly realtime: RuntimeEventHub;
+  private readonly coordinator: RunExecutionCoordinator;
 
-  constructor(scheduler?: SchedulerService, realtime = new RuntimeEventHub()) {
+  constructor(
+    scheduler?: SchedulerService,
+    realtime = new RuntimeEventHub(),
+    coordinator = new RunExecutionCoordinator(),
+  ) {
     this.realtime = realtime;
-    this.scheduler = scheduler ?? new SchedulerService(realtime);
+    this.coordinator = coordinator;
+    this.scheduler = scheduler ?? new SchedulerService(realtime, coordinator);
   }
 
   async start(environment: ServerEnvironment = process.env): Promise<SparkKeeperStartResult> {
@@ -28,7 +35,11 @@ export class SparkKeeperService {
       throw new Error('SparkKeeper service is already started.');
     }
 
-    const application = createApiApplication({ environment, realtime: this.realtime });
+    const application = createApiApplication({
+      environment,
+      realtime: this.realtime,
+      coordinator: this.coordinator,
+    });
     this.application = application;
     try {
       const address = await listenApiApplication(application);
@@ -62,6 +73,11 @@ export class SparkKeeperService {
     }
     try {
       await this.scheduler.stop();
+    } catch (error) {
+      firstError ??= error;
+    }
+    try {
+      await application?.stopManualRuns();
     } catch (error) {
       firstError ??= error;
     }

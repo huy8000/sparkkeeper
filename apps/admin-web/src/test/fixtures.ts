@@ -5,6 +5,8 @@ import type {
   Health,
   MessageTemplateDetail,
   MessageTemplateSummary,
+  ManualRunAccepted,
+  ManualRunPreflight,
   RuntimeStatus,
   Schedule,
   SendRecord,
@@ -32,6 +34,7 @@ export const runtimeFixture: RuntimeStatus = {
   serverStatus: 'READY',
   schedulerEnabled: false,
   realSendAuthorizationEnabled: false,
+  manualRunEnabled: false,
   timezone: 'Asia/Shanghai',
   databaseReady: true,
   migrationReady: true,
@@ -90,6 +93,29 @@ export const templateSummaryFixture: MessageTemplateSummary = {
 export const templateDetailFixture: MessageTemplateDetail = {
   ...templateSummaryFixture,
   messages: ['Fictional template editor content.'],
+};
+
+export const manualRunPreflightFixture: ManualRunPreflight = {
+  accountId: ACCOUNT_ID,
+  templateId: TEMPLATE_ID,
+  businessDate: '2026-01-02',
+  manualRunEnabled: true,
+  realSendAuthorizationEnabled: true,
+  accountEnabled: true,
+  templateEnabled: true,
+  enabledFriendCount: 2,
+  scheduleConfigured: true,
+  currentDailyRunStatus: null,
+  successfulFriendCount: 0,
+  pendingFriendCount: 2,
+  canRun: true,
+  blockedReasons: [],
+};
+
+export const manualRunAcceptedFixture: ManualRunAccepted = {
+  runId: RUN_ID,
+  businessDate: '2026-01-02',
+  status: 'ACCEPTED',
 };
 
 export const runFixture: DailyRun = {

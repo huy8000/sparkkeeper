@@ -14,6 +14,9 @@ import type {
   MessageTemplateDetail,
   MessageTemplateInput,
   MessageTemplateSummary,
+  ManualRunAccepted,
+  ManualRunPreflight,
+  ManualRunRequest,
   UpdateAccountInput,
   UpdateFriendInput,
   UpdateMessageTemplateInput,
@@ -29,6 +32,8 @@ import {
   parseHealth,
   parseMessageTemplateDetail,
   parseMessageTemplateSummaries,
+  parseManualRunAccepted,
+  parseManualRunPreflight,
   parseRuntimeStatus,
   parseSchedule,
   parseSchedules,
@@ -72,6 +77,16 @@ export interface SparkKeeperApi {
   getRun(runId: string, signal?: AbortSignal): Promise<DailyRun>;
   listSendRecords(runId: string, signal?: AbortSignal): Promise<SendRecord[]>;
   listSystemEvents(runId: string, signal?: AbortSignal): Promise<SystemEvent[]>;
+  getManualRunPreflight(
+    accountId: string,
+    templateId: string,
+    signal?: AbortSignal,
+  ): Promise<ManualRunPreflight>;
+  startManualRun(
+    accountId: string,
+    input: ManualRunRequest,
+    signal?: AbortSignal,
+  ): Promise<ManualRunAccepted>;
 }
 
 export function createSparkKeeperApi(
@@ -157,5 +172,19 @@ export function createSparkKeeperApi(
       client.get(`/runs/${encodeURIComponent(runId)}/send-records`, parseSendRecords, signal),
     listSystemEvents: (runId, signal) =>
       client.get(`/runs/${encodeURIComponent(runId)}/events`, parseSystemEvents, signal),
+    getManualRunPreflight: (accountId, templateId, signal) =>
+      client.get(
+        `/accounts/${encodeURIComponent(accountId)}/manual-run/preflight?templateId=${encodeURIComponent(templateId)}`,
+        parseManualRunPreflight,
+        signal,
+      ),
+    startManualRun: (accountId, input, signal) =>
+      client.mutate(
+        'POST',
+        `/accounts/${encodeURIComponent(accountId)}/manual-runs`,
+        input,
+        parseManualRunAccepted,
+        signal,
+      ),
   };
 }
