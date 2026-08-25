@@ -45,7 +45,7 @@ const databasePath = path.join(directory, 'sparkkeeper.db');
 let client: DatabaseClient = createDatabase({ databasePath });
 
 try {
-  assert.equal(client.migrate().appliedMigrationCount, 7);
+  assert.equal(client.migrate().appliedMigrationCount, 8);
   const account = new AccountRepository(client).create({
     name: 'Test Account',
     loginStatus: 'READY',
@@ -80,7 +80,7 @@ try {
 
   client.close();
   client = createDatabase({ databasePath });
-  assert.equal(client.migrate().appliedMigrationCount, 7);
+  assert.equal(client.migrate().appliedMigrationCount, 8);
   assert.equal(new ScheduleRepository(client).findById(schedule.id)?.accountId, account.id);
   const restartAutomation = new SmokeAutomation();
   const restartRunner = createRunner(

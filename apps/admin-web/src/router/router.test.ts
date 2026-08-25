@@ -11,6 +11,7 @@ describe('admin routing', () => {
     [`/accounts/${ACCOUNT_ID}`, 'Account detail'],
     ['/schedules', 'Account schedule windows'],
     ['/templates', 'Message templates'],
+    ['/notifications', 'Webhook notifications'],
     ['/runs', 'Daily run history'],
     [`/runs/${RUN_ID}`, 'Run summary'],
   ])('renders %s', async (path, expected) => {

@@ -287,5 +287,11 @@ function optionalRunResult(
 }
 
 function isConfigEntityType(value: unknown): value is ConfigEntityType {
-  return value === 'ACCOUNT' || value === 'FRIEND' || value === 'TEMPLATE' || value === 'SCHEDULE';
+  return (
+    value === 'ACCOUNT' ||
+    value === 'FRIEND' ||
+    value === 'TEMPLATE' ||
+    value === 'SCHEDULE' ||
+    value === 'NOTIFICATION'
+  );
 }

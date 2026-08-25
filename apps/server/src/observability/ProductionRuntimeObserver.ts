@@ -1,4 +1,5 @@
 import type { CreateSystemEventInput } from '@sparkkeeper/database';
+import type { NotificationEventCandidate } from '@sparkkeeper/notifier';
 
 import type { RealtimeEventPublisher } from '../realtime/RealtimeEvent.js';
 import type { RuntimeLogEvent, RuntimeLogWriter } from './RuntimeLogger.js';
@@ -40,6 +41,10 @@ interface EvidenceRetention {
   cleanup(now?: Date): RetentionResult;
 }
 
+interface NotificationPublisher {
+  publish(candidate: NotificationEventCandidate): void;
+}
+
 export interface ProductionRuntimeObserverOptions {
   readonly logger: SafeLogger | RuntimeLogWriter;
   readonly systemEvents: SystemEventStore;
@@ -47,6 +52,8 @@ export interface ProductionRuntimeObserverOptions {
   readonly traces: TraceEvidence;
   readonly retention: EvidenceRetention | RetentionManager;
   readonly realtime?: RealtimeEventPublisher;
+  readonly notifications?: NotificationPublisher;
+  readonly clock?: () => Date;
   readonly fallback?: (safeMessage: string) => void;
 }
 
@@ -54,9 +61,11 @@ export class ProductionRuntimeObserver implements RuntimeObserver {
   private readonly tracePaths = new Map<string, string>();
   private readonly runsWithScreenshot = new Set<string>();
   private readonly fallback: (safeMessage: string) => void;
+  private readonly clock: () => Date;
 
   constructor(private readonly options: ProductionRuntimeObserverOptions) {
     this.fallback = options.fallback ?? ((message) => process.stderr.write(`${message}\n`));
+    this.clock = options.clock ?? (() => new Date());
   }
 
   async observe(event: RuntimeObservation): Promise<void> {
@@ -105,6 +114,7 @@ export class ProductionRuntimeObserver implements RuntimeObserver {
       }
     }
     this.safeRealtimeBroadcast(event);
+    this.safeNotificationPublish(event);
   }
 
   async startRun(context: RuntimeRunContext): Promise<void> {
@@ -203,6 +213,24 @@ export class ProductionRuntimeObserver implements RuntimeObserver {
     } catch {
       this.safeLog('error', observabilityFailureEvent('REALTIME_BROADCAST_FAILED', event));
       this.safeFallback('SparkKeeper realtime broadcast failed.');
+    }
+  }
+
+  private safeNotificationPublish(event: RuntimeObservation): void {
+    try {
+      this.options.notifications?.publish({
+        eventType: event.eventType,
+        severity: event.level === 'error' ? 'ERROR' : 'WARN',
+        safeMessage: safeEventMessage(event.eventType),
+        timestamp: this.clock().toISOString(),
+        ...(event.runId === undefined ? {} : { runId: event.runId }),
+        ...(event.accountId === undefined ? {} : { accountId: event.accountId }),
+        ...(event.businessDate === undefined ? {} : { businessDate: event.businessDate }),
+        ...(event.errorCode === undefined ? {} : { errorCode: event.errorCode }),
+      });
+    } catch {
+      this.safeLog('error', observabilityFailureEvent('NOTIFICATION_PUBLISH_FAILED', event));
+      this.safeFallback('SparkKeeper notification scheduling failed.');
     }
   }
 

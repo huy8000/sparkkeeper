@@ -12,6 +12,10 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test": "pnpm --filter @sparkkeeper/shared build && tsx --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@sparkkeeper/shared": "workspace:*"
   }
 }

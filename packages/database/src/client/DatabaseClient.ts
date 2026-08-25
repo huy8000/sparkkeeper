@@ -48,6 +48,7 @@ export interface DatabaseInspection {
   readonly dailyRunColumns: readonly DatabaseColumnState[];
   readonly friendColumns: readonly DatabaseColumnState[];
   readonly messageTemplateColumns: readonly DatabaseColumnState[];
+  readonly notificationConfigColumns: readonly DatabaseColumnState[];
   readonly sendRecordColumns: readonly DatabaseColumnState[];
   readonly scheduleColumns: readonly DatabaseColumnState[];
   readonly systemEventColumns: readonly DatabaseColumnState[];
@@ -55,6 +56,7 @@ export interface DatabaseInspection {
   readonly dailyRunsSchemaCompatible: boolean;
   readonly friendsSchemaCompatible: boolean;
   readonly messageTemplatesSchemaCompatible: boolean;
+  readonly notificationConfigsSchemaCompatible: boolean;
   readonly sendRecordsSchemaCompatible: boolean;
   readonly schedulesSchemaCompatible: boolean;
   readonly systemEventsSchemaCompatible: boolean;
@@ -66,6 +68,7 @@ export interface DatabaseMigrationResult {
   readonly dailyRunsSchemaVerified: true;
   readonly friendsSchemaVerified: true;
   readonly messageTemplatesSchemaVerified: true;
+  readonly notificationConfigsSchemaVerified: true;
   readonly sendRecordsSchemaVerified: true;
   readonly schedulesSchemaVerified: true;
   readonly systemEventsSchemaVerified: true;
@@ -132,6 +135,19 @@ const EXPECTED_MESSAGE_TEMPLATE_COLUMNS: readonly DatabaseColumnState[] = [
   { name: 'provider_type', type: 'TEXT', notNull: true, primaryKey: false },
   { name: 'content', type: 'TEXT', notNull: true, primaryKey: false },
   { name: 'enabled', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'created_at', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
+];
+
+const EXPECTED_NOTIFICATION_CONFIG_COLUMNS: readonly DatabaseColumnState[] = [
+  { name: 'id', type: 'INTEGER', notNull: true, primaryKey: true },
+  { name: 'enabled', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'provider', type: 'TEXT', notNull: true, primaryKey: false },
+  { name: 'webhook_url', type: 'TEXT', notNull: false, primaryKey: false },
+  { name: 'notify_auth_expired', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'notify_task_failed', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'notify_consecutive_failure', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'notify_delivery_unknown', type: 'INTEGER', notNull: true, primaryKey: false },
   { name: 'created_at', type: 'INTEGER', notNull: true, primaryKey: false },
   { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
 ];
@@ -216,6 +232,7 @@ export class DatabaseClient {
       !inspection.dailyRunsSchemaCompatible ||
       !inspection.friendsSchemaCompatible ||
       !inspection.messageTemplatesSchemaCompatible ||
+      !inspection.notificationConfigsSchemaCompatible ||
       !inspection.sendRecordsSchemaCompatible ||
       !inspection.schedulesSchemaCompatible ||
       !inspection.systemEventsSchemaCompatible
@@ -231,6 +248,7 @@ export class DatabaseClient {
       dailyRunsSchemaVerified: true,
       friendsSchemaVerified: true,
       messageTemplatesSchemaVerified: true,
+      notificationConfigsSchemaVerified: true,
       sendRecordsSchemaVerified: true,
       schedulesSchemaVerified: true,
       systemEventsSchemaVerified: true,
@@ -252,6 +270,9 @@ export class DatabaseClient {
     const messageTemplateColumns = tableNames.includes('message_templates')
       ? this.readMessageTemplateColumns()
       : [];
+    const notificationConfigColumns = tableNames.includes('notification_configs')
+      ? this.readNotificationConfigColumns()
+      : [];
     const sendRecordColumns = tableNames.includes('send_records')
       ? this.readSendRecordColumns()
       : [];
@@ -271,6 +292,7 @@ export class DatabaseClient {
       dailyRunColumns,
       friendColumns,
       messageTemplateColumns,
+      notificationConfigColumns,
       sendRecordColumns,
       scheduleColumns,
       systemEventColumns,
@@ -278,6 +300,8 @@ export class DatabaseClient {
       dailyRunsSchemaCompatible: dailyRunColumnsMatch(dailyRunColumns),
       friendsSchemaCompatible: friendColumnsMatch(friendColumns),
       messageTemplatesSchemaCompatible: messageTemplateColumnsMatch(messageTemplateColumns),
+      notificationConfigsSchemaCompatible:
+        notificationConfigColumnsMatch(notificationConfigColumns),
       sendRecordsSchemaCompatible: sendRecordColumnsMatch(sendRecordColumns),
       schedulesSchemaCompatible: scheduleColumnsMatch(scheduleColumns),
       systemEventsSchemaCompatible: systemEventColumnsMatch(systemEventColumns),
@@ -357,6 +381,16 @@ export class DatabaseClient {
 
   private readMessageTemplateColumns(): DatabaseColumnState[] {
     const rows = this.sqlite.pragma('table_info(message_templates)') as SqliteTableInfoRow[];
+    return rows.map((row) => ({
+      name: row.name,
+      type: row.type.toUpperCase(),
+      notNull: row.notnull === 1,
+      primaryKey: row.pk === 1,
+    }));
+  }
+
+  private readNotificationConfigColumns(): DatabaseColumnState[] {
+    const rows = this.sqlite.pragma('table_info(notification_configs)') as SqliteTableInfoRow[];
     return rows.map((row) => ({
       name: row.name,
       type: row.type.toUpperCase(),
@@ -547,6 +581,10 @@ function dailyRunColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
 
 function messageTemplateColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
   return columnsMatch(actual, EXPECTED_MESSAGE_TEMPLATE_COLUMNS);
+}
+
+function notificationConfigColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {
+  return columnsMatch(actual, EXPECTED_NOTIFICATION_CONFIG_COLUMNS);
 }
 
 function sendRecordColumnsMatch(actual: readonly DatabaseColumnState[]): boolean {

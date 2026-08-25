@@ -115,10 +115,10 @@ export function runV1Preflight(options: RunV1PreflightOptions = {}): V1Preflight
       inspection.pragmas.synchronous === 2;
     database = schemasReady ? 'READY' : 'INVALID';
     migration =
-      inspection.appliedMigrationCount === EXPECTED_V1_MIGRATION_COUNT ? 'READY' : 'INVALID';
+      inspection.appliedMigrationCount >= EXPECTED_V1_MIGRATION_COUNT ? 'READY' : 'INVALID';
     if (database !== 'READY') blockers.push('Database schema or PRAGMA state is not ready.');
     if (migration !== 'READY')
-      blockers.push('Database migration journal does not contain 7 entries.');
+      blockers.push('Database migration journal does not contain the 7 immutable V1 entries.');
 
     const readModel = new V1ReleaseReadModel(client);
     if (accountId === undefined) {

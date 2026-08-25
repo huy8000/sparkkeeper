@@ -8,6 +8,7 @@ import {
   SystemEventRepository,
   type DatabaseClient,
 } from '@sparkkeeper/database';
+import type { NotificationService } from '@sparkkeeper/notifier';
 
 import { DailyTaskRunner } from '../application/DailyTaskRunner.js';
 import { ProductionDailyTaskAutomation } from '../automation/ProductionDailyTaskAutomation.js';
@@ -26,6 +27,7 @@ export interface ProductionDailyTaskRunnerOptions {
   readonly observability: ObservabilityConfig;
   readonly logger: RuntimeLogger;
   readonly realtime?: RealtimeEventPublisher;
+  readonly notifications?: Pick<NotificationService, 'publish'>;
   readonly clock?: () => Date;
 }
 
@@ -57,6 +59,8 @@ export function createProductionDailyTaskRunner(
       traceRetentionDays: options.observability.traceRetentionDays,
     }),
     ...(options.realtime === undefined ? {} : { realtime: options.realtime }),
+    ...(options.notifications === undefined ? {} : { notifications: options.notifications }),
+    ...(options.clock === undefined ? {} : { clock: options.clock }),
   });
   return {
     schedules,

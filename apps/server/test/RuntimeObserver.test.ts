@@ -187,6 +187,65 @@ test('ProductionRuntimeObserver contains realtime publisher failure without chan
   assert.deepEqual(logged, ['TASK_FAILED', 'REALTIME_BROADCAST_FAILED']);
 });
 
+test('ProductionRuntimeObserver publishes one safe notification candidate after persistence and realtime', async () => {
+  const order: string[] = [];
+  const candidates: unknown[] = [];
+  const observer = observerFixture({
+    logger: { emit: () => order.push('log') },
+    systemEvents: { create: () => order.push('persist') },
+    realtime: { publish: () => order.push('realtime') },
+    notifications: {
+      publish: (candidate) => {
+        order.push('notification');
+        candidates.push(candidate);
+      },
+    },
+  });
+
+  await observer.observe({
+    eventType: 'DELIVERY_UNKNOWN',
+    level: 'error',
+    accountId: 'fixture-account-id',
+    runId: 'fixture-run-id',
+    friendId: 'fixture-friend-id',
+    businessDate: parseBusinessDate('2026-08-23'),
+    errorCode: 'DELIVERY_UNKNOWN',
+    captureScreenshot: false,
+    messageText: 'PRIVATE_MESSAGE_SENTINEL',
+    token: 'PRIVATE_TOKEN_SENTINEL',
+    screenshotPath: '/private/evidence.png',
+  } as RuntimeObservation & Record<string, unknown>);
+
+  assert.deepEqual(order, ['log', 'persist', 'realtime', 'notification']);
+  assert.deepEqual(candidates, [
+    {
+      eventType: 'DELIVERY_UNKNOWN',
+      severity: 'ERROR',
+      safeMessage: 'Delivery result is uncertain',
+      timestamp: '2026-08-23T12:00:00.000Z',
+      accountId: 'fixture-account-id',
+      runId: 'fixture-run-id',
+      businessDate: '2026-08-23',
+      errorCode: 'DELIVERY_UNKNOWN',
+    },
+  ]);
+  assert.doesNotMatch(JSON.stringify(candidates), /friend|PRIVATE_|messageText|token|screenshot/u);
+});
+
+test('ProductionRuntimeObserver contains notification publisher failure', async () => {
+  const observer = observerFixture({
+    notifications: {
+      publish: () => {
+        throw new Error('PRIVATE_NOTIFICATION_FAILURE');
+      },
+    },
+  });
+
+  await assert.doesNotReject(() =>
+    observer.observe({ eventType: 'TASK_FAILED', level: 'error', captureScreenshot: false }),
+  );
+});
+
 function observerFixture(
   overrides: Partial<ConstructorParameters<typeof ProductionRuntimeObserver>[0]> = {},
 ): ProductionRuntimeObserver {
@@ -202,6 +261,7 @@ function observerFixture(
     },
     retention: { cleanup: () => ({ removedFiles: [], errorCount: 0 }) },
     fallback: () => undefined,
+    clock: () => new Date('2026-08-23T12:00:00.000Z'),
     ...overrides,
   });
 }

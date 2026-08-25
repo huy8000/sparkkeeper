@@ -215,6 +215,59 @@ export const manualRunAcceptedSchema = {
   },
 } as const;
 
+const notificationConfigurationProperties = {
+  enabled: { type: 'boolean' },
+  provider: { const: 'WEBHOOK' },
+  webhookUrl: { type: 'string', minLength: 1, maxLength: 2048, nullable: true },
+  notifyAuthExpired: { type: 'boolean' },
+  notifyTaskFailed: { type: 'boolean' },
+  notifyConsecutiveFailure: { type: 'boolean' },
+  notifyDeliveryUnknown: { type: 'boolean' },
+} as const;
+
+const notificationConfigurationRequired = [
+  'enabled',
+  'provider',
+  'webhookUrl',
+  'notifyAuthExpired',
+  'notifyTaskFailed',
+  'notifyConsecutiveFailure',
+  'notifyDeliveryUnknown',
+] as const;
+
+export const notificationConfigurationBodySchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: [...notificationConfigurationRequired],
+  properties: notificationConfigurationProperties,
+} as const;
+
+export const notificationConfigurationSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: [...notificationConfigurationRequired, 'createdAt', 'updatedAt'],
+  properties: {
+    ...notificationConfigurationProperties,
+    createdAt: nullableTimestampSchema,
+    updatedAt: nullableTimestampSchema,
+  },
+} as const;
+
+export const notificationDeliveryResultSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['status', 'attempts'],
+  properties: {
+    status: { type: 'string', enum: ['SENT', 'FAILED', 'BLOCKED'] },
+    attempts: { type: 'integer', minimum: 0, maximum: 3 },
+    failureCode: {
+      type: 'string',
+      enum: ['TIMEOUT', 'NETWORK_ERROR', 'HTTP_ERROR', 'DESTINATION_BLOCKED', 'INVALID_CONFIG'],
+    },
+    httpStatus: { type: 'integer', minimum: 100, maximum: 599 },
+  },
+} as const;
+
 export const accountSchema = {
   type: 'object',
   additionalProperties: false,
