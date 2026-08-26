@@ -24,6 +24,14 @@ export interface NotificationEventCandidate {
   readonly errorCode?: string;
 }
 
+export type SendableNotificationEventCandidate = Omit<NotificationEventCandidate, 'eventType'> & {
+  readonly eventType: NotificationEventType;
+};
+
+export function isNotificationEventType(value: RuntimeEventType): value is NotificationEventType {
+  return NOTIFICATION_EVENT_TYPES.some((eventType) => eventType === value);
+}
+
 export interface NotificationPayload {
   readonly serviceName: 'SparkKeeper';
   readonly eventType: NotificationPayloadEventType;
@@ -36,10 +44,12 @@ export interface NotificationPayload {
   readonly errorCode?: string;
 }
 
-export function toNotificationPayload(candidate: NotificationEventCandidate): NotificationPayload {
+export function toNotificationPayload(
+  candidate: SendableNotificationEventCandidate,
+): NotificationPayload {
   return {
     serviceName: 'SparkKeeper',
-    eventType: candidate.eventType as NotificationEventType,
+    eventType: candidate.eventType,
     severity: candidate.severity,
     message: candidate.safeMessage,
     timestamp: candidate.timestamp,

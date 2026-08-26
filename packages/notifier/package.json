@@ -2,7 +2,7 @@
   "name": "@sparkkeeper/notifier",
   "version": "0.0.0",
   "private": true,
-  "description": "SparkKeeper notifier package foundation",
+  "description": "SparkKeeper notification policy and webhook delivery package",
   "type": "module",
   "exports": {
     ".": {

@@ -7,7 +7,7 @@ import {
   WebhookProvider,
   WebhookTransportError,
   type HostAddressResolver,
-  type NotificationEventCandidate,
+  type SendableNotificationEventCandidate,
   type WebhookTransport,
   type WebhookTransportRequest,
 } from '../src/index.js';
@@ -16,7 +16,7 @@ const resolver: HostAddressResolver = {
   lookup: async () => [{ address: '93.184.216.34', family: 4 }],
 };
 
-const event: NotificationEventCandidate = {
+const event: SendableNotificationEventCandidate = {
   eventType: 'TASK_FAILED',
   severity: 'ERROR',
   safeMessage: 'Task finished with failure',
@@ -46,7 +46,7 @@ test('webhook provider sends a strict safe payload and reports a successful 2xx 
     token: 'PRIVATE_TOKEN_SENTINEL',
     screenshotPath: '/private/evidence.png',
     stack: 'PRIVATE_STACK_SENTINEL',
-  } as NotificationEventCandidate;
+  } as SendableNotificationEventCandidate;
 
   const result = await provider.send(
     toNotificationPayload(malicious),

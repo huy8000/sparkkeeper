@@ -1,6 +1,7 @@
 import {
   type NotificationConfiguration,
   type NotificationEventCandidate,
+  isNotificationEventType,
   type NotificationPayload,
   toNotificationPayload,
 } from './Notification.js';
@@ -53,13 +54,15 @@ export class NotificationService {
       const configuration = this.options.configuration.get();
       if (
         configuration.webhookUrl === null ||
-        this.policy.decide(candidate, configuration) !== 'SEND'
+        this.policy.decide(candidate, configuration) !== 'SEND' ||
+        !isNotificationEventType(candidate.eventType)
       ) {
         return;
       }
+      const sendableCandidate = { ...candidate, eventType: candidate.eventType };
       this.track(
         this.deliver(
-          toNotificationPayload(candidate),
+          toNotificationPayload(sendableCandidate),
           configuration.webhookUrl,
           candidate.timestamp,
         ).then(() => undefined),
@@ -107,7 +110,10 @@ export class NotificationService {
 
   private track(delivery: Promise<void>): void {
     this.inFlight.add(delivery);
-    void delivery.finally(() => this.inFlight.delete(delivery));
+    void delivery.then(
+      () => this.inFlight.delete(delivery),
+      () => this.inFlight.delete(delivery),
+    );
   }
 
   private async deliver(

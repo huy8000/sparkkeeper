@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  isNotificationEventType,
   NotificationPolicy,
   type NotificationConfiguration,
   type NotificationEventCandidate,
@@ -63,4 +64,10 @@ test('notification policy sends only configured high-value failure events', () =
       'IGNORE',
     );
   }
+});
+
+test('notification event type guard narrows only supported delivery candidates', () => {
+  assert.equal(isNotificationEventType('TASK_FAILED'), true);
+  assert.equal(isNotificationEventType('AUTH_EXPIRED'), true);
+  assert.equal(isNotificationEventType('RUN_FINISHED'), false);
 });

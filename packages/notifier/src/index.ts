@@ -1,8 +1,9 @@
-// Public package entry point. Notification behavior is intentionally deferred beyond Phase 0.
+// Public package entry point for SparkKeeper notification policy, delivery, and safety primitives.
 export {
   DEFAULT_NOTIFICATION_CONFIGURATION,
   NOTIFICATION_EVENT_TYPES,
   NOTIFICATION_PROVIDER_TYPES,
+  isNotificationEventType,
   toNotificationPayload,
   type NotificationConfiguration,
   type NotificationEventCandidate,
@@ -11,6 +12,7 @@ export {
   type NotificationPayloadEventType,
   type NotificationProviderType,
   type NotificationSeverity,
+  type SendableNotificationEventCandidate,
 } from './Notification.js';
 export { NotificationPolicy, type NotificationDecision } from './NotificationPolicy.js';
 export {

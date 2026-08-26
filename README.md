@@ -170,7 +170,7 @@ SSE 是非持久化的实时信号，不提供 durable replay。断线或服务�
 
 ### V2 Notifications Foundation
 
-本机 Admin 现可配置唯一的 `WEBHOOK` 通知 Provider，并选择 `AUTH_EXPIRED`、`TASK_FAILED`、`CONSECUTIVE_RUN_FAILURE` 与 `DELIVERY_UNKNOWN` 高价值事件。普通运行进度与成功结果默认静默。通知从既有 RuntimeObserver 的安全事件进入统一 policy/service；Provider 失败只记录安全的 delivery 状态，不会改变 DailyRun、SendRecord 或发送/重试结果。
+本机 Admin 现可配置唯一的 `WEBHOOK` 通知 Provider，并选择 `AUTH_EXPIRED`、`TASK_FAILED`、`CONSECUTIVE_RUN_FAILURE` 与 `DELIVERY_UNKNOWN` 高价值事件。普通运行进度与成功结果默认静默。通知从既有 RuntimeObserver 的安全事件进入统一 policy/service；Provider 失败只记录安全的 delivery 状态，不会改变 DailyRun、SendRecord 或发送/重试结果。同一 DailyRun 的 `AUTH_EXPIRED` / `DELIVERY_UNKNOWN` 与最终汇总 `TASK_FAILED` 会在 run 结束时合并为一个最具体的终态通知，避免同一失败结果重复提醒；当当前失败与上一条已完成 DailyRun 连续失败时，会额外产生 `CONSECUTIVE_RUN_FAILURE` 升级事件（默认阈值为 2 个连续失败 run）。
 
 Webhook payload 是严格白名单摘要，只包含服务名、事件类型、severity、时间、安全消息，以及必要时的 businessDate、run/account ID 和 error code；不包含联系人名称、模板/消息正文、聊天内容、cookie/token、环境变量、数据库/browser/evidence 路径、SQL、stack 或原始异常。URL 可能带有 secret query，应按敏感本地配置保护；它不会写入日志、SystemEvent、SSE、文档或报告，Admin 也不会将其渲染成外链。
 
