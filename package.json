@@ -14,7 +14,11 @@
     "build": "pnpm -r --if-present build",
     "lint": "eslint . --max-warnings=0 && prettier --check .",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "pnpm -r --if-present test",
+    "test": "pnpm -r --if-present test && node --test scripts/docker-deployment.test.mjs",
+    "docker:config": "docker compose config --quiet",
+    "docker:test": "node --test scripts/docker-deployment.test.mjs",
+    "docker:smoke": "node scripts/docker-production-smoke.mjs",
+    "docker:maintenance:smoke": "node scripts/docker-maintenance-smoke.mjs",
     "format": "prettier --write ."
   },
   "devDependencies": {

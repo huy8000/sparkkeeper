@@ -72,10 +72,19 @@ test('SSE route streams ready, runtime events, heartbeat, and cleans every conne
 
   first.abort.abort();
   await waitFor(() => hub.subscriberCount === 1);
+  hub.publish({
+    type: 'RUNTIME_EVENT',
+    data: {
+      eventType: 'RUN_FINISHED',
+      level: 'info',
+      message: 'Daily run finished',
+      runId: 'fixture-buffered-run-id',
+      runResult: 'SUCCESS',
+    },
+  });
   await server.close();
   await waitFor(() => hub.subscriberCount === 0);
-  const finalRead = await second.reader.read();
-  assert.equal(finalRead.done, true);
+  await waitForStreamEnd(second.reader);
 });
 
 test('SSE local access guard rejects invalid Host and Origin without mutation headers', async (context) => {
@@ -150,6 +159,31 @@ async function waitFor(predicate: () => boolean): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
   assert.fail('Timed out waiting for the SSE lifecycle fixture.');
+}
+
+async function waitForStreamEnd(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {
+  for (let bufferedChunk = 0; bufferedChunk < 20; bufferedChunk += 1) {
+    let timeout: NodeJS.Timeout | undefined;
+    try {
+      const chunk = await Promise.race([
+        reader.read(),
+        new Promise<never>((_resolve, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error('Timed out waiting for the SSE client stream to close.')),
+            1_000,
+          );
+        }),
+      ]);
+      if (chunk.done) return;
+    } catch (error) {
+      await reader.cancel().catch(() => undefined);
+      throw error;
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout);
+    }
+  }
+  await reader.cancel().catch(() => undefined);
+  assert.fail('SSE client stream did not close after draining buffered events.');
 }
 
 function unusedServices(): ApiServices {
