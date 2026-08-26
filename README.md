@@ -71,7 +71,7 @@ M5 不读取或记录历史聊天正文；历史 Bubble 只在页面内进行结
 - Vite
 - ESLint
 - Prettier
-- Docker Compose（当前仅保留基础骨架）
+- Docker Compose（production runtime + opt-in noVNC maintenance）
 
 ## 项目结构
 
@@ -87,7 +87,7 @@ sparkkeeper/
 │   ├── shared/          # 跨应用共享类型与定义
 │   └── notifier/        # 通知 policy / provider / transport
 ├── docs/                # 产品、技术与架构设计文档
-├── docker-compose.yml   # 容器编排基础骨架
+├── docker-compose.yml   # Production 与 opt-in maintenance 编排
 ├── pnpm-workspace.yaml
 └── tsconfig.base.json
 ```
@@ -209,6 +209,137 @@ pnpm build
 ```bash
 cp .env.example .env
 ```
+
+## Docker Compose 部署
+
+V2-7 提供面向单机 Linux VPS 的 production topology：`app` 运行 Fastify、Scheduler composition root 与 Playwright runtime；非特权 `admin` Nginx 容器提供 Vue 静态资源，并将同源 `/api`（包括 SSE）代理到 Docker 内网的 `app:8080`。只有 Admin 的 `127.0.0.1:8080` 映射到宿主机，Fastify backend 不 publish。Nginx 对 SSE 关闭 buffering/cache 并保留长连接，SPA 深路由使用 history fallback。
+
+这仍是 local-only Admin guard，不是 remote authentication。Compose 不默认提供 TLS、远程认证或公网入口；不要把 8080、6080 或 VNC 端口开放到公网。远程使用应通过 SSH tunnel、可信 private network，或操作者另行维护的受控认证反向代理。
+
+### Prerequisites 与首次启动
+
+需要可用的 Docker Engine 与 Docker Compose plugin。部署前确认：
+
+```bash
+docker version
+docker compose version
+docker info
+docker ps
+```
+
+创建仅包含安全配置的本地 `.env`；该文件已被 Git 与 Docker build context 排除：
+
+```bash
+cp .env.example .env
+mkdir -p data
+chmod 700 data
+docker compose build
+docker compose up -d
+```
+
+容器内统一使用 `/app/data`，默认 bind mount 到仓库旁的 `./data`。也可在 `.env` 通过 `SPARKKEEPER_DATA_DIR` 指向专用宿主机目录。该目录必须可由镜像内非 root `pwuser` 读写；可在 build 后用 `docker compose run --rm --entrypoint id app` 查看实际 UID/GID，再由操作者为目标目录设置对应 ownership。不要使用 `chmod -R 777`。
+
+Compose 明确在容器内设置 `HOST=0.0.0.0`，仅用于让同一隔离 Docker network 内的 Nginx 访问 Fastify；直接运行源码时的默认 bind 仍是 `127.0.0.1`。部署默认继续保持：
+
+- `SCHEDULER_ENABLED=false`
+- `SCHEDULER_ALLOW_REAL_SEND=false`
+- `MANUAL_RUN_ENABLED=false`
+- maintenance profile 未启动
+
+这些 gate 只能由 server operator 明确配置，Web/API 不能开启它们。Notification configuration（包括可能含 secret query 的 Webhook URL）存放在 SQLite，不应写入 image、Compose 或 `.env.example`。
+
+### 日常操作与健康检查
+
+```bash
+docker compose ps
+docker compose logs --tail=100 app admin
+curl --fail http://127.0.0.1:8080/api/health
+curl --fail http://127.0.0.1:8080/api/runtime/status
+docker compose stop
+docker compose up -d
+```
+
+`app` healthcheck 使用 Node 请求 `/api/health`，`admin` 独立检查静态站点；两者均有 timeout、start period 与 `unless-stopped` restart policy。App 的 stop grace period 为 10 分钟，让现有 lifecycle 先停止 HTTP/Scheduler，并为已 accepted 的 server-owned Manual Run 与 bounded Notification drain 留出保守收尾时间；不要用强制 kill 代替正常 `docker compose stop`。`docker compose logs` 是容器 stdout/stderr，`<SPARKKEEPER_DATA_DIR>/logs` 是持久化 structured application logs；日志仍遵循既有 redaction，不记录消息正文、Webhook secret 或 profile 内容。
+
+Admin 的远程访问示例使用 SSH 本地转发：
+
+```bash
+ssh -L 8080:127.0.0.1:8080 user@server
+```
+
+随后仅在本机打开 `http://127.0.0.1:8080/`。不要修改 Compose 为 wildcard host 来替代认证设计。
+
+### 持久化、备份与恢复
+
+同一个 data root 持久化：
+
+- `sparkkeeper.db` 及 SQLite WAL/SHM；
+- `browser-profile/` persistent Chromium profile；
+- `logs/` structured logs；
+- `screenshots/` 与 `traces/` evidence；
+- 其他安全 runtime state。
+
+Profile 继续由 `chromium.launchPersistentContext(userDataDir)` 使用，不进行 cookie injection、token restore 或自动登录。容器 restart/recreate 不会更换 profile。SQLite 启动时继续启用 WAL、foreign keys 并执行版本化 migration；fresh deployment 会前向应用当前 immutable 的 0000–0007。Migration 是 forward-only，不承诺自动 rollback。
+
+一致性最清晰的备份流程是先确认 normal 与 maintenance 都已停止，再备份整个宿主机 data root：
+
+```bash
+scripts/docker-maintenance.sh status
+docker compose --profile maintenance stop maintenance
+docker compose stop app admin
+# 在服务停止后，使用操作者选择的备份工具复制整个 SPARKKEEPER_DATA_DIR。
+```
+
+不要在 Chromium 正在运行时半复制 browser profile，也不要在 SQLite 活跃写入时直接拆分复制 DB/WAL/SHM。恢复时同样先停止两个 runtime，将一份完整备份恢复到空的 data root、修正 ownership，再 `docker compose up -d` 并检查 health；新版服务只会继续执行 forward migration。
+
+升级流程：先完成备份，再更新受信任的源码版本，运行 `docker compose build`，然后 `docker compose up -d --remove-orphans`；待自动 migration 完成后检查 `docker compose ps`、health 与 runtime status。不要假设 migration 可以降级回滚。
+
+### Controlled noVNC maintenance
+
+Maintenance profile 只运行 Xvfb、Openbox、headed Chromium、x11vnc 与 noVNC/websockify，不运行 Fastify、Scheduler、Manual Run、DailyTaskRunner 或 Notification runtime。它使用 normal runtime 的同一 `/app/data/browser-profile`，初始页面固定为 `about:blank`；操作者可在 noVNC 内手工导航和登录，SparkKeeper 不会自动登录、处理 CAPTCHA 或绕过平台风控。
+
+先创建被 Git 忽略的 VNC password file（密码不会 bake 到 image 或打印到日志）：
+
+```bash
+mkdir -p .secrets
+chmod 700 .secrets
+read -rsp 'noVNC password: ' NOVNC_PASSWORD
+printf '%s\n' "$NOVNC_PASSWORD" > .secrets/novnc-password
+chmod 600 .secrets/novnc-password
+unset NOVNC_PASSWORD
+```
+
+推荐且唯一受支持的切换入口是 wrapper：
+
+```bash
+scripts/docker-maintenance.sh status
+scripts/docker-maintenance.sh start
+scripts/docker-maintenance.sh stop
+```
+
+`start` 会先停止并等待 normal `app` 完全退出，再启动 opt-in maintenance；两个 entrypoint 还会争用同一个 process-level profile lock，所以误用裸 Compose 命令也不能同时打开 profile。`stop` 会先终止 Chromium/Xvfb/VNC/websockify、释放 profile lock，再重启 normal `app` 与 `admin`。不要直接运行可能同时启动两个 runtime 的 maintenance Compose 命令。
+
+Maintenance noVNC 只映射 `127.0.0.1:6080`；内部 VNC 5900 不 publish。远程维护时：
+
+```bash
+ssh -L 6080:127.0.0.1:6080 user@server
+```
+
+随后在本机打开 `http://127.0.0.1:6080/`，完成人工扫码/重新登录或 profile 修复。结束后关闭维护浏览器，执行 wrapper `stop`，确认 `docker compose ps`、`/api/health` 和 `/api/runtime/status` 恢复正常；任何真实运行验证仍留给单独、明确授权的 V2 Release Gate。
+
+### Docker 验证与排障
+
+以下门禁只使用 temporary data、fixture configuration、`about:blank` 和 loopback services，不访问真实平台或外部 Webhook：
+
+```bash
+pnpm docker:config
+pnpm docker:test
+docker compose --profile maintenance build
+pnpm docker:smoke
+pnpm docker:maintenance:smoke
+```
+
+若 health 未 ready，先检查 `docker compose ps` 与 bounded container logs，再检查 data root ownership、磁盘空间和 migration error；不要删除 SQLite 或 profile 来掩盖问题。若 maintenance 报 profile 已被占用，使用 wrapper 停止 normal runtime，并确认其完全退出；不要删除 lock file 强行并发打开 Chromium。若 noVNC 不可达，确认 maintenance health、password file 权限，以及端口仍仅绑定 `127.0.0.1`。若 SSE 断线，先确认 Nginx 与 app health；客户端会自动重连并重新读取 REST snapshot。
 
 ### Persistent Profile Smoke Test
 

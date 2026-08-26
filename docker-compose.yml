@@ -1,5 +1,112 @@
 name: sparkkeeper
 
-# Phase 0 only reserves the SparkKeeper Compose entry point.
-# Runtime services and persistent volumes will be added in their designated phase.
-services: {}
+x-app-environment: &app-environment
+  NODE_ENV: production
+  HOST: 0.0.0.0
+  PORT: 8080
+  APP_VERSION: ${APP_VERSION:-development}
+  APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Shanghai}
+  DATA_DIR: /app/data
+  BROWSER_PROFILE_DIR: /app/data/browser-profile
+  BROWSER_HEADLESS: 'true'
+  LOG_DIR: /app/data/logs
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  LOG_RETENTION_DAYS: ${LOG_RETENTION_DAYS:-14}
+  SCREENSHOT_RETENTION_DAYS: ${SCREENSHOT_RETENTION_DAYS:-14}
+  TRACE_MODE: ${TRACE_MODE:-off}
+  TRACE_RETENTION_DAYS: ${TRACE_RETENTION_DAYS:-7}
+  SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-false}
+  SCHEDULER_ALLOW_REAL_SEND: ${SCHEDULER_ALLOW_REAL_SEND:-false}
+  SCHEDULER_ACCOUNT_ID: ${SCHEDULER_ACCOUNT_ID:-}
+  SCHEDULER_MESSAGE_TEMPLATE_ID: ${SCHEDULER_MESSAGE_TEMPLATE_ID:-}
+  MANUAL_RUN_ENABLED: ${MANUAL_RUN_ENABLED:-false}
+
+x-data-volume: &data-volume
+  type: bind
+  source: ${SPARKKEEPER_DATA_DIR:-./data}
+  target: /app/data
+
+services:
+  app:
+    image: sparkkeeper-app:local
+    build:
+      context: .
+      target: app-runtime
+    init: true
+    restart: unless-stopped
+    environment: *app-environment
+    expose:
+      - '8080'
+    volumes:
+      - *data-volume
+    healthcheck:
+      test: ['CMD', 'node', '/app/server/docker-healthcheck.mjs']
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    # Accepted Manual Runs belong to the server lifecycle and may span several bounded browser steps.
+    stop_grace_period: 10m
+    security_opt:
+      - no-new-privileges:true
+
+  admin:
+    image: sparkkeeper-admin:local
+    build:
+      context: .
+      target: admin-runtime
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:8080:8080'
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/']
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    stop_grace_period: 20s
+    security_opt:
+      - no-new-privileges:true
+
+  maintenance:
+    image: sparkkeeper-maintenance:local
+    build:
+      context: .
+      target: maintenance-runtime
+    profiles:
+      - maintenance
+    init: true
+    restart: 'no'
+    environment:
+      DATA_DIR: /app/data
+      BROWSER_PROFILE_DIR: /app/data/browser-profile
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Shanghai}
+      DISPLAY: :99
+      NOVNC_SCREEN: ${NOVNC_SCREEN:-1440x900x24}
+      NOVNC_PASSWORD_FILE: /run/secrets/novnc-password
+    ports:
+      - '127.0.0.1:6080:6080'
+    volumes:
+      - *data-volume
+      - type: bind
+        source: ${NOVNC_PASSWORD_FILE:-./.secrets/novnc-password}
+        target: /run/secrets/novnc-password
+        read_only: true
+        bind:
+          create_host_path: false
+    shm_size: 1gb
+    healthcheck:
+      test: ['CMD', 'node', '/app/server/maintenance-healthcheck.mjs']
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 6
+    stop_grace_period: 40s
+    security_opt:
+      - no-new-privileges:true

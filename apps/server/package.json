@@ -26,6 +26,7 @@
     "@sparkkeeper/notifier": "workspace:*",
     "@sparkkeeper/shared": "workspace:*",
     "fastify": "^5.12.1",
+    "playwright": "^1.62.1",
     "pino": "^10.3.1"
   }
 }
