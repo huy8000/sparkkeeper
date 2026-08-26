@@ -54,7 +54,7 @@ let logger: RuntimeLogger | undefined;
 
 try {
   client = createDatabase({ databasePath });
-  assert.equal(client.migrate().appliedMigrationCount, 7);
+  assert.equal(client.migrate().appliedMigrationCount, 8);
   const account = new AccountRepository(client).create({ name: 'Test Account' });
   const friend = new FriendRepository(client).create({
     accountId: account.id,
@@ -160,7 +160,7 @@ try {
   logger = undefined;
   client.close();
   client = createDatabase({ databasePath });
-  assert.equal(client.migrate().appliedMigrationCount, 7);
+  assert.equal(client.migrate().appliedMigrationCount, 8);
   assert.equal(new SystemEventRepository(client).listByRunId(run.id).length >= 2, true);
 
   const logFile = path.join(logRoot, 'sparkkeeper-2026-08-23.log');

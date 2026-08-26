@@ -6,13 +6,15 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "pretest": "pnpm --filter @sparkkeeper/shared build && pnpm --filter @sparkkeeper/message-engine build && pnpm --filter @sparkkeeper/database build && pnpm --filter @sparkkeeper/automation build",
+    "pretest": "pnpm --filter @sparkkeeper/shared build && pnpm --filter @sparkkeeper/message-engine build && pnpm --filter @sparkkeeper/database build && pnpm --filter @sparkkeeper/automation build && pnpm --filter @sparkkeeper/notifier build",
     "test": "tsx --test test/*.test.ts",
     "scheduler:smoke": "pnpm pretest && tsx scripts/scheduler-smoke.ts",
     "retry:smoke": "pnpm pretest && tsx scripts/retry-smoke.ts",
     "observability:smoke": "pnpm pretest && tsx scripts/observability-smoke.ts",
+    "api:smoke": "pnpm pretest && tsx --test test/ApiFoundation.test.ts test/ConfigurationApi.test.ts test/ManualRunApi.test.ts test/NotificationApi.test.ts test/RealtimeApi.test.ts test/RuntimeEventHub.test.ts",
     "v1:preflight": "pnpm pretest && tsx scripts/v1-preflight.ts",
     "v1:audit": "pnpm pretest && tsx scripts/v1-audit.ts",
     "v1:gate:smoke": "pnpm pretest && tsx scripts/v1-gate-smoke.ts"
@@ -21,7 +23,10 @@
     "@sparkkeeper/automation": "workspace:*",
     "@sparkkeeper/database": "workspace:*",
     "@sparkkeeper/message-engine": "workspace:*",
+    "@sparkkeeper/notifier": "workspace:*",
     "@sparkkeeper/shared": "workspace:*",
+    "fastify": "^5.12.1",
+    "playwright": "^1.62.1",
     "pino": "^10.3.1"
   }
 }

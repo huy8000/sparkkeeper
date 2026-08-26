@@ -20,6 +20,7 @@ export const PINO_REDACT_PATHS = [
   'userDataDir',
   'qrCode',
   'messageText',
+  'webhookUrl',
   '*.cookie',
   '*.cookies',
   '*.authorization',
@@ -33,6 +34,7 @@ export const PINO_REDACT_PATHS = [
   '*.userDataDir',
   '*.qrCode',
   '*.messageText',
+  '*.webhookUrl',
 ] as const;
 
 export interface RuntimeLogContext {

@@ -71,7 +71,7 @@ M5 不读取或记录历史聊天正文；历史 Bubble 只在页面内进行结
 - Vite
 - ESLint
 - Prettier
-- Docker Compose（当前仅保留基础骨架）
+- Docker Compose（production runtime + opt-in noVNC maintenance）
 
 ## 项目结构
 
@@ -85,9 +85,9 @@ sparkkeeper/
 │   ├── database/        # SQLite、Drizzle migration 与具体 Repository
 │   ├── message-engine/  # 纯 TypeScript 消息模板校验与 Provider
 │   ├── shared/          # 跨应用共享类型与定义
-│   └── notifier/        # 后续通知抽象
+│   └── notifier/        # 通知 policy / provider / transport
 ├── docs/                # 产品、技术与架构设计文档
-├── docker-compose.yml   # 容器编排基础骨架
+├── docker-compose.yml   # Production 与 opt-in maintenance 编排
 ├── pnpm-workspace.yaml
 └── tsconfig.base.json
 ```
@@ -105,13 +105,93 @@ sparkkeeper/
 pnpm install
 ```
 
-同时启动服务端基础进程和管理端开发服务器：
+同时启动服务端 API/Scheduler composition root 和管理端开发服务器：
 
 ```bash
 pnpm dev
 ```
 
-管理端默认地址为 `http://localhost:5173`。当前服务端承载 Scheduler、Task Runner 和本地运行证据链，尚未实现 V2 业务 API，也不监听业务端口。
+管理端开发服务器默认仅绑定 `127.0.0.1`，地址为 `http://127.0.0.1:5173`。服务端可单独运行：
+
+```bash
+pnpm --filter @sparkkeeper/server dev
+```
+
+构建后也可通过 `pnpm --filter @sparkkeeper/server start` 启动。V2 API foundation 默认绑定 `127.0.0.1:8080`，仅供本机访问；只有显式配置 `HOST` 才会改变绑定地址。后续远程访问必须先采用明确的 authentication、reverse proxy 或 trusted network 方案，不能把当前未认证 API 直接暴露到公网。
+
+### V2 API and Local Configuration Foundation
+
+当前 HTTP API 提供运行状态、历史查询和本地配置管理。已有只读端点包括：
+
+- `GET /api/health`
+- `GET /api/runtime/status`
+- `GET /api/events/stream`（SSE live status/invalidation stream）
+- `GET /api/accounts`
+- `GET /api/accounts/:accountId`
+- `GET /api/accounts/:accountId/friends`
+- `GET /api/friends/:friendId`
+- `GET /api/accounts/:accountId/schedules`
+- `GET /api/schedules/:scheduleId`
+- `GET /api/runs`
+- `GET /api/runs/:runId`
+- `GET /api/runs/:runId/send-records`
+- `GET /api/runs/:runId/events`
+- `GET /api/templates`
+- `GET /api/templates/:templateId`
+- `GET /api/notification-config`
+- `GET /api/accounts/:accountId/manual-run/preflight?templateId=<template-id>`（read-only）
+
+本地配置写端点包括：
+
+- `POST /api/accounts`
+- `PATCH /api/accounts/:accountId`
+- `POST /api/accounts/:accountId/friends`
+- `PATCH /api/friends/:friendId`
+- `POST /api/templates`
+- `PATCH /api/templates/:templateId`
+- `PUT /api/accounts/:accountId/schedule`
+- `PUT /api/notification-config`
+- `POST /api/notification-config/test`（fixed server-generated test payload）
+- `POST /api/accounts/:accountId/manual-runs`（explicitly gated, `202 Accepted`）
+
+配置 mutation 统一要求 `application/json`、`X-SparkKeeper-Admin-Request: 1`、精确的本机 Host，并在浏览器提供 Origin 时校验为允许的本机 Admin origin。服务仍默认只绑定 `127.0.0.1`，且没有 wildcard CORS。这是 **local-only + same-origin Admin protection**，用于降低跨站浏览器写请求风险，不是完整的 remote authentication；远程部署前仍必须另行设计身份认证、反向代理和可信网络边界。
+
+API 与 Scheduler 使用独立的安全控制。配置写入不会 trigger scheduler tick、Manual Run、BrowserSession 或真实发送；Scheduler 仍由 `SCHEDULER_ENABLED` 和 `SCHEDULER_ALLOW_REAL_SEND` 等原有环境开关控制，默认保持关闭，且这些开关不能通过 Web/API 修改。本阶段没有 DELETE、real-send toggle、browser login、evidence 下载、CORS 通配配置或任意 recipient/message 发送入口。
+
+Manual Run 是本机 Admin 的 Account-level 能力，默认由 `MANUAL_RUN_ENABLED=false` 关闭。只有 server operator 同时显式设置 `MANUAL_RUN_ENABLED=true` 与现有 real-send authorization，POST 才可能被接受；Web/API 只能读取这两个 boolean，不能启用它们。请求只允许选择已保存且 enabled 的 MessageTemplate，并要求显式确认；不接受 BusinessDate、recipient 列表、临时消息、retry 或 browser 参数。
+
+预检完全只读。真正的 POST 会重新计算 Schedule timezone 下的当前 BusinessDate 并完整复检，随后通过 Scheduler 与 Manual Run 共享的执行协调器进入原 `DailyTaskRunner`。因为 production execution 共用同一个 persistent Browser profile，同一进程中的自动与手动执行会全局串行；Account/BusinessDate 仍作为运行上下文并由 DailyRun/SendRecord 提供持久幂等。Manual Run 只绕过 Schedule 的 enabled 状态与初始时间窗口；Account、Template、Friend enabled、auth、retry、`AUTH_EXPIRED`、`DELIVERY_UNKNOWN` 和终态规则均保持不变。既有 SUCCESS 不会 resend，也没有 force-send 或历史补跑。
+
+成功响应为 `202 Accepted` 并返回现有 DailyRun ID；accepted 不代表 delivery success。执行归属于 server lifecycle，不随 HTTP 连接中断取消，最终结果通过 Run Detail、REST snapshot 和既有 SSE 观察。客户端不会自动重试 Manual Run POST；网络失败会要求先检查 Runs，避免不确定请求造成重复触发。
+
+SSE endpoint 采用与 Admin Web 相同的 local-only / same-origin Host 和 Origin 精确校验，不要求 mutation 专用 header，也不会为 EventSource 放宽 CORS。连接会发送 ready、process-local monotonic event ID、约 20 秒 heartbeat，并建议浏览器以 3 秒间隔自动重连。Runtime 与配置事件均为严格白名单 DTO：配置事件只用于提示相关 REST 资源需要刷新，不包含 mutation payload、联系人显示信息或模板正文。
+
+SSE 是非持久化的实时信号，不提供 durable replay。断线或服务重启期间可能错过事件；Admin Web 重连并收到 ready 后会重新读取现有 REST snapshot，REST API 与持久化 SystemEvent 仍是当前状态和审计记录的权威来源。该通道同样不是 remote authentication，不能在没有额外身份认证和网络边界的情况下直接公网暴露。
+
+### V2 Notifications Foundation
+
+本机 Admin 现可配置唯一的 `WEBHOOK` 通知 Provider，并选择 `AUTH_EXPIRED`、`TASK_FAILED`、`CONSECUTIVE_RUN_FAILURE` 与 `DELIVERY_UNKNOWN` 高价值事件。普通运行进度与成功结果默认静默。通知从既有 RuntimeObserver 的安全事件进入统一 policy/service；Provider 失败只记录安全的 delivery 状态，不会改变 DailyRun、SendRecord 或发送/重试结果。同一 DailyRun 的 `AUTH_EXPIRED` / `DELIVERY_UNKNOWN` 与最终汇总 `TASK_FAILED` 会在 run 结束时合并为一个最具体的终态通知，避免同一失败结果重复提醒；当当前失败与上一条已完成 DailyRun 连续失败时，会额外产生 `CONSECUTIVE_RUN_FAILURE` 升级事件（默认阈值为 2 个连续失败 run）。
+
+Webhook payload 是严格白名单摘要，只包含服务名、事件类型、severity、时间、安全消息，以及必要时的 businessDate、run/account ID 和 error code；不包含联系人名称、模板/消息正文、聊天内容、cookie/token、环境变量、数据库/browser/evidence 路径、SQL、stack 或原始异常。URL 可能带有 secret query，应按敏感本地配置保护；它不会写入日志、SystemEvent、SSE、文档或报告，Admin 也不会将其渲染成外链。
+
+生产 Webhook 仅允许无内嵌用户名/密码的 HTTP(S) URL。发送前会解析完整 DNS answer set 并拒绝 localhost、loopback、private、link-local、metadata、ULA 等非公网目标；任一解析地址不安全即整体拒绝。传输固定到已验证地址、保留原始 Host/TLS hostname、不跟随 redirect、不缓存 response body，并采用 5 秒 timeout 与最多 3 次有界重试。只有 network/timeout、HTTP 408/429/5xx 会 retry；其他 4xx、redirect、无效或被 SSRF policy 拒绝的目标不会 retry。
+
+`Test Notification` 只向当前已保存 URL 发送由 server 生成的固定测试摘要，客户端不能提交任意文本/body。它会产生真实的 Webhook 网络请求，但不会访问 Douyin；本任务的自动与手工验证只使用注入的 fake transport 或本机 loopback receiver，没有请求任何真实外部 Webhook。Notification mutation 继续使用 JSON-only、精确 Host/Origin 与 Admin header 防护，无 wildcard CORS。该 local-only 模型仍不等于 remote authentication。
+
+### V2 Local Admin Web Foundation
+
+Vue 3 + TypeScript 管理端现已提供 Dashboard、Accounts、Account Detail（Friends、Schedules 与 Manual Run）、Templates、Notifications、Schedules、Runs 和 Run Detail（SendRecords 与 SystemEvents）页面。Accounts、Friends、Message Templates、Schedules 和 Webhook Notifications 支持本地配置；Manual Run 通过模板选择、read-only preflight 和明确确认调用已有执行链。可分别启动本机 API 与管理端：
+
+```bash
+pnpm --filter @sparkkeeper/server dev
+pnpm --filter @sparkkeeper/admin-web dev
+```
+
+管理端默认使用 same-origin `/api`，Vite 在开发环境将其代理到本机 `http://127.0.0.1:8080`，因此无需为 Fastify 开启 CORS。若部署拓扑另有需要，可显式设置 `VITE_API_BASE_URL`，但默认配置仍保持仅供本机访问。
+
+管理端通过单一 same-origin EventSource 显示 Live Connected/Reconnecting/Offline 状态，并对 Dashboard、Runs、Run Detail 和当前配置页面执行 debounced REST refresh。Runs 筛选保持不变，Run Detail 只响应同一 run ID 的事件；页面不会将事件永久存入浏览器内存或存储。
+
+当前管理端仍没有 real-send gate toggle、Manual Run gate toggle、任意收件人/消息发送、浏览器登录、远程认证、Telegram/Email/Slack 等其他 Provider、evidence 下载或文件路径拼接。模板正文只在本地详情/编辑请求中使用，不写入 URL、浏览器存储、SSE 或日志；Manual Run dialog 只读取模板 summary，不显示正文；Screenshot/Trace 仍只显示是否可用。真正的远程身份认证与其他通知 Provider 将在后续任务中设计。
 
 工程检查：
 
@@ -129,6 +209,137 @@ pnpm build
 ```bash
 cp .env.example .env
 ```
+
+## Docker Compose 部署
+
+V2-7 提供面向单机 Linux VPS 的 production topology：`app` 运行 Fastify、Scheduler composition root 与 Playwright runtime；非特权 `admin` Nginx 容器提供 Vue 静态资源，并将同源 `/api`（包括 SSE）代理到 Docker 内网的 `app:8080`。只有 Admin 的 `127.0.0.1:8080` 映射到宿主机，Fastify backend 不 publish。Nginx 对 SSE 关闭 buffering/cache 并保留长连接，SPA 深路由使用 history fallback。
+
+这仍是 local-only Admin guard，不是 remote authentication。Compose 不默认提供 TLS、远程认证或公网入口；不要把 8080、6080 或 VNC 端口开放到公网。远程使用应通过 SSH tunnel、可信 private network，或操作者另行维护的受控认证反向代理。
+
+### Prerequisites 与首次启动
+
+需要可用的 Docker Engine 与 Docker Compose plugin。部署前确认：
+
+```bash
+docker version
+docker compose version
+docker info
+docker ps
+```
+
+创建仅包含安全配置的本地 `.env`；该文件已被 Git 与 Docker build context 排除：
+
+```bash
+cp .env.example .env
+mkdir -p data
+chmod 700 data
+docker compose build
+docker compose up -d
+```
+
+容器内统一使用 `/app/data`，默认 bind mount 到仓库旁的 `./data`。也可在 `.env` 通过 `SPARKKEEPER_DATA_DIR` 指向专用宿主机目录。该目录必须可由镜像内非 root `pwuser` 读写；可在 build 后用 `docker compose run --rm --entrypoint id app` 查看实际 UID/GID，再由操作者为目标目录设置对应 ownership。不要使用 `chmod -R 777`。
+
+Compose 明确在容器内设置 `HOST=0.0.0.0`，仅用于让同一隔离 Docker network 内的 Nginx 访问 Fastify；直接运行源码时的默认 bind 仍是 `127.0.0.1`。部署默认继续保持：
+
+- `SCHEDULER_ENABLED=false`
+- `SCHEDULER_ALLOW_REAL_SEND=false`
+- `MANUAL_RUN_ENABLED=false`
+- maintenance profile 未启动
+
+这些 gate 只能由 server operator 明确配置，Web/API 不能开启它们。Notification configuration（包括可能含 secret query 的 Webhook URL）存放在 SQLite，不应写入 image、Compose 或 `.env.example`。
+
+### 日常操作与健康检查
+
+```bash
+docker compose ps
+docker compose logs --tail=100 app admin
+curl --fail http://127.0.0.1:8080/api/health
+curl --fail http://127.0.0.1:8080/api/runtime/status
+docker compose stop
+docker compose up -d
+```
+
+`app` healthcheck 使用 Node 请求 `/api/health`，`admin` 独立检查静态站点；两者均有 timeout、start period 与 `unless-stopped` restart policy。App 的 stop grace period 为 10 分钟，让现有 lifecycle 先停止 HTTP/Scheduler，并为已 accepted 的 server-owned Manual Run 与 bounded Notification drain 留出保守收尾时间；不要用强制 kill 代替正常 `docker compose stop`。`docker compose logs` 是容器 stdout/stderr，`<SPARKKEEPER_DATA_DIR>/logs` 是持久化 structured application logs；日志仍遵循既有 redaction，不记录消息正文、Webhook secret 或 profile 内容。
+
+Admin 的远程访问示例使用 SSH 本地转发：
+
+```bash
+ssh -L 8080:127.0.0.1:8080 user@server
+```
+
+随后仅在本机打开 `http://127.0.0.1:8080/`。不要修改 Compose 为 wildcard host 来替代认证设计。
+
+### 持久化、备份与恢复
+
+同一个 data root 持久化：
+
+- `sparkkeeper.db` 及 SQLite WAL/SHM；
+- `browser-profile/` persistent Chromium profile；
+- `logs/` structured logs；
+- `screenshots/` 与 `traces/` evidence；
+- 其他安全 runtime state。
+
+Profile 继续由 `chromium.launchPersistentContext(userDataDir)` 使用，不进行 cookie injection、token restore 或自动登录。容器 restart/recreate 不会更换 profile。SQLite 启动时继续启用 WAL、foreign keys 并执行版本化 migration；fresh deployment 会前向应用当前 immutable 的 0000–0007。Migration 是 forward-only，不承诺自动 rollback。
+
+一致性最清晰的备份流程是先确认 normal 与 maintenance 都已停止，再备份整个宿主机 data root：
+
+```bash
+scripts/docker-maintenance.sh status
+docker compose --profile maintenance stop maintenance
+docker compose stop app admin
+# 在服务停止后，使用操作者选择的备份工具复制整个 SPARKKEEPER_DATA_DIR。
+```
+
+不要在 Chromium 正在运行时半复制 browser profile，也不要在 SQLite 活跃写入时直接拆分复制 DB/WAL/SHM。恢复时同样先停止两个 runtime，将一份完整备份恢复到空的 data root、修正 ownership，再 `docker compose up -d` 并检查 health；新版服务只会继续执行 forward migration。
+
+升级流程：先完成备份，再更新受信任的源码版本，运行 `docker compose build`，然后 `docker compose up -d --remove-orphans`；待自动 migration 完成后检查 `docker compose ps`、health 与 runtime status。不要假设 migration 可以降级回滚。
+
+### Controlled noVNC maintenance
+
+Maintenance profile 只运行 Xvfb、Openbox、headed Chromium、x11vnc 与 noVNC/websockify，不运行 Fastify、Scheduler、Manual Run、DailyTaskRunner 或 Notification runtime。它使用 normal runtime 的同一 `/app/data/browser-profile`，初始页面固定为 `about:blank`；操作者可在 noVNC 内手工导航和登录，SparkKeeper 不会自动登录、处理 CAPTCHA 或绕过平台风控。
+
+先创建被 Git 忽略的 VNC password file（密码不会 bake 到 image 或打印到日志）：
+
+```bash
+mkdir -p .secrets
+chmod 700 .secrets
+read -rsp 'noVNC password: ' NOVNC_PASSWORD
+printf '%s\n' "$NOVNC_PASSWORD" > .secrets/novnc-password
+chmod 600 .secrets/novnc-password
+unset NOVNC_PASSWORD
+```
+
+推荐且唯一受支持的切换入口是 wrapper：
+
+```bash
+scripts/docker-maintenance.sh status
+scripts/docker-maintenance.sh start
+scripts/docker-maintenance.sh stop
+```
+
+`start` 会先停止并等待 normal `app` 完全退出，再启动 opt-in maintenance；两个 entrypoint 还会争用同一个 process-level profile lock，所以误用裸 Compose 命令也不能同时打开 profile。`stop` 会先终止 Chromium/Xvfb/VNC/websockify、释放 profile lock，再重启 normal `app` 与 `admin`。不要直接运行可能同时启动两个 runtime 的 maintenance Compose 命令。
+
+Maintenance noVNC 只映射 `127.0.0.1:6080`；内部 VNC 5900 不 publish。远程维护时：
+
+```bash
+ssh -L 6080:127.0.0.1:6080 user@server
+```
+
+随后在本机打开 `http://127.0.0.1:6080/`，完成人工扫码/重新登录或 profile 修复。结束后关闭维护浏览器，执行 wrapper `stop`，确认 `docker compose ps`、`/api/health` 和 `/api/runtime/status` 恢复正常；任何真实运行验证仍留给单独、明确授权的 V2 Release Gate。
+
+### Docker 验证与排障
+
+以下门禁只使用 temporary data、fixture configuration、`about:blank` 和 loopback services，不访问真实平台或外部 Webhook：
+
+```bash
+pnpm docker:config
+pnpm docker:test
+docker compose --profile maintenance build
+pnpm docker:smoke
+pnpm docker:maintenance:smoke
+```
+
+若 health 未 ready，先检查 `docker compose ps` 与 bounded container logs，再检查 data root ownership、磁盘空间和 migration error；不要删除 SQLite 或 profile 来掩盖问题。若 maintenance 报 profile 已被占用，使用 wrapper 停止 normal runtime，并确认其完全退出；不要删除 lock file 强行并发打开 Chromium。若 noVNC 不可达，确认 maintenance health、password file 权限，以及端口仍仅绑定 `127.0.0.1`。若 SSE 断线，先确认 Nginx 与 app health；客户端会自动重连并重新读取 REST snapshot。
 
 ### Persistent Profile Smoke Test
 

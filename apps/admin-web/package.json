@@ -7,9 +7,17 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -p tsconfig.app.json --noEmit && vite build",
-    "typecheck": "vue-tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit"
+    "typecheck": "vue-tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
-    "vue": "^3.5.20"
+    "@sparkkeeper/shared": "workspace:*",
+    "vue": "^3.5.20",
+    "vue-router": "^5.2.0"
+  },
+  "devDependencies": {
+    "@vue/test-utils": "^2.4.11",
+    "jsdom": "^30.0.1",
+    "vitest": "^4.1.11"
   }
 }

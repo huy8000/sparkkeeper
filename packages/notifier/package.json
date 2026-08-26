@@ -2,7 +2,7 @@
   "name": "@sparkkeeper/notifier",
   "version": "0.0.0",
   "private": true,
-  "description": "SparkKeeper notifier package foundation",
+  "description": "SparkKeeper notification policy and webhook delivery package",
   "type": "module",
   "exports": {
     ".": {
@@ -12,6 +12,10 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test": "pnpm --filter @sparkkeeper/shared build && tsx --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@sparkkeeper/shared": "workspace:*"
   }
 }

@@ -1,5 +1,8 @@
 import type { CreateSystemEventInput } from '@sparkkeeper/database';
+import type { NotificationEventCandidate, NotificationEventType } from '@sparkkeeper/notifier';
 
+import type { ConsecutiveRunFailureSource } from '../notifications/ConsecutiveRunFailureDetector.js';
+import type { RealtimeEventPublisher } from '../realtime/RealtimeEvent.js';
 import type { RuntimeLogEvent, RuntimeLogWriter } from './RuntimeLogger.js';
 import { safeEventMessage } from './RuntimeLogger.js';
 import {
@@ -39,22 +42,37 @@ interface EvidenceRetention {
   cleanup(now?: Date): RetentionResult;
 }
 
+interface NotificationPublisher {
+  publish(candidate: NotificationEventCandidate): void;
+}
+
+type TerminalNotificationCandidate = Omit<NotificationEventCandidate, 'eventType'> & {
+  readonly eventType: NotificationEventType;
+};
+
 export interface ProductionRuntimeObserverOptions {
   readonly logger: SafeLogger | RuntimeLogWriter;
   readonly systemEvents: SystemEventStore;
   readonly screenshots: ScreenshotEvidence;
   readonly traces: TraceEvidence;
   readonly retention: EvidenceRetention | RetentionManager;
+  readonly realtime?: RealtimeEventPublisher;
+  readonly notifications?: NotificationPublisher;
+  readonly consecutiveFailures?: ConsecutiveRunFailureSource;
+  readonly clock?: () => Date;
   readonly fallback?: (safeMessage: string) => void;
 }
 
 export class ProductionRuntimeObserver implements RuntimeObserver {
   private readonly tracePaths = new Map<string, string>();
   private readonly runsWithScreenshot = new Set<string>();
+  private readonly pendingRunNotifications = new Map<string, TerminalNotificationCandidate>();
   private readonly fallback: (safeMessage: string) => void;
+  private readonly clock: () => Date;
 
   constructor(private readonly options: ProductionRuntimeObserverOptions) {
     this.fallback = options.fallback ?? ((message) => process.stderr.write(`${message}\n`));
+    this.clock = options.clock ?? (() => new Date());
   }
 
   async observe(event: RuntimeObservation): Promise<void> {
@@ -82,25 +100,29 @@ export class ProductionRuntimeObserver implements RuntimeObserver {
     }
 
     const shouldPersist = event.persist ?? defaultSystemEventPersistence(event.eventType);
-    if (!shouldPersist) return;
-    const tracePath = event.runId === undefined ? undefined : this.tracePaths.get(event.runId);
-    try {
-      this.options.systemEvents.create({
-        eventType: event.eventType,
-        level: systemEventLevel(event.level),
-        ...(event.runId === undefined ? {} : { runId: event.runId }),
-        ...(event.accountId === undefined ? {} : { accountId: event.accountId }),
-        ...(event.friendId === undefined ? {} : { friendId: event.friendId }),
-        ...(event.attempt === undefined ? {} : { attempt: event.attempt }),
-        ...(event.errorCode === undefined ? {} : { errorCode: event.errorCode }),
-        message: safeEventMessage(event.eventType),
-        ...(screenshotPath === undefined ? {} : { screenshotPath }),
-        ...(tracePath === undefined ? {} : { tracePath }),
-      });
-    } catch {
-      this.safeLog('error', observabilityFailureEvent('OBSERVABILITY_PERSIST_FAILED', event));
-      this.safeFallback('SparkKeeper observability persistence failed.');
+    if (shouldPersist) {
+      const tracePath = event.runId === undefined ? undefined : this.tracePaths.get(event.runId);
+      try {
+        this.options.systemEvents.create({
+          eventType: event.eventType,
+          level: systemEventLevel(event.level),
+          ...(event.runId === undefined ? {} : { runId: event.runId }),
+          ...(event.accountId === undefined ? {} : { accountId: event.accountId }),
+          ...(event.friendId === undefined ? {} : { friendId: event.friendId }),
+          ...(event.attempt === undefined ? {} : { attempt: event.attempt }),
+          ...(event.errorCode === undefined ? {} : { errorCode: event.errorCode }),
+          message: safeEventMessage(event.eventType),
+          ...(screenshotPath === undefined ? {} : { screenshotPath }),
+          ...(tracePath === undefined ? {} : { tracePath }),
+        });
+      } catch {
+        this.safeLog('error', observabilityFailureEvent('OBSERVABILITY_PERSIST_FAILED', event));
+        this.safeFallback('SparkKeeper observability persistence failed.');
+      }
     }
+    this.safeRealtimeBroadcast(event);
+    this.safeNotificationPublish(event);
+    await this.safeConsecutiveFailureObserve(event);
   }
 
   async startRun(context: RuntimeRunContext): Promise<void> {
@@ -170,6 +192,114 @@ export class ProductionRuntimeObserver implements RuntimeObserver {
     }
   }
 
+  private safeRealtimeBroadcast(event: RuntimeObservation): void {
+    try {
+      this.options.realtime?.publish({
+        type: 'RUNTIME_EVENT',
+        data: {
+          eventType: event.eventType,
+          level: event.level,
+          message: safeEventMessage(event.eventType),
+          ...(event.runId === undefined ? {} : { runId: event.runId }),
+          ...(event.accountId === undefined ? {} : { accountId: event.accountId }),
+          ...(event.friendId === undefined ? {} : { friendId: event.friendId }),
+          ...(event.businessDate === undefined ? {} : { businessDate: event.businessDate }),
+          ...(event.attempt === undefined ? {} : { attempt: event.attempt }),
+          ...(event.errorCode === undefined ? {} : { errorCode: event.errorCode }),
+          ...(event.nextRetryAt === undefined
+            ? {}
+            : { nextRetryAt: event.nextRetryAt.toISOString() }),
+          ...(event.successCount === undefined ? {} : { successCount: event.successCount }),
+          ...(event.failedCount === undefined ? {} : { failedCount: event.failedCount }),
+          ...(event.retryWaitCount === undefined ? {} : { retryWaitCount: event.retryWaitCount }),
+          ...(event.idempotentSkipCount === undefined
+            ? {}
+            : { idempotentSkipCount: event.idempotentSkipCount }),
+          ...(event.runResult === undefined ? {} : { runResult: event.runResult }),
+        },
+      });
+    } catch {
+      this.safeLog('error', observabilityFailureEvent('REALTIME_BROADCAST_FAILED', event));
+      this.safeFallback('SparkKeeper realtime broadcast failed.');
+    }
+  }
+
+  private safeNotificationPublish(event: RuntimeObservation): void {
+    const notifications = this.options.notifications;
+    if (notifications === undefined) return;
+
+    try {
+      if (event.eventType === 'RUN_STARTED' && event.runId !== undefined) {
+        this.pendingRunNotifications.delete(event.runId);
+      }
+
+      if (event.eventType === 'RUN_FINISHED' && event.runId !== undefined) {
+        const pending = this.pendingRunNotifications.get(event.runId);
+        this.pendingRunNotifications.delete(event.runId);
+        if (pending !== undefined) notifications.publish(pending);
+        return;
+      }
+
+      const terminalCandidate = toTerminalNotificationCandidate(event, this.clock().toISOString());
+      if (terminalCandidate !== undefined && event.runId !== undefined) {
+        const existing = this.pendingRunNotifications.get(event.runId);
+        if (
+          existing === undefined ||
+          terminalNotificationPriority(terminalCandidate.eventType) >
+            terminalNotificationPriority(existing.eventType)
+        ) {
+          this.pendingRunNotifications.set(event.runId, terminalCandidate);
+        }
+        return;
+      }
+
+      notifications.publish(toNotificationCandidate(event, this.clock().toISOString()));
+    } catch {
+      this.safeLog('error', observabilityFailureEvent('NOTIFICATION_PUBLISH_FAILED', event));
+      this.safeFallback('SparkKeeper notification scheduling failed.');
+    }
+  }
+
+  private async safeConsecutiveFailureObserve(event: RuntimeObservation): Promise<void> {
+    if (
+      event.eventType !== 'RUN_FINISHED' ||
+      event.runId === undefined ||
+      event.accountId === undefined ||
+      event.businessDate === undefined ||
+      event.runResult === undefined ||
+      this.options.consecutiveFailures === undefined
+    ) {
+      return;
+    }
+
+    let shouldEmit: boolean;
+    try {
+      shouldEmit = this.options.consecutiveFailures.shouldEmit({
+        accountId: event.accountId,
+        businessDate: event.businessDate,
+        runResult: event.runResult,
+      });
+    } catch {
+      this.safeLog(
+        'error',
+        observabilityFailureEvent('CONSECUTIVE_RUN_FAILURE_DETECTION_FAILED', event),
+      );
+      this.safeFallback('SparkKeeper consecutive failure detection failed.');
+      return;
+    }
+
+    if (!shouldEmit) return;
+    await this.observe({
+      accountId: event.accountId,
+      runId: event.runId,
+      businessDate: event.businessDate,
+      eventType: 'CONSECUTIVE_RUN_FAILURE',
+      level: 'error',
+      errorCode: 'CONSECUTIVE_RUN_FAILURE',
+      captureScreenshot: false,
+    });
+  }
+
   private safeFallback(message: string): void {
     try {
       this.fallback(message);
@@ -177,6 +307,48 @@ export class ProductionRuntimeObserver implements RuntimeObserver {
       // Observability must never control business state.
     }
   }
+}
+
+function toNotificationCandidate(
+  event: RuntimeObservation,
+  timestamp: string,
+): NotificationEventCandidate {
+  return {
+    eventType: event.eventType,
+    severity: event.level === 'error' ? 'ERROR' : 'WARN',
+    safeMessage: safeEventMessage(event.eventType),
+    timestamp,
+    ...(event.runId === undefined ? {} : { runId: event.runId }),
+    ...(event.accountId === undefined ? {} : { accountId: event.accountId }),
+    ...(event.businessDate === undefined ? {} : { businessDate: event.businessDate }),
+    ...(event.errorCode === undefined ? {} : { errorCode: event.errorCode }),
+  };
+}
+
+function toTerminalNotificationCandidate(
+  event: RuntimeObservation,
+  timestamp: string,
+): TerminalNotificationCandidate | undefined {
+  let eventType: NotificationEventType;
+  if (event.eventType === 'AUTH_EXPIRED') eventType = 'AUTH_EXPIRED';
+  else if (event.eventType === 'DELIVERY_UNKNOWN') eventType = 'DELIVERY_UNKNOWN';
+  else if (event.eventType === 'TASK_FAILED') {
+    eventType = event.errorCode === 'DELIVERY_UNKNOWN' ? 'DELIVERY_UNKNOWN' : 'TASK_FAILED';
+  } else {
+    return undefined;
+  }
+
+  return {
+    ...toNotificationCandidate(event, timestamp),
+    eventType,
+    safeMessage: safeEventMessage(eventType),
+  };
+}
+
+function terminalNotificationPriority(eventType: NotificationEventType): number {
+  if (eventType === 'AUTH_EXPIRED') return 3;
+  if (eventType === 'DELIVERY_UNKNOWN') return 2;
+  return 1;
 }
 
 function observabilityFailureEvent(

@@ -29,6 +29,8 @@ import {
   type RuntimeRunResult,
 } from '../src/observability/RuntimeObserver.js';
 import { TaskScheduler } from '../src/scheduler/TaskScheduler.js';
+import type { RealtimeEvent } from '../src/realtime/RealtimeEvent.js';
+import { RuntimeEventHub } from '../src/realtime/RuntimeEventHub.js';
 
 test('ProductionRuntimeObserver contains logger failure with a safe fallback', async () => {
   let fallbackCount = 0;
@@ -122,6 +124,269 @@ test('ProductionRuntimeObserver contains retention failure', async () => {
   assert.deepEqual(logged, ['RETENTION_CLEANUP_FAILED']);
 });
 
+test('ProductionRuntimeObserver broadcasts a whitelisted runtime DTO after persistence', async () => {
+  const order: string[] = [];
+  const realtimeEvents: RealtimeEvent[] = [];
+  const hub = new RuntimeEventHub(() => new Date('2026-08-23T12:00:00.000Z'));
+  hub.subscribe((event) => {
+    order.push('broadcast');
+    realtimeEvents.push(event);
+  });
+  const observer = observerFixture({
+    logger: { emit: () => order.push('log') },
+    systemEvents: { create: () => order.push('persist') },
+    realtime: hub,
+  });
+
+  await observer.observe({
+    eventType: 'AUTH_EXPIRED',
+    level: 'error',
+    persist: true,
+    accountId: 'fixture-account-id',
+    runId: 'fixture-run-id',
+    businessDate: parseBusinessDate('2026-08-23'),
+    errorCode: 'AUTH_EXPIRED',
+    captureScreenshot: false,
+    messageText: 'PRIVATE_MESSAGE_SENTINEL',
+    cookie: 'PRIVATE_COOKIE_SENTINEL',
+    stack: 'PRIVATE_STACK_SENTINEL',
+    screenshotPath: '/private/evidence.png',
+  } as RuntimeObservation & Record<string, unknown>);
+
+  assert.deepEqual(order, ['log', 'persist', 'broadcast']);
+  assert.equal(realtimeEvents.length, 1);
+  const serialized = JSON.stringify(realtimeEvents[0]);
+  assert.match(serialized, /AUTH_EXPIRED/u);
+  assert.doesNotMatch(
+    serialized,
+    /PRIVATE_|messageText|cookie|stack|screenshotPath|tracePath|databasePath|browserProfile|SQL/u,
+  );
+});
+
+test('ProductionRuntimeObserver contains realtime publisher failure without changing persistence', async () => {
+  let persisted = 0;
+  const logged: string[] = [];
+  const observer = observerFixture({
+    logger: { emit: (_level, event) => logged.push(event.errorCode ?? event.eventType) },
+    systemEvents: {
+      create: () => {
+        persisted += 1;
+      },
+    },
+    realtime: {
+      publish: () => {
+        throw new Error('fixture realtime failure');
+      },
+    },
+  });
+
+  await assert.doesNotReject(() =>
+    observer.observe({ eventType: 'TASK_FAILED', level: 'error', persist: true }),
+  );
+  assert.equal(persisted, 1);
+  assert.deepEqual(logged, ['TASK_FAILED', 'REALTIME_BROADCAST_FAILED']);
+});
+
+test('ProductionRuntimeObserver coalesces terminal aliases into one specific notification after RUN_FINISHED', async () => {
+  const order: string[] = [];
+  const candidates: unknown[] = [];
+  const observer = observerFixture({
+    logger: { emit: () => order.push('log') },
+    systemEvents: { create: () => order.push('persist') },
+    realtime: { publish: () => order.push('realtime') },
+    notifications: {
+      publish: (candidate) => {
+        order.push('notification');
+        candidates.push(candidate);
+      },
+    },
+  });
+  const context = {
+    accountId: 'fixture-account-id',
+    runId: 'fixture-run-id',
+    businessDate: parseBusinessDate('2026-08-23'),
+  };
+
+  await observer.observe({
+    ...context,
+    eventType: 'DELIVERY_UNKNOWN',
+    level: 'error',
+    friendId: 'fixture-friend-id',
+    errorCode: 'DELIVERY_UNKNOWN',
+    captureScreenshot: false,
+    messageText: 'PRIVATE_MESSAGE_SENTINEL',
+    token: 'PRIVATE_TOKEN_SENTINEL',
+    screenshotPath: '/private/evidence.png',
+  } as RuntimeObservation & Record<string, unknown>);
+  await observer.observe({
+    ...context,
+    eventType: 'TASK_FAILED',
+    level: 'error',
+    captureScreenshot: false,
+  });
+  assert.equal(candidates.length, 0);
+
+  await observer.observe({
+    ...context,
+    eventType: 'RUN_FINISHED',
+    level: 'info',
+    runResult: 'FAILED',
+  });
+
+  assert.deepEqual(order, [
+    'log',
+    'persist',
+    'realtime',
+    'log',
+    'persist',
+    'realtime',
+    'log',
+    'realtime',
+    'notification',
+  ]);
+  assert.deepEqual(candidates, [
+    {
+      eventType: 'DELIVERY_UNKNOWN',
+      severity: 'ERROR',
+      safeMessage: 'Delivery result is uncertain',
+      timestamp: '2026-08-23T12:00:00.000Z',
+      accountId: 'fixture-account-id',
+      runId: 'fixture-run-id',
+      businessDate: '2026-08-23',
+      errorCode: 'DELIVERY_UNKNOWN',
+    },
+  ]);
+  assert.doesNotMatch(JSON.stringify(candidates), /friend|PRIVATE_|messageText|token|screenshot/u);
+});
+
+test('ProductionRuntimeObserver preserves DELIVERY_UNKNOWN specificity from a run-level TASK_FAILED error code', async () => {
+  const candidates: unknown[] = [];
+  const observer = observerFixture({
+    notifications: { publish: (candidate) => candidates.push(candidate) },
+  });
+  const context = {
+    accountId: 'fixture-account-id',
+    runId: 'fixture-recovery-run-id',
+    businessDate: parseBusinessDate('2026-08-24'),
+  };
+
+  await observer.observe({
+    ...context,
+    eventType: 'TASK_FAILED',
+    level: 'error',
+    errorCode: 'DELIVERY_UNKNOWN',
+    captureScreenshot: false,
+  });
+  await observer.observe({
+    ...context,
+    eventType: 'RUN_FINISHED',
+    level: 'info',
+    runResult: 'FAILED',
+  });
+
+  assert.equal(candidates.length, 1);
+  assert.equal((candidates[0] as { eventType?: string }).eventType, 'DELIVERY_UNKNOWN');
+});
+
+test('ProductionRuntimeObserver prefers AUTH_EXPIRED over synthetic TASK_FAILED for one run notification', async () => {
+  const candidates: unknown[] = [];
+  const observer = observerFixture({
+    notifications: { publish: (candidate) => candidates.push(candidate) },
+  });
+  const context = {
+    accountId: 'fixture-account-id',
+    runId: 'fixture-auth-run-id',
+    businessDate: parseBusinessDate('2026-08-24'),
+  };
+
+  await observer.observe({
+    ...context,
+    eventType: 'AUTH_EXPIRED',
+    level: 'error',
+    errorCode: 'AUTH_EXPIRED',
+    captureScreenshot: false,
+  });
+  await observer.observe({
+    ...context,
+    eventType: 'TASK_FAILED',
+    level: 'error',
+    captureScreenshot: false,
+  });
+  await observer.observe({
+    ...context,
+    eventType: 'RUN_FINISHED',
+    level: 'info',
+    runResult: 'AUTH_EXPIRED',
+  });
+
+  assert.equal(candidates.length, 1);
+  assert.equal((candidates[0] as { eventType?: string }).eventType, 'AUTH_EXPIRED');
+});
+
+test('ProductionRuntimeObserver emits a persisted consecutive-failure event from the production trigger point', async () => {
+  const persisted: Array<Record<string, unknown>> = [];
+  const candidates: unknown[] = [];
+  const observer = observerFixture({
+    systemEvents: { create: (input) => persisted.push({ ...input }) },
+    notifications: { publish: (candidate) => candidates.push(candidate) },
+    consecutiveFailures: { shouldEmit: () => true },
+  });
+
+  await observer.observe({
+    accountId: 'fixture-account-id',
+    runId: 'fixture-consecutive-run-id',
+    businessDate: parseBusinessDate('2026-08-25'),
+    eventType: 'RUN_FINISHED',
+    level: 'info',
+    runResult: 'FAILED',
+  });
+
+  assert.ok(persisted.some((event) => event.eventType === 'CONSECUTIVE_RUN_FAILURE'));
+  assert.ok(
+    candidates.some(
+      (candidate) => (candidate as { eventType?: string }).eventType === 'CONSECUTIVE_RUN_FAILURE',
+    ),
+  );
+});
+
+test('ProductionRuntimeObserver contains consecutive-failure detector failure', async () => {
+  const logged: string[] = [];
+  const observer = observerFixture({
+    logger: { emit: (_level, event) => logged.push(event.errorCode ?? event.eventType) },
+    consecutiveFailures: {
+      shouldEmit: () => {
+        throw new Error('fixture detector failed');
+      },
+    },
+  });
+
+  await assert.doesNotReject(() =>
+    observer.observe({
+      accountId: 'fixture-account-id',
+      runId: 'fixture-detector-failure-run-id',
+      businessDate: parseBusinessDate('2026-08-25'),
+      eventType: 'RUN_FINISHED',
+      level: 'info',
+      runResult: 'FAILED',
+    }),
+  );
+  assert.ok(logged.includes('CONSECUTIVE_RUN_FAILURE_DETECTION_FAILED'));
+});
+
+test('ProductionRuntimeObserver contains notification publisher failure', async () => {
+  const observer = observerFixture({
+    notifications: {
+      publish: () => {
+        throw new Error('PRIVATE_NOTIFICATION_FAILURE');
+      },
+    },
+  });
+
+  await assert.doesNotReject(() =>
+    observer.observe({ eventType: 'TASK_FAILED', level: 'error', captureScreenshot: false }),
+  );
+});
+
 function observerFixture(
   overrides: Partial<ConstructorParameters<typeof ProductionRuntimeObserver>[0]> = {},
 ): ProductionRuntimeObserver {
@@ -137,6 +402,7 @@ function observerFixture(
     },
     retention: { cleanup: () => ({ removedFiles: [], errorCount: 0 }) },
     fallback: () => undefined,
+    clock: () => new Date('2026-08-23T12:00:00.000Z'),
     ...overrides,
   });
 }
