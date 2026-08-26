@@ -1,4 +1,5 @@
 import type { DatabaseClient } from '@sparkkeeper/database';
+import type { NotificationService } from '@sparkkeeper/notifier';
 
 import type { ObservabilityConfig } from '../../config/ObservabilityConfig.js';
 import {
@@ -13,6 +14,7 @@ export interface ProductionManualRunRunnerFactoryOptions {
   readonly database: DatabaseClient;
   readonly observability: ObservabilityConfig;
   readonly realtime?: RealtimeEventPublisher;
+  readonly notifications?: Pick<NotificationService, 'publish'>;
   readonly clock?: () => Date;
 }
 
@@ -30,6 +32,9 @@ export class ProductionManualRunRunnerFactory implements ManualRunRunnerFactory 
       observability: this.options.observability,
       logger: this.runtimeLogger(),
       ...(this.options.realtime === undefined ? {} : { realtime: this.options.realtime }),
+      ...(this.options.notifications === undefined
+        ? {}
+        : { notifications: this.options.notifications }),
       ...(this.options.clock === undefined ? {} : { clock: this.options.clock }),
     });
     this.retentionCleanup ??= composition.observer.cleanup().catch(() => {

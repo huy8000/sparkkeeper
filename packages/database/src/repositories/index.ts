@@ -31,6 +31,12 @@ export {
   type UpdateMessageTemplateInput,
 } from './MessageTemplateRepository.js';
 export {
+  NotificationConfigRepository,
+  NotificationConfigRepositoryError,
+  type NotificationConfig,
+  type SaveNotificationConfigInput,
+} from './NotificationConfigRepository.js';
+export {
   SendRecordRepository,
   SendRecordRepositoryError,
   type ClaimSendRecordResult,

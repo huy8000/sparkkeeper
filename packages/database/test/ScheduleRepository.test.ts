@@ -228,6 +228,6 @@ test('persists Schedule through close, reopen and repeated migrate', (context) =
   temporary.client.close();
   const reopened = createDatabase({ databasePath: temporary.databasePath });
   context.after(() => reopened.close());
-  assert.equal(reopened.migrate().appliedMigrationCount, 7);
+  assert.equal(reopened.migrate().appliedMigrationCount, 8);
   assert.equal(new ScheduleRepository(reopened).findById(schedule.id)?.accountId, account.id);
 });

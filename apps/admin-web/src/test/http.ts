@@ -17,6 +17,8 @@ import {
   templateSummaryFixture,
   manualRunAcceptedFixture,
   manualRunPreflightFixture,
+  notificationConfigurationFixture,
+  notificationDeliveryFixture,
 } from './fixtures';
 
 export function success(data: unknown, status = 200): Response {
@@ -67,6 +69,11 @@ export function installApiFetch(override?: TestHandler): ReturnType<typeof vi.fn
         return success(manualRunPreflightFixture);
       case `POST /api/accounts/${ACCOUNT_ID}/manual-runs`:
         return success(manualRunAcceptedFixture, 202);
+      case 'GET /api/notification-config':
+      case 'PUT /api/notification-config':
+        return success(notificationConfigurationFixture);
+      case 'POST /api/notification-config/test':
+        return success(notificationDeliveryFixture);
       case `PUT /api/accounts/${ACCOUNT_ID}/schedule`:
         return success(scheduleFixture);
       case 'GET /api/templates':

@@ -16,7 +16,8 @@ export interface SparkKeeperStartResult {
 export class SparkKeeperService {
   private application: ApiApplication | undefined;
   private stopping: Promise<void> | undefined;
-  private readonly scheduler: SchedulerService;
+  private scheduler: SchedulerService | undefined;
+  private readonly schedulerOverride: SchedulerService | undefined;
   private readonly realtime: RuntimeEventHub;
   private readonly coordinator: RunExecutionCoordinator;
 
@@ -27,7 +28,8 @@ export class SparkKeeperService {
   ) {
     this.realtime = realtime;
     this.coordinator = coordinator;
-    this.scheduler = scheduler ?? new SchedulerService(realtime, coordinator);
+    this.scheduler = scheduler;
+    this.schedulerOverride = scheduler;
   }
 
   async start(environment: ServerEnvironment = process.env): Promise<SparkKeeperStartResult> {
@@ -43,7 +45,11 @@ export class SparkKeeperService {
     this.application = application;
     try {
       const address = await listenApiApplication(application);
-      const scheduler = await this.scheduler.start(environment);
+      const schedulerService =
+        this.scheduler ??
+        new SchedulerService(this.realtime, this.coordinator, application.notifications);
+      this.scheduler = schedulerService;
+      const scheduler = await schedulerService.start(environment);
       return { address, scheduler };
     } catch (error) {
       await this.stop();
@@ -72,7 +78,7 @@ export class SparkKeeperService {
       firstError = error;
     }
     try {
-      await this.scheduler.stop();
+      await this.scheduler?.stop();
     } catch (error) {
       firstError ??= error;
     }
@@ -82,11 +88,17 @@ export class SparkKeeperService {
       firstError ??= error;
     }
     try {
+      await application?.stopNotifications();
+    } catch (error) {
+      firstError ??= error;
+    }
+    try {
       application?.closeDatabase();
     } catch (error) {
       firstError ??= error;
     }
 
+    if (this.schedulerOverride === undefined) this.scheduler = undefined;
     if (firstError !== undefined) throw firstError;
   }
 }

@@ -63,7 +63,7 @@ export function runtimeEvent(runId: string, eventType = 'RUN_STARTED', id = '2')
 }
 
 export function configEvent(
-  entityType: 'ACCOUNT' | 'FRIEND' | 'TEMPLATE' | 'SCHEDULE',
+  entityType: 'ACCOUNT' | 'FRIEND' | 'TEMPLATE' | 'SCHEDULE' | 'NOTIFICATION',
   entityId: string,
   accountId?: string,
   id = '3',

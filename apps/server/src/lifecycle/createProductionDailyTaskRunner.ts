@@ -8,10 +8,12 @@ import {
   SystemEventRepository,
   type DatabaseClient,
 } from '@sparkkeeper/database';
+import type { NotificationService } from '@sparkkeeper/notifier';
 
 import { DailyTaskRunner } from '../application/DailyTaskRunner.js';
 import { ProductionDailyTaskAutomation } from '../automation/ProductionDailyTaskAutomation.js';
 import type { ObservabilityConfig } from '../config/ObservabilityConfig.js';
+import { DatabaseConsecutiveRunFailureDetector } from '../notifications/ConsecutiveRunFailureDetector.js';
 import { ProductionRuntimeObserver } from '../observability/ProductionRuntimeObserver.js';
 import { RetentionManager } from '../observability/RetentionManager.js';
 import type { RuntimeLogger } from '../observability/RuntimeLogger.js';
@@ -26,6 +28,7 @@ export interface ProductionDailyTaskRunnerOptions {
   readonly observability: ObservabilityConfig;
   readonly logger: RuntimeLogger;
   readonly realtime?: RealtimeEventPublisher;
+  readonly notifications?: Pick<NotificationService, 'publish'>;
   readonly clock?: () => Date;
 }
 
@@ -40,6 +43,7 @@ export function createProductionDailyTaskRunner(
 ): ProductionDailyTaskRunnerComposition {
   const automation = new ProductionDailyTaskAutomation();
   const schedules = new ScheduleRepository(options.database);
+  const dailyRuns = new DailyRunRepository(options.database);
   const observer = new ProductionRuntimeObserver({
     logger: options.logger,
     systemEvents: new SystemEventRepository(options.database),
@@ -57,6 +61,9 @@ export function createProductionDailyTaskRunner(
       traceRetentionDays: options.observability.traceRetentionDays,
     }),
     ...(options.realtime === undefined ? {} : { realtime: options.realtime }),
+    ...(options.notifications === undefined ? {} : { notifications: options.notifications }),
+    consecutiveFailures: new DatabaseConsecutiveRunFailureDetector(dailyRuns),
+    ...(options.clock === undefined ? {} : { clock: options.clock }),
   });
   return {
     schedules,
@@ -70,7 +77,7 @@ export function createProductionDailyTaskRunner(
       schedules,
       friends: new FriendRepository(options.database),
       templates: new MessageTemplateRepository(options.database),
-      dailyRuns: new DailyRunRepository(options.database),
+      dailyRuns,
       sendRecords: new SendRecordRepository(options.database),
       observer,
       ...(options.clock === undefined ? {} : { now: options.clock }),

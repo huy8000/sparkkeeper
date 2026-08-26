@@ -7,6 +7,8 @@ import type {
   MessageTemplateSummary,
   ManualRunAccepted,
   ManualRunPreflight,
+  NotificationConfiguration,
+  NotificationDeliveryResult,
   RuntimeStatus,
   Schedule,
   SendRecord,
@@ -243,6 +245,77 @@ export const parseManualRunAccepted: Parser<ManualRunAccepted> = (value) => {
     return undefined;
   }
   return { runId, businessDate, status: 'ACCEPTED' };
+};
+
+export const parseNotificationConfiguration: Parser<NotificationConfiguration> = (value) => {
+  const data = record(value);
+  const enabled = boolean(data?.enabled);
+  const webhookUrl = nullableString(data?.webhookUrl);
+  const notifyAuthExpired = boolean(data?.notifyAuthExpired);
+  const notifyTaskFailed = boolean(data?.notifyTaskFailed);
+  const notifyConsecutiveFailure = boolean(data?.notifyConsecutiveFailure);
+  const notifyDeliveryUnknown = boolean(data?.notifyDeliveryUnknown);
+  const createdAt = nullableString(data?.createdAt);
+  const updatedAt = nullableString(data?.updatedAt);
+  if (
+    data?.provider !== 'WEBHOOK' ||
+    [
+      enabled,
+      webhookUrl,
+      notifyAuthExpired,
+      notifyTaskFailed,
+      notifyConsecutiveFailure,
+      notifyDeliveryUnknown,
+      createdAt,
+      updatedAt,
+    ].some((item) => item === undefined)
+  ) {
+    return undefined;
+  }
+  return {
+    enabled: enabled!,
+    provider: 'WEBHOOK',
+    webhookUrl: webhookUrl!,
+    notifyAuthExpired: notifyAuthExpired!,
+    notifyTaskFailed: notifyTaskFailed!,
+    notifyConsecutiveFailure: notifyConsecutiveFailure!,
+    notifyDeliveryUnknown: notifyDeliveryUnknown!,
+    createdAt: createdAt!,
+    updatedAt: updatedAt!,
+  };
+};
+
+export const parseNotificationDeliveryResult: Parser<NotificationDeliveryResult> = (value) => {
+  const data = record(value);
+  const attempts = number(data?.attempts);
+  const httpStatus = data?.httpStatus === undefined ? undefined : number(data.httpStatus);
+  if (attempts === undefined) return undefined;
+  if (data?.status === 'SENT' && httpStatus !== undefined) {
+    return { status: 'SENT', attempts, httpStatus };
+  }
+  if (
+    data?.status === 'FAILED' &&
+    oneOf(data.failureCode, ['TIMEOUT', 'NETWORK_ERROR', 'HTTP_ERROR'] as const) !== undefined
+  ) {
+    return {
+      status: 'FAILED',
+      attempts,
+      failureCode: data.failureCode as 'TIMEOUT' | 'NETWORK_ERROR' | 'HTTP_ERROR',
+      ...(httpStatus === undefined ? {} : { httpStatus }),
+    };
+  }
+  if (
+    data?.status === 'BLOCKED' &&
+    attempts === 0 &&
+    oneOf(data.failureCode, ['DESTINATION_BLOCKED', 'INVALID_CONFIG'] as const) !== undefined
+  ) {
+    return {
+      status: 'BLOCKED',
+      attempts: 0,
+      failureCode: data.failureCode as 'DESTINATION_BLOCKED' | 'INVALID_CONFIG',
+    };
+  }
+  return undefined;
 };
 
 export const parseAccount: Parser<Account> = (value) => {

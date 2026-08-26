@@ -11,6 +11,7 @@ import { registerConfigurationRoutes } from './routes/configurationRoutes.js';
 import { registerRealtimeRoutes, type RealtimeRouteOptions } from './routes/realtimeRoutes.js';
 import { registerRunRoutes } from './routes/runRoutes.js';
 import { registerManualRunRoutes } from './routes/manualRunRoutes.js';
+import { registerNotificationRoutes } from './routes/notificationRoutes.js';
 import { registerStatusRoutes } from './routes/statusRoutes.js';
 import { failure } from './serializers/envelope.js';
 import type { ApiServices } from './services/ApiServices.js';
@@ -64,6 +65,7 @@ export function createServer(options: CreateServerOptions): FastifyInstance {
   registerConfigurationRoutes(server, options.services);
   registerRunRoutes(server, options.services);
   registerManualRunRoutes(server, options.services);
+  registerNotificationRoutes(server, options.services);
   if (options.realtime !== undefined) registerRealtimeRoutes(server, options.realtime);
   return server;
 }

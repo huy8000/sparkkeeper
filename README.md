@@ -85,7 +85,7 @@ sparkkeeper/
 │   ├── database/        # SQLite、Drizzle migration 与具体 Repository
 │   ├── message-engine/  # 纯 TypeScript 消息模板校验与 Provider
 │   ├── shared/          # 跨应用共享类型与定义
-│   └── notifier/        # 后续通知抽象
+│   └── notifier/        # 通知 policy / provider / transport
 ├── docs/                # 产品、技术与架构设计文档
 ├── docker-compose.yml   # 容器编排基础骨架
 ├── pnpm-workspace.yaml
@@ -138,6 +138,7 @@ pnpm --filter @sparkkeeper/server dev
 - `GET /api/runs/:runId/events`
 - `GET /api/templates`
 - `GET /api/templates/:templateId`
+- `GET /api/notification-config`
 - `GET /api/accounts/:accountId/manual-run/preflight?templateId=<template-id>`（read-only）
 
 本地配置写端点包括：
@@ -149,6 +150,8 @@ pnpm --filter @sparkkeeper/server dev
 - `POST /api/templates`
 - `PATCH /api/templates/:templateId`
 - `PUT /api/accounts/:accountId/schedule`
+- `PUT /api/notification-config`
+- `POST /api/notification-config/test`（fixed server-generated test payload）
 - `POST /api/accounts/:accountId/manual-runs`（explicitly gated, `202 Accepted`）
 
 配置 mutation 统一要求 `application/json`、`X-SparkKeeper-Admin-Request: 1`、精确的本机 Host，并在浏览器提供 Origin 时校验为允许的本机 Admin origin。服务仍默认只绑定 `127.0.0.1`，且没有 wildcard CORS。这是 **local-only + same-origin Admin protection**，用于降低跨站浏览器写请求风险，不是完整的 remote authentication；远程部署前仍必须另行设计身份认证、反向代理和可信网络边界。
@@ -165,9 +168,19 @@ SSE endpoint 采用与 Admin Web 相同的 local-only / same-origin Host 和 Ori
 
 SSE 是非持久化的实时信号，不提供 durable replay。断线或服务重启期间可能错过事件；Admin Web 重连并收到 ready 后会重新读取现有 REST snapshot，REST API 与持久化 SystemEvent 仍是当前状态和审计记录的权威来源。该通道同样不是 remote authentication，不能在没有额外身份认证和网络边界的情况下直接公网暴露。
 
+### V2 Notifications Foundation
+
+本机 Admin 现可配置唯一的 `WEBHOOK` 通知 Provider，并选择 `AUTH_EXPIRED`、`TASK_FAILED`、`CONSECUTIVE_RUN_FAILURE` 与 `DELIVERY_UNKNOWN` 高价值事件。普通运行进度与成功结果默认静默。通知从既有 RuntimeObserver 的安全事件进入统一 policy/service；Provider 失败只记录安全的 delivery 状态，不会改变 DailyRun、SendRecord 或发送/重试结果。同一 DailyRun 的 `AUTH_EXPIRED` / `DELIVERY_UNKNOWN` 与最终汇总 `TASK_FAILED` 会在 run 结束时合并为一个最具体的终态通知，避免同一失败结果重复提醒；当当前失败与上一条已完成 DailyRun 连续失败时，会额外产生 `CONSECUTIVE_RUN_FAILURE` 升级事件（默认阈值为 2 个连续失败 run）。
+
+Webhook payload 是严格白名单摘要，只包含服务名、事件类型、severity、时间、安全消息，以及必要时的 businessDate、run/account ID 和 error code；不包含联系人名称、模板/消息正文、聊天内容、cookie/token、环境变量、数据库/browser/evidence 路径、SQL、stack 或原始异常。URL 可能带有 secret query，应按敏感本地配置保护；它不会写入日志、SystemEvent、SSE、文档或报告，Admin 也不会将其渲染成外链。
+
+生产 Webhook 仅允许无内嵌用户名/密码的 HTTP(S) URL。发送前会解析完整 DNS answer set 并拒绝 localhost、loopback、private、link-local、metadata、ULA 等非公网目标；任一解析地址不安全即整体拒绝。传输固定到已验证地址、保留原始 Host/TLS hostname、不跟随 redirect、不缓存 response body，并采用 5 秒 timeout 与最多 3 次有界重试。只有 network/timeout、HTTP 408/429/5xx 会 retry；其他 4xx、redirect、无效或被 SSRF policy 拒绝的目标不会 retry。
+
+`Test Notification` 只向当前已保存 URL 发送由 server 生成的固定测试摘要，客户端不能提交任意文本/body。它会产生真实的 Webhook 网络请求，但不会访问 Douyin；本任务的自动与手工验证只使用注入的 fake transport 或本机 loopback receiver，没有请求任何真实外部 Webhook。Notification mutation 继续使用 JSON-only、精确 Host/Origin 与 Admin header 防护，无 wildcard CORS。该 local-only 模型仍不等于 remote authentication。
+
 ### V2 Local Admin Web Foundation
 
-Vue 3 + TypeScript 管理端现已提供 Dashboard、Accounts、Account Detail（Friends、Schedules 与 Manual Run）、Templates、Schedules、Runs 和 Run Detail（SendRecords 与 SystemEvents）页面。Accounts、Friends、Message Templates 和 Schedules 支持本地配置创建/编辑；Manual Run 通过模板选择、read-only preflight 和明确确认调用已有执行链。可分别启动本机 API 与管理端：
+Vue 3 + TypeScript 管理端现已提供 Dashboard、Accounts、Account Detail（Friends、Schedules 与 Manual Run）、Templates、Notifications、Schedules、Runs 和 Run Detail（SendRecords 与 SystemEvents）页面。Accounts、Friends、Message Templates、Schedules 和 Webhook Notifications 支持本地配置；Manual Run 通过模板选择、read-only preflight 和明确确认调用已有执行链。可分别启动本机 API 与管理端：
 
 ```bash
 pnpm --filter @sparkkeeper/server dev
@@ -178,7 +191,7 @@ pnpm --filter @sparkkeeper/admin-web dev
 
 管理端通过单一 same-origin EventSource 显示 Live Connected/Reconnecting/Offline 状态，并对 Dashboard、Runs、Run Detail 和当前配置页面执行 debounced REST refresh。Runs 筛选保持不变，Run Detail 只响应同一 run ID 的事件；页面不会将事件永久存入浏览器内存或存储。
 
-当前管理端仍没有 real-send gate toggle、Manual Run gate toggle、任意收件人/消息发送、浏览器登录、远程认证、通知、evidence 下载或文件路径拼接。模板正文只在本地详情/编辑请求中使用，不写入 URL、浏览器存储、SSE 或日志；Manual Run dialog 只读取模板 summary，不显示正文；Screenshot/Trace 仍只显示是否可用。真正的远程身份认证与通知系统将在后续 V2 任务中设计。
+当前管理端仍没有 real-send gate toggle、Manual Run gate toggle、任意收件人/消息发送、浏览器登录、远程认证、Telegram/Email/Slack 等其他 Provider、evidence 下载或文件路径拼接。模板正文只在本地详情/编辑请求中使用，不写入 URL、浏览器存储、SSE 或日志；Manual Run dialog 只读取模板 summary，不显示正文；Screenshot/Trace 仍只显示是否可用。真正的远程身份认证与其他通知 Provider 将在后续任务中设计。
 
 工程检查：
 

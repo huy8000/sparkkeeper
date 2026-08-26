@@ -1,6 +1,12 @@
 import type { BusinessDate, RuntimeEventType } from '@sparkkeeper/shared';
 
-export const CONFIG_ENTITY_TYPES = ['ACCOUNT', 'FRIEND', 'TEMPLATE', 'SCHEDULE'] as const;
+export const CONFIG_ENTITY_TYPES = [
+  'ACCOUNT',
+  'FRIEND',
+  'TEMPLATE',
+  'SCHEDULE',
+  'NOTIFICATION',
+] as const;
 
 export type ConfigEntityType = (typeof CONFIG_ENTITY_TYPES)[number];
 export type RealtimeRunResult = 'SUCCESS' | 'FAILED' | 'AUTH_EXPIRED' | 'RETRY_WAIT' | 'SKIPPED';

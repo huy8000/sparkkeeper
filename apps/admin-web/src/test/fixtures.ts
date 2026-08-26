@@ -7,6 +7,8 @@ import type {
   MessageTemplateSummary,
   ManualRunAccepted,
   ManualRunPreflight,
+  NotificationConfiguration,
+  NotificationDeliveryResult,
   RuntimeStatus,
   Schedule,
   SendRecord,
@@ -116,6 +118,24 @@ export const manualRunAcceptedFixture: ManualRunAccepted = {
   runId: RUN_ID,
   businessDate: '2026-01-02',
   status: 'ACCEPTED',
+};
+
+export const notificationConfigurationFixture: NotificationConfiguration = {
+  enabled: true,
+  provider: 'WEBHOOK',
+  webhookUrl: 'https://example.invalid/webhook',
+  notifyAuthExpired: true,
+  notifyTaskFailed: true,
+  notifyConsecutiveFailure: true,
+  notifyDeliveryUnknown: true,
+  createdAt: CREATED_AT,
+  updatedAt: CREATED_AT,
+};
+
+export const notificationDeliveryFixture: NotificationDeliveryResult = {
+  status: 'SENT',
+  attempts: 1,
+  httpStatus: 204,
 };
 
 export const runFixture: DailyRun = {

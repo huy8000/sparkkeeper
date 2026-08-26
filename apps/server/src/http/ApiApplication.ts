@@ -4,12 +4,20 @@ import {
   DailyRunRepository,
   FriendRepository,
   MessageTemplateRepository,
+  NotificationConfigRepository,
   ScheduleRepository,
   SendRecordRepository,
   SystemEventRepository,
   type DatabaseClient,
   type DatabaseEnvironment,
 } from '@sparkkeeper/database';
+import {
+  NodeWebhookTransport,
+  NotificationService,
+  PublicDestinationPolicy,
+  WebhookProvider,
+  type NotificationProvider,
+} from '@sparkkeeper/notifier';
 import type { FastifyInstance, FastifyServerOptions } from 'fastify';
 
 import { RunExecutionCoordinator } from '../application/RunExecutionCoordinator.js';
@@ -33,6 +41,8 @@ import {
   type ManualRunServiceOptions,
 } from './services/ManualRunService.js';
 import { ProductionManualRunRunnerFactory } from './services/ProductionManualRunRunnerFactory.js';
+import { NotificationConfigurationService } from './services/NotificationConfigurationService.js';
+import { DatabaseNotificationConfigurationSource } from '../notifications/DatabaseNotificationConfigurationSource.js';
 
 export type ServerEnvironment = HttpEnvironment &
   SchedulerEnvironment &
@@ -53,6 +63,8 @@ export interface CreateApiApplicationOptions {
   readonly onManualRunBackgroundFailure?: NonNullable<
     ManualRunServiceOptions['onBackgroundFailure']
   >;
+  readonly notificationAddressPolicy?: Pick<PublicDestinationPolicy, 'resolve'>;
+  readonly notificationProvider?: NotificationProvider;
 }
 
 export interface ApiApplication {
@@ -61,8 +73,10 @@ export interface ApiApplication {
   readonly config: HttpConfig;
   readonly realtime: RuntimeEventHub;
   readonly manualRun: ManualRunService;
+  readonly notifications: NotificationService;
   closeHttp(): Promise<void>;
   stopManualRuns(): Promise<void>;
+  stopNotifications(): Promise<void>;
   closeDatabase(): void;
   close(): Promise<void>;
 }
@@ -96,7 +110,36 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
     const friends = new FriendRepository(database);
     const schedules = new ScheduleRepository(database);
     const templates = new MessageTemplateRepository(database);
+    const notificationConfigs = new NotificationConfigRepository(database);
     const systemEvents = new SystemEventRepository(database);
+    const notificationAddressPolicy =
+      options.notificationAddressPolicy ?? new PublicDestinationPolicy();
+    const notificationProvider =
+      options.notificationProvider ??
+      new WebhookProvider({
+        addressPolicy: notificationAddressPolicy,
+        transport: new NodeWebhookTransport(),
+      });
+    const notifications = new NotificationService({
+      configuration: new DatabaseNotificationConfigurationSource(notificationConfigs),
+      provider: notificationProvider,
+      ...(options.clock === undefined ? {} : { clock: options.clock }),
+      onDelivery: (status) => {
+        const fields = {
+          eventType: status.result.status === 'SENT' ? 'NOTIFICATION_SENT' : 'NOTIFICATION_FAILED',
+          notificationEventType: status.eventType,
+          deliveryStatus: status.result.status,
+          attempts: status.result.attempts,
+          ...('failureCode' in status.result ? { failureCode: status.result.failureCode } : {}),
+          ...('httpStatus' in status.result ? { httpStatus: status.result.httpStatus } : {}),
+        };
+        if (status.result.status === 'SENT') {
+          backgroundDiagnostics.server?.log.info(fields, 'Notification delivery completed.');
+        } else {
+          backgroundDiagnostics.server?.log.warn(fields, 'Notification delivery did not complete.');
+        }
+      },
+    });
     const coordinator = options.coordinator ?? new RunExecutionCoordinator();
     const manualRun = new ManualRunService({
       repositories: {
@@ -116,6 +159,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
           database,
           observability: observabilityConfig,
           realtime,
+          notifications,
           ...(options.clock === undefined ? {} : { clock: options.clock }),
         }),
       ...(options.clock === undefined ? {} : { clock: options.clock }),
@@ -170,6 +214,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
             inspection.dailyRunsSchemaCompatible &&
             inspection.friendsSchemaCompatible &&
             inspection.messageTemplatesSchemaCompatible &&
+            inspection.notificationConfigsSchemaCompatible &&
             inspection.sendRecordsSchemaCompatible &&
             inspection.schedulesSchemaCompatible &&
             inspection.systemEventsSchemaCompatible
@@ -197,6 +242,13 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
         options.clock,
         realtime,
       ),
+      notifications: new NotificationConfigurationService({
+        repository: notificationConfigs,
+        addressPolicy: notificationAddressPolicy,
+        notifications,
+        realtime,
+        ...(options.clock === undefined ? {} : { clock: options.clock }),
+      }),
       manualRun,
     };
     const server = createServer({
@@ -220,6 +272,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
     let httpClosed = false;
     let databaseClosed = false;
     let manualRunsStopped = false;
+    let notificationsStopped = false;
     const closeHttp = async (): Promise<void> => {
       if (httpClosed) return;
       await server.close();
@@ -235,14 +288,21 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
       await manualRun.stop();
       manualRunsStopped = true;
     };
+    const stopNotifications = async (): Promise<void> => {
+      if (notificationsStopped) return;
+      await notifications.stop();
+      notificationsStopped = true;
+    };
     return {
       server,
       database,
       config,
       realtime,
       manualRun,
+      notifications,
       closeHttp,
       stopManualRuns,
+      stopNotifications,
       closeDatabase,
       async close(): Promise<void> {
         try {
@@ -251,7 +311,11 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
           try {
             await stopManualRuns();
           } finally {
-            closeDatabase();
+            try {
+              await stopNotifications();
+            } finally {
+              closeDatabase();
+            }
           }
         }
       },

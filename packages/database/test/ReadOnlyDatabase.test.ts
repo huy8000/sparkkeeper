@@ -16,7 +16,7 @@ test('read-only database access inspects V1 state without changing business data
   const inspection = client.inspect();
   client.close();
 
-  assert.equal(inspection.appliedMigrationCount, 7);
+  assert.equal(inspection.appliedMigrationCount, 8);
   assert.equal(inspection.pragmas.journalMode, 'wal');
   assert.equal(inspection.pragmas.foreignKeys, 1);
   assert.equal(inspection.pragmas.busyTimeoutMs, 5_000);

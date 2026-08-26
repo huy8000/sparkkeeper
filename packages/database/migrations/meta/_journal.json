@@ -50,6 +50,13 @@
       "when": 1787481913368,
       "tag": "0006_sweet_micromacro",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1787651908729,
+      "tag": "0007_cute_cerebro",
+      "breakpoints": true
     }
   ]
 }

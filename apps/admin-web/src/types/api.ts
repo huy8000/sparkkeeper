@@ -218,9 +218,38 @@ export interface ManualRunRequest {
   readonly acknowledgeRealSend: true;
 }
 
+export interface NotificationConfigurationInput {
+  readonly enabled: boolean;
+  readonly provider: 'WEBHOOK';
+  readonly webhookUrl: string | null;
+  readonly notifyAuthExpired: boolean;
+  readonly notifyTaskFailed: boolean;
+  readonly notifyConsecutiveFailure: boolean;
+  readonly notifyDeliveryUnknown: boolean;
+}
+
+export interface NotificationConfiguration extends NotificationConfigurationInput {
+  readonly createdAt: string | null;
+  readonly updatedAt: string | null;
+}
+
+export type NotificationDeliveryResult =
+  | { readonly status: 'SENT'; readonly attempts: number; readonly httpStatus: number }
+  | {
+      readonly status: 'FAILED';
+      readonly attempts: number;
+      readonly failureCode: 'TIMEOUT' | 'NETWORK_ERROR' | 'HTTP_ERROR';
+      readonly httpStatus?: number;
+    }
+  | {
+      readonly status: 'BLOCKED';
+      readonly attempts: 0;
+      readonly failureCode: 'DESTINATION_BLOCKED' | 'INVALID_CONFIG';
+    };
+
 export type RealtimeConnectionState = 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED';
 
-export type ConfigEntityType = 'ACCOUNT' | 'FRIEND' | 'TEMPLATE' | 'SCHEDULE';
+export type ConfigEntityType = 'ACCOUNT' | 'FRIEND' | 'TEMPLATE' | 'SCHEDULE' | 'NOTIFICATION';
 
 export interface RealtimeReadyEvent {
   readonly id: string;

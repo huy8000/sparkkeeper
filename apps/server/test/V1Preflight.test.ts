@@ -50,7 +50,7 @@ test('V1 preflight blocks when the database is missing', (context) => {
   assert.equal(result.ready, false);
 });
 
-test('V1 preflight blocks when the migration journal is not at seven entries', (context) => {
+test('V1 preflight blocks when the immutable seven-entry V1 migration prefix is missing', (context) => {
   const fixture = readyFixture(context);
   const dataDirectory = path.join(fixture.root, 'empty-data');
   mkdirSync(dataDirectory, { recursive: true });

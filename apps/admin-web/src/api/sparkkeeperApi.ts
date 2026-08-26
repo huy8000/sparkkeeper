@@ -17,6 +17,9 @@ import type {
   ManualRunAccepted,
   ManualRunPreflight,
   ManualRunRequest,
+  NotificationConfiguration,
+  NotificationConfigurationInput,
+  NotificationDeliveryResult,
   UpdateAccountInput,
   UpdateFriendInput,
   UpdateMessageTemplateInput,
@@ -34,6 +37,8 @@ import {
   parseMessageTemplateSummaries,
   parseManualRunAccepted,
   parseManualRunPreflight,
+  parseNotificationConfiguration,
+  parseNotificationDeliveryResult,
   parseRuntimeStatus,
   parseSchedule,
   parseSchedules,
@@ -87,6 +92,12 @@ export interface SparkKeeperApi {
     input: ManualRunRequest,
     signal?: AbortSignal,
   ): Promise<ManualRunAccepted>;
+  getNotificationConfiguration(signal?: AbortSignal): Promise<NotificationConfiguration>;
+  updateNotificationConfiguration(
+    input: NotificationConfigurationInput,
+    signal?: AbortSignal,
+  ): Promise<NotificationConfiguration>;
+  sendTestNotification(signal?: AbortSignal): Promise<NotificationDeliveryResult>;
 }
 
 export function createSparkKeeperApi(
@@ -184,6 +195,18 @@ export function createSparkKeeperApi(
         `/accounts/${encodeURIComponent(accountId)}/manual-runs`,
         input,
         parseManualRunAccepted,
+        signal,
+      ),
+    getNotificationConfiguration: (signal) =>
+      client.get('/notification-config', parseNotificationConfiguration, signal),
+    updateNotificationConfiguration: (input, signal) =>
+      client.mutate('PUT', '/notification-config', input, parseNotificationConfiguration, signal),
+    sendTestNotification: (signal) =>
+      client.mutate(
+        'POST',
+        '/notification-config/test',
+        {},
+        parseNotificationDeliveryResult,
         signal,
       ),
   };

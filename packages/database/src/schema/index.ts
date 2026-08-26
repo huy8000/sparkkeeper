@@ -12,6 +12,11 @@ export {
   type NewMessageTemplateRow,
 } from './messageTemplates.js';
 export {
+  notificationConfigs,
+  type NewNotificationConfigRow,
+  type NotificationConfigRow,
+} from './notificationConfigs.js';
+export {
   sendRecords,
   SEND_RECORD_STATUSES,
   type NewSendRecordRow,

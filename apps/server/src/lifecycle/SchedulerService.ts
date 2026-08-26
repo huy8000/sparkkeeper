@@ -1,4 +1,5 @@
 import { createDatabase, type DatabaseClient } from '@sparkkeeper/database';
+import type { NotificationService } from '@sparkkeeper/notifier';
 
 import { RunExecutionCoordinator } from '../application/RunExecutionCoordinator.js';
 import { resolveSchedulerConfig, type SchedulerEnvironment } from '../config/SchedulerConfig.js';
@@ -22,6 +23,7 @@ export class SchedulerService {
   constructor(
     private readonly realtime?: RealtimeEventPublisher,
     private readonly coordinator = new RunExecutionCoordinator(),
+    private readonly notifications?: Pick<NotificationService, 'publish'>,
   ) {}
 
   async start(
@@ -47,6 +49,7 @@ export class SchedulerService {
         observability: observabilityConfig,
         logger,
         ...(this.realtime === undefined ? {} : { realtime: this.realtime }),
+        ...(this.notifications === undefined ? {} : { notifications: this.notifications }),
       });
       await observer.cleanup();
       this.client = client;
