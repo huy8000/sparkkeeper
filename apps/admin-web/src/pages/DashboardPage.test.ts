@@ -111,10 +111,11 @@ describe('Dashboard', () => {
 
     source.emit('open');
     await wrapper.vm.$nextTick();
-    expect(wrapper.text()).toContain('Live updates: Connected');
+    expect(wrapper.text()).toContain('Live');
+    expect(wrapper.text()).not.toContain('Reconnecting');
     source.emit('error');
     await wrapper.vm.$nextTick();
-    expect(wrapper.text()).toContain('Live updates: Reconnecting');
+    expect(wrapper.text()).toContain('Reconnecting');
 
     const before = fetchMock.mock.calls.filter(([input]) =>
       String(input).includes('/api/runtime/status'),

@@ -7,6 +7,21 @@
     <title>SparkKeeper</title>
   </head>
   <body>
+    <script>
+      // Apply the persisted theme before first paint to avoid flashes.
+      try {
+        var storedTheme = window.localStorage.getItem('sparkkeeper.theme');
+        var theme =
+          storedTheme === 'light' || storedTheme === 'dark'
+            ? storedTheme
+            : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (error) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    </script>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
