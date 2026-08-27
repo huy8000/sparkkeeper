@@ -7,7 +7,7 @@ import { createAdminRouter } from './index';
 
 describe('admin routing', () => {
   it.each([
-    ['/', 'Runtime at a glance'],
+    ['/', 'Today at a glance'],
     ['/accounts', 'Configured accounts'],
     [`/accounts/${ACCOUNT_ID}`, 'Account detail'],
     [`/accounts/${ACCOUNT_ID}/overview`, 'Account detail'],
@@ -46,12 +46,12 @@ describe('admin routing', () => {
     wrapper.unmount();
   });
 
-  it('renders an accessible unknown-route page with a Dashboard link', async () => {
+  it('renders an accessible unknown-route page with an Overview link', async () => {
     installApiFetch();
     const wrapper = await mountAdmin('/unknown-route');
 
     expect(wrapper.text()).toContain('Not Found');
-    expect(wrapper.find('.not-found a[href="/"]').text()).toContain('Return to Dashboard');
+    expect(wrapper.find('.not-found a[href="/"]').text()).toContain('Return to Overview');
     wrapper.unmount();
   });
 });

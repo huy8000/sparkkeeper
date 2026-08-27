@@ -119,8 +119,8 @@ describe('SSE status', () => {
     source.emit('error');
     await wrapper.vm.$nextTick();
     expect(wrapper.find('.sse-status').text()).toBe('Reconnecting');
-    // The dashboard body keeps rendering; only the realtime badge changes.
-    expect(wrapper.text()).toContain('Runtime at a glance');
+    // The Overview body keeps rendering; only the realtime badge changes.
+    expect(wrapper.text()).toContain('Today at a glance');
     expect(wrapper.text()).not.toContain('Server Down');
     wrapper.unmount();
   });
@@ -129,7 +129,7 @@ describe('SSE status', () => {
     installApiFetch();
     const wrapper = await mountAdmin('/');
     expect(wrapper.find('.sse-status').text()).toBe('Offline');
-    expect(wrapper.text()).toContain('Runtime at a glance');
+    expect(wrapper.text()).toContain('Today at a glance');
     wrapper.unmount();
   });
 });

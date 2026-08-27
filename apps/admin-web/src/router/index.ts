@@ -4,7 +4,7 @@ import AdminLayout from '../layouts/AdminLayout.vue';
 import AccountDetailPage from '../pages/AccountDetailPage.vue';
 import AccountsPage from '../pages/AccountsPage.vue';
 import AccountSectionPage from '../pages/AccountSectionPage.vue';
-import DashboardPage from '../pages/DashboardPage.vue';
+import OverviewPage from '../pages/OverviewPage.vue';
 import NotFoundPage from '../pages/NotFoundPage.vue';
 import NotificationsPage from '../pages/NotificationsPage.vue';
 import RunDetailPage from '../pages/RunDetailPage.vue';
@@ -21,7 +21,7 @@ export function createAdminRouter(): Router {
         path: '/',
         component: AdminLayout,
         children: [
-          { path: '', component: DashboardPage, meta: { title: 'Overview', section: 'overview' } },
+          { path: '', component: OverviewPage, meta: { title: 'Overview', section: 'overview' } },
           {
             path: 'accounts',
             component: AccountsPage,
