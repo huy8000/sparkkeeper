@@ -12,6 +12,7 @@ describe('status labels', () => {
     expect(statusLabel('DELIVERY_UNKNOWN')).toBe('Delivery uncertain');
     expect(statusLabel('RETRY_WAIT')).toBe('Waiting to retry');
     expect(statusLabel('UNKNOWN')).toBe('Unknown');
+    expect(statusLabel('EMPTY')).toBe('No runs yet');
   });
 
   it('prettifies unknown statuses instead of dropping them', () => {
@@ -32,6 +33,7 @@ describe('status labels', () => {
     expect(statusTone('UNAVAILABLE')).toBe('danger');
     expect(statusTone('NOT_READY')).toBe('danger');
     expect(statusTone('UNKNOWN')).toBe('neutral');
+    expect(statusTone('EMPTY')).toBe('neutral');
   });
 
   it('falls back to a neutral tone for unknown statuses', () => {

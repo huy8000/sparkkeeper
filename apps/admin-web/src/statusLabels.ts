@@ -24,6 +24,7 @@ const STATUS_LABELS: Record<string, string> = {
   INFO: 'Info',
   WARN: 'Warning',
   ERROR: 'Error',
+  EMPTY: 'No runs yet',
 };
 
 const STATUS_TONES: Record<string, StatusTone> = {
@@ -45,6 +46,7 @@ const STATUS_TONES: Record<string, StatusTone> = {
   INFO: 'positive',
   UNKNOWN: 'neutral',
   DISABLED: 'neutral',
+  EMPTY: 'neutral',
 };
 
 /** Human-readable label for a backend status enum; unknown values are prettified, never dropped. */
