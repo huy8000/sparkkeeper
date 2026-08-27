@@ -5,6 +5,16 @@ import AuthStatusBadge from './AuthStatusBadge.vue';
 import RuntimeStatus from './RuntimeStatus.vue';
 import RunStatusBadge from './RunStatusBadge.vue';
 import SseStatus from './SseStatus.vue';
+import StatusBadge from './StatusBadge.vue';
+
+describe('StatusBadge', () => {
+  it('uses the shared status mapping unless an explicit contextual label is provided', () => {
+    expect(mount(StatusBadge, { props: { status: 'ENABLED' } }).text()).toBe('Enabled');
+    expect(
+      mount(StatusBadge, { props: { status: 'READY', label: 'Profile configured' } }).text(),
+    ).toBe('Profile configured');
+  });
+});
 
 describe('RunStatusBadge', () => {
   it('renders human text and a tone class per status enum', () => {

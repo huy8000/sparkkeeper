@@ -3,10 +3,10 @@ import { ref, watch } from 'vue';
 
 import { useAdminApp } from '../appContext';
 import AccountForm from '../components/AccountForm.vue';
+import AuthStatusBadge from '../components/AuthStatusBadge.vue';
 import EmptyState from '../components/EmptyState.vue';
 import ErrorState from '../components/ErrorState.vue';
 import FormPanel from '../components/FormPanel.vue';
-import IdentifierValue from '../components/IdentifierValue.vue';
 import LoadingState from '../components/LoadingState.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { useRequest } from '../composables/useRequest';
@@ -98,20 +98,18 @@ function closeForm(): void {
             <th>Name</th>
             <th>Enabled</th>
             <th>Login status</th>
-            <th>Identifier</th>
             <th>Updated</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="account in accounts.data.value" :key="account.id">
             <td>
-              <RouterLink class="table-link" :to="`/accounts/${account.id}`">{{
+              <RouterLink class="table-link" :to="`/accounts/${account.id}/overview`">{{
                 account.name
               }}</RouterLink>
             </td>
             <td><StatusBadge :status="account.enabled ? 'ENABLED' : 'DISABLED'" /></td>
-            <td><StatusBadge :status="account.loginStatus" /></td>
-            <td><IdentifierValue :value="account.id" compact /></td>
+            <td><AuthStatusBadge :status="account.loginStatus" /></td>
             <td>{{ formatTimestamp(account.updatedAt) }}</td>
           </tr>
         </tbody>

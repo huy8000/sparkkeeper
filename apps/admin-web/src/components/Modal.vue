@@ -1,10 +1,12 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <script setup lang="ts">
-/* global document, KeyboardEvent */
-import { onBeforeUnmount, watch } from 'vue';
+/* global document, HTMLElement, KeyboardEvent */
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
 
 const props = defineProps<{ open: boolean; title: string; labelledBy?: string }>();
 const emit = defineEmits<{ close: [] }>();
+const dialog = ref<HTMLElement | null>(null);
+let previousFocus: HTMLElement | null = null;
 
 function handleKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape' && props.open) emit('close');
@@ -13,19 +15,34 @@ function handleKeydown(event: KeyboardEvent): void {
 watch(
   () => props.open,
   (open) => {
-    if (open) document.addEventListener('keydown', handleKeydown);
-    else document.removeEventListener('keydown', handleKeydown);
+    if (open) {
+      previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      document.addEventListener('keydown', handleKeydown);
+      void nextTick(() =>
+        dialog.value
+          ?.querySelector<HTMLElement>('button, [href], input, select, textarea')
+          ?.focus(),
+      );
+    } else {
+      document.removeEventListener('keydown', handleKeydown);
+      previousFocus?.focus();
+      previousFocus = null;
+    }
   },
   { immediate: true },
 );
 
-onBeforeUnmount(() => document.removeEventListener('keydown', handleKeydown));
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', handleKeydown);
+  previousFocus?.focus();
+});
 </script>
 
 <template>
   <Teleport v-if="open" to="body">
     <div class="modal-backdrop" @click.self="$emit('close')">
       <div
+        ref="dialog"
         class="modal-card"
         role="dialog"
         aria-modal="true"

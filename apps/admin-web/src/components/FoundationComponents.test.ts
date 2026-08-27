@@ -120,6 +120,18 @@ describe('Modal', () => {
     expect(wrapper.emitted('close')).toHaveLength(1);
     wrapper.unmount();
   });
+
+  it('moves focus inside and restores the previously focused control', async () => {
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    trigger.focus();
+    const wrapper = mount(Modal, { props: { open: true, title: 'Focused modal' } });
+    await wrapper.vm.$nextTick();
+    expect(document.activeElement).toBe(document.body.querySelector('.modal-card button'));
+    await wrapper.setProps({ open: false });
+    expect(document.activeElement).toBe(trigger);
+    wrapper.unmount();
+  });
 });
 
 describe('Drawer', () => {
@@ -129,6 +141,18 @@ describe('Drawer', () => {
     expect(dialog).not.toBeNull();
     expect(dialog!.getAttribute('role')).toBe('dialog');
     expect(dialog!.getAttribute('aria-label')).toBe('Send records');
+    wrapper.unmount();
+  });
+
+  it('moves focus inside and restores the previously focused control', async () => {
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    trigger.focus();
+    const wrapper = mount(Drawer, { props: { open: true, title: 'Focused drawer' } });
+    await wrapper.vm.$nextTick();
+    expect(document.activeElement).toBe(document.body.querySelector('.drawer button'));
+    await wrapper.setProps({ open: false });
+    expect(document.activeElement).toBe(trigger);
     wrapper.unmount();
   });
 });

@@ -1,9 +1,13 @@
 import { createRouter, createWebHistory, type Router } from 'vue-router';
 
+import AccountWorkspaceLayout from '../layouts/AccountWorkspaceLayout.vue';
 import AdminLayout from '../layouts/AdminLayout.vue';
-import AccountDetailPage from '../pages/AccountDetailPage.vue';
+import AccountFriendsPage from '../pages/AccountFriendsPage.vue';
+import AccountHistoryPage from '../pages/AccountHistoryPage.vue';
+import AccountManualRunPage from '../pages/AccountManualRunPage.vue';
+import AccountOverviewPage from '../pages/AccountOverviewPage.vue';
+import AccountSchedulePage from '../pages/AccountSchedulePage.vue';
 import AccountsPage from '../pages/AccountsPage.vue';
-import AccountSectionPage from '../pages/AccountSectionPage.vue';
 import OverviewPage from '../pages/OverviewPage.vue';
 import NotFoundPage from '../pages/NotFoundPage.vue';
 import NotificationsPage from '../pages/NotificationsPage.vue';
@@ -28,58 +32,40 @@ export function createAdminRouter(): Router {
             meta: { title: 'Accounts', section: 'accounts' },
           },
           {
-            // Compatibility redirect: the pre-V3 account workspace path.
             path: 'accounts/:accountId',
-            redirect: (to) => `/accounts/${to.params.accountId}/overview`,
-          },
-          {
-            path: 'accounts/:accountId/overview',
-            component: AccountDetailPage,
-            meta: { title: 'Account detail', section: 'accounts' },
-          },
-          {
-            path: 'accounts/:accountId/friends',
-            component: AccountSectionPage,
-            meta: {
-              title: 'Friends',
-              section: 'accounts',
-              sectionTitle: 'Friends',
-              sectionDescription:
-                'Friend management stays on the account overview until this V3 section is built.',
-            },
-          },
-          {
-            path: 'accounts/:accountId/schedule',
-            component: AccountSectionPage,
-            meta: {
-              title: 'Schedule',
-              section: 'accounts',
-              sectionTitle: 'Schedule',
-              sectionDescription:
-                'Schedule configuration stays on the account overview until this V3 section is built.',
-            },
-          },
-          {
-            path: 'accounts/:accountId/manual-run',
-            component: AccountSectionPage,
-            meta: {
-              title: 'Manual run',
-              section: 'accounts',
-              sectionTitle: 'Manual run',
-              sectionDescription:
-                'Manual run stays on the account overview until this V3 section is built. No run is started from this placeholder.',
-            },
-          },
-          {
-            path: 'accounts/:accountId/history',
-            component: AccountSectionPage,
-            meta: {
-              title: 'History',
-              section: 'accounts',
-              sectionTitle: 'History',
-              sectionDescription:
-                'Run history stays on the account overview until this V3 section is built.',
-            },
+            component: AccountWorkspaceLayout,
+            meta: { section: 'accounts' },
+            children: [
+              {
+                path: '',
+                redirect: (to) => `/accounts/${to.params.accountId}/overview`,
+              },
+              {
+                path: 'overview',
+                component: AccountOverviewPage,
+                meta: { title: 'Account Overview', section: 'accounts' },
+              },
+              {
+                path: 'friends',
+                component: AccountFriendsPage,
+                meta: { title: 'Account Friends', section: 'accounts' },
+              },
+              {
+                path: 'schedule',
+                component: AccountSchedulePage,
+                meta: { title: 'Account Schedule', section: 'accounts' },
+              },
+              {
+                path: 'manual-run',
+                component: AccountManualRunPage,
+                meta: { title: 'Account Manual Run', section: 'accounts' },
+              },
+              {
+                path: 'history',
+                component: AccountHistoryPage,
+                meta: { title: 'Account History', section: 'accounts' },
+              },
+            ],
           },
           {
             // Legacy global schedules page: hidden from V3 navigation but kept
