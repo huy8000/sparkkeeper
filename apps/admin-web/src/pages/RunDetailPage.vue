@@ -1,193 +1,181 @@
 <script setup lang="ts">
-import { watch } from 'vue';
+import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 
-import { useAdminApp } from '../appContext';
-import { invalidatesRunDetail } from '../api/realtimeInvalidation';
-import EmptyState from '../components/EmptyState.vue';
-import ErrorState from '../components/ErrorState.vue';
-import IdentifierValue from '../components/IdentifierValue.vue';
-import LoadingState from '../components/LoadingState.vue';
-import StatusBadge from '../components/StatusBadge.vue';
-import { useRequest } from '../composables/useRequest';
-import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
-import { formatTimestamp } from '../utils/format';
+import RunDeliveryList from '../components/run/RunDeliveryList.vue';
+import RunResultSummary from '../components/run/RunResultSummary.vue';
+import RunTechnicalDetails from '../components/run/RunTechnicalDetails.vue';
+import RunTimeline from '../components/run/RunTimeline.vue';
+import PageError from '../components/PageError.vue';
+import RunStatusBadge from '../components/RunStatusBadge.vue';
+import Skeleton from '../components/Skeleton.vue';
+import { useRunDetail } from '../composables/useRunDetail';
+import { formatDuration, formatTimestamp } from '../utils/format';
 
-const app = useAdminApp();
 const route = useRoute();
 const runId = String(route.params.runId);
-const detail = useRequest(async (signal) => {
-  const run = await app.api.getRun(runId, signal);
-  const [account, sendRecords, events] = await Promise.all([
-    app.api.getAccount(run.accountId, signal),
-    app.api.listSendRecords(runId, signal),
-    app.api.listSystemEvents(runId, signal),
-  ]);
-  return { run, account, sendRecords, events };
+const detail = useRunDetail(runId);
+
+const run = computed(() => detail.run.data.value);
+const is404 = computed(() => detail.run.error.value?.httpStatus === 404);
+
+const durationLabel = computed(() => {
+  const current = run.value;
+  if (current === null) return '—';
+  if (current.status === 'RUNNING' || current.finishedAt === null) return 'In progress';
+  return formatDuration(current.startedAt, current.finishedAt);
 });
-watch(app.refreshVersion, () => void detail.load());
-useRealtimeRefresh(
-  app.realtime,
-  (event) => invalidatesRunDetail(event, runId),
-  () => void detail.load(),
+
+const successfulDeliveryCount = computed(
+  () =>
+    (detail.sendRecords.data.value ?? []).filter((record) => record.status === 'SUCCESS').length,
 );
+
+const failureCodes = computed(() => {
+  const codes = new Set<string>();
+  for (const record of detail.sendRecords.data.value ?? [])
+    if (record.failureCode !== null) codes.add(record.failureCode);
+  for (const event of detail.events.data.value ?? [])
+    if (event.errorCode !== null) codes.add(event.errorCode);
+  return [...codes];
+});
+
+const failureSummary = computed(() => {
+  const errorEvents = detail.orderedEvents.value.filter((event) => event.level === 'ERROR');
+  return errorEvents.length > 0 ? (errorEvents.at(-1)?.message ?? null) : null;
+});
 </script>
 
 <template>
-  <div class="page-stack">
+  <div class="page-stack run-detail-page">
     <p v-if="route.query.accepted === 'manual-run'" class="success-message" role="status">
       Manual Run request accepted. The final outcome appears below.
     </p>
-    <header class="page-heading">
-      <div>
-        <p class="eyebrow">Run detail</p>
-        <h2>{{ detail.data.value?.run.businessDate ?? 'Daily run' }}</h2>
-        <p>Safe execution metadata, delivery outcomes, and system events.</p>
+
+    <!-- Primary loading: header + content skeletons, shell stays visible. -->
+    <div
+      v-if="detail.run.loading.value && run === null"
+      class="run-detail-skeleton"
+      aria-busy="true"
+    >
+      <Skeleton height="36px" width="40%" label="Loading run header…" />
+      <Skeleton height="120px" label="Loading run summary…" />
+      <div class="run-detail-skeleton__split">
+        <Skeleton height="220px" label="Loading delivery records…" />
+        <Skeleton height="220px" label="Loading timeline…" />
       </div>
-      <button class="button button--secondary" type="button" @click="detail.load">Refresh</button>
-    </header>
-    <LoadingState v-if="detail.loading.value && !detail.data.value" label="Loading run detail…" />
-    <ErrorState
-      v-else-if="detail.error.value"
-      :title="detail.error.value.httpStatus === 404 ? 'Run not found' : 'Unable to load run'"
-      :message="
-        detail.error.value.httpStatus === 404
-          ? 'This run is not available.'
-          : detail.error.value.message
-      "
-      @retry="detail.load"
+    </div>
+
+    <section v-else-if="is404" class="state-panel state-panel--empty" role="alert">
+      <div>
+        <h2 class="state-panel__title">Run not found</h2>
+        <p>This run is not available.</p>
+      </div>
+      <RouterLink class="button button--secondary" to="/runs">Back to Runs</RouterLink>
+    </section>
+
+    <PageError
+      v-else-if="detail.run.error.value"
+      title="Unable to load run"
+      :message="detail.run.error.value.message"
+      retry-label="Try loading again"
+      @retry="detail.refresh"
     />
-    <template v-else-if="detail.data.value">
-      <section class="card" aria-labelledby="run-summary-title">
-        <div class="card__header">
-          <div>
-            <p class="eyebrow">Run summary</p>
-            <h3 id="run-summary-title">{{ detail.data.value.account.name }}</h3>
-          </div>
-          <StatusBadge :status="detail.data.value.run.status" />
-        </div>
-        <dl class="definition-grid">
-          <div>
-            <dt>Business date</dt>
-            <dd>{{ detail.data.value.run.businessDate }}</dd>
-          </div>
-          <div>
-            <dt>Run identifier</dt>
-            <dd><IdentifierValue :value="detail.data.value.run.id" /></dd>
-          </div>
-          <div>
-            <dt>Started</dt>
-            <dd>{{ formatTimestamp(detail.data.value.run.startedAt) }}</dd>
-          </div>
-          <div>
-            <dt>Finished</dt>
-            <dd>{{ formatTimestamp(detail.data.value.run.finishedAt) }}</dd>
-          </div>
-          <div>
-            <dt>Created</dt>
-            <dd>{{ formatTimestamp(detail.data.value.run.createdAt) }}</dd>
-          </div>
-          <div>
-            <dt>Updated</dt>
-            <dd>{{ formatTimestamp(detail.data.value.run.updatedAt) }}</dd>
-          </div>
-        </dl>
-      </section>
 
-      <section class="section-stack" aria-labelledby="send-records-title">
-        <header class="section-heading">
-          <div>
-            <p class="eyebrow">Delivery metadata</p>
-            <h3 id="send-records-title">Send records</h3>
-          </div>
-          <span class="count">{{ detail.data.value.sendRecords.length }}</span>
-        </header>
-        <EmptyState
-          v-if="detail.data.value.sendRecords.length === 0"
-          title="No send records"
-          description="This run has no delivery records."
-        />
-        <div v-else class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Friend ID</th>
-                <th>Business date</th>
-                <th>Status</th>
-                <th>Attempts</th>
-                <th>Failure code</th>
-                <th>Finished</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="record in detail.data.value.sendRecords" :key="record.id">
-                <td><IdentifierValue :value="record.friendId" compact /></td>
-                <td>{{ record.businessDate }}</td>
-                <td><StatusBadge :status="record.status" /></td>
-                <td>{{ record.attempts }}</td>
-                <td>{{ record.failureCode ?? '—' }}</td>
-                <td>{{ formatTimestamp(record.finishedAt) }}</td>
-              </tr>
-            </tbody>
-          </table>
+    <template v-else-if="run !== null && detail.detailState.value !== null">
+      <header class="page-heading run-detail-heading">
+        <div>
+          <p class="eyebrow">Run detail</p>
+          <h2>{{ run.businessDate }} · {{ detail.accountName.value }}</h2>
+          <p>Read-only execution record: deliveries and persisted system events.</p>
         </div>
-      </section>
+        <div class="run-detail-heading__statuses">
+          <RunStatusBadge :status="detail.detailState.value" />
+          <span v-if="run.status === 'RUNNING'" class="run-live-chip">
+            <span class="run-live-chip__pulse" aria-hidden="true" />
+            Live
+          </span>
+          <button class="button button--secondary" type="button" @click="detail.refresh">
+            Refresh
+          </button>
+        </div>
+      </header>
 
-      <section class="section-stack" aria-labelledby="events-title">
-        <header class="section-heading">
-          <div>
-            <p class="eyebrow">Observability</p>
-            <h3 id="events-title">System events</h3>
-          </div>
-          <span class="count">{{ detail.data.value.events.length }}</span>
-        </header>
-        <EmptyState
-          v-if="detail.data.value.events.length === 0"
-          title="No system events"
-          description="This run has no recorded events."
-        />
-        <ol v-else class="timeline">
-          <li
-            v-for="(event, index) in detail.data.value.events"
-            :key="`${event.createdAt}-${index}`"
-            class="timeline__item"
-          >
-            <div class="timeline__marker" aria-hidden="true" />
-            <div class="timeline__content">
-              <div class="timeline__header">
-                <div>
-                  <time :datetime="event.createdAt">{{ formatTimestamp(event.createdAt) }}</time>
-                  <h4>{{ event.eventType.replaceAll('_', ' ') }}</h4>
-                </div>
-                <StatusBadge :status="event.level" />
-              </div>
-              <p>{{ event.message }}</p>
-              <dl class="event-meta">
-                <div v-if="event.friendId">
-                  <dt>Friend ID</dt>
-                  <dd>{{ event.friendId }}</dd>
-                </div>
-                <div v-if="event.attempt !== null">
-                  <dt>Attempt</dt>
-                  <dd>{{ event.attempt }}</dd>
-                </div>
-                <div v-if="event.errorCode">
-                  <dt>Error code</dt>
-                  <dd>{{ event.errorCode }}</dd>
-                </div>
-              </dl>
-              <div
-                v-if="event.screenshotEvidenceAvailable || event.traceEvidenceAvailable"
-                class="evidence-list"
-                aria-label="Evidence availability"
-              >
-                <span v-if="event.screenshotEvidenceAvailable">Screenshot available</span
-                ><span v-if="event.traceEvidenceAvailable">Trace available</span>
-              </div>
+      <p v-if="detail.liveUpdatesUnavailable.value" class="run-live-notice" role="status">
+        Live updates temporarily unavailable.
+      </p>
+
+      <dl class="definition-grid run-detail-meta">
+        <div>
+          <dt>Business date</dt>
+          <dd>{{ run.businessDate }}</dd>
+        </div>
+        <div>
+          <dt>Account</dt>
+          <dd>{{ detail.accountName.value }}</dd>
+        </div>
+        <div>
+          <dt>Started</dt>
+          <dd>{{ formatTimestamp(run.startedAt) }}</dd>
+        </div>
+        <div>
+          <dt>Finished</dt>
+          <dd>{{ formatTimestamp(run.finishedAt) }}</dd>
+        </div>
+        <div>
+          <dt>Duration</dt>
+          <dd>{{ durationLabel }}</dd>
+        </div>
+      </dl>
+
+      <RunResultSummary
+        :state="detail.detailState.value"
+        :account-id="run.accountId"
+        :duration-label="durationLabel"
+        :successful-delivery-count="successfulDeliveryCount"
+        :failure-codes="failureCodes"
+        :failure-summary="failureSummary"
+      />
+
+      <div class="run-detail-split">
+        <section class="section-stack" aria-labelledby="send-records-title">
+          <header class="section-heading">
+            <div>
+              <p class="eyebrow">Delivery results</p>
+              <h3 id="send-records-title">Send records</h3>
             </div>
-          </li>
-        </ol>
-      </section>
+            <span v-if="detail.sendRecords.data.value" class="count">
+              {{ detail.sendRecords.data.value.length }}
+            </span>
+          </header>
+          <RunDeliveryList
+            :records="detail.sendRecords.data.value"
+            :loading="detail.sendRecords.loading.value"
+            :error-message="detail.sendRecords.error.value?.message ?? null"
+            :friend-name="detail.friendName"
+          />
+        </section>
+
+        <section class="section-stack" aria-labelledby="events-title">
+          <header class="section-heading">
+            <div>
+              <p class="eyebrow">Timeline</p>
+              <h3 id="events-title">System events</h3>
+            </div>
+            <span v-if="detail.events.data.value" class="count">
+              {{ detail.events.data.value.length }}
+            </span>
+          </header>
+          <RunTimeline
+            :events="detail.orderedEvents.value"
+            :loading="detail.events.loading.value"
+            :error-message="detail.events.error.value?.message ?? null"
+            :friend-name="detail.friendName"
+          />
+        </section>
+      </div>
+
+      <RunTechnicalDetails :run="run" :send-records="detail.sendRecords.data.value" />
     </template>
   </div>
 </template>

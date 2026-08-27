@@ -21,7 +21,7 @@ describe('admin routing', () => {
     ['/operations/notifications', 'Webhook notifications'],
     ['/operations/system', 'System status'],
     ['/runs', 'Daily run history'],
-    [`/runs/${RUN_ID}`, 'Run summary'],
+    [`/runs/${RUN_ID}`, 'Run detail'],
   ])('renders %s', async (path, expected) => {
     installApiFetch();
     const wrapper = await mountAdmin(path);
