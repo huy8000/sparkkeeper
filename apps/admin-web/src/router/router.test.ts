@@ -9,12 +9,12 @@ describe('admin routing', () => {
   it.each([
     ['/', 'Today at a glance'],
     ['/accounts', 'Configured accounts'],
-    [`/accounts/${ACCOUNT_ID}`, 'Account detail'],
-    [`/accounts/${ACCOUNT_ID}/overview`, 'Account detail'],
-    [`/accounts/${ACCOUNT_ID}/friends`, 'Friends'],
-    [`/accounts/${ACCOUNT_ID}/schedule`, 'Schedule'],
-    [`/accounts/${ACCOUNT_ID}/manual-run`, 'Manual run'],
-    [`/accounts/${ACCOUNT_ID}/history`, 'History'],
+    [`/accounts/${ACCOUNT_ID}`, 'Account readiness'],
+    [`/accounts/${ACCOUNT_ID}/overview`, 'Account readiness'],
+    [`/accounts/${ACCOUNT_ID}/friends`, 'Configured friends'],
+    [`/accounts/${ACCOUNT_ID}/schedule`, 'Automatic execution window'],
+    [`/accounts/${ACCOUNT_ID}/manual-run`, 'Server-authorized execution'],
+    [`/accounts/${ACCOUNT_ID}/history`, 'Demo Account run history'],
     ['/schedules', 'Account schedule windows'],
     ['/templates', 'Message templates'],
     ['/notifications', 'Webhook notifications'],
@@ -37,19 +37,22 @@ describe('admin routing', () => {
     expect(router.currentRoute.value.fullPath).toBe('/operations/notifications');
   });
 
-  it('links account sections back to the account overview', async () => {
+  it('uses semantic routed tabs and supports deep-link refresh', async () => {
     installApiFetch();
     const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}/friends`);
-    const backLink = wrapper.find('a[href="/accounts/' + ACCOUNT_ID + '/overview"]');
-    expect(backLink.exists()).toBe(true);
-    expect(backLink.text()).toContain('Back to account overview');
+    const tabs = wrapper.get('nav[aria-label="Account workspace"]');
+    expect(tabs.findAll('a')).toHaveLength(5);
+    expect(tabs.get(`a[href="/accounts/${ACCOUNT_ID}/friends"]`).classes()).toContain(
+      'account-tabs__link--active',
+    );
+    expect(wrapper.get(`a[href="/accounts/${ACCOUNT_ID}/overview"]`).text()).toBe('Overview');
+    expect(wrapper.get('a[href="/accounts"]').text()).toContain('Accounts');
     wrapper.unmount();
   });
 
   it('renders an accessible unknown-route page with an Overview link', async () => {
     installApiFetch();
     const wrapper = await mountAdmin('/unknown-route');
-
     expect(wrapper.text()).toContain('Not Found');
     expect(wrapper.find('.not-found a[href="/"]').text()).toContain('Return to Overview');
     wrapper.unmount();

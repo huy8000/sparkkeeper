@@ -1,20 +1,21 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
 import type { Friend, FriendConfigurationInput, FriendMatchField } from '../types/api';
+import FormField from './FormField.vue';
 
 const props = defineProps<{
-  friend: Friend | undefined;
+  friend?: Friend | undefined;
   submitting: boolean;
   serverError?: string;
 }>();
 const emit = defineEmits<{ submit: [value: FriendConfigurationInput]; cancel: [] }>();
-const matchFields: readonly FriendMatchField[] = [
-  'displayName',
-  'remarkName',
-  'shortId',
-  'uniqueId',
-  'secUid',
+const matchFields: readonly { value: FriendMatchField; label: string; stability: string }[] = [
+  { value: 'secUid', label: 'Sec UID', stability: 'Highest stability' },
+  { value: 'uniqueId', label: 'Unique ID', stability: 'High stability' },
+  { value: 'shortId', label: 'Short ID', stability: 'Medium stability' },
+  { value: 'remarkName', label: 'Remark name', stability: 'Lower stability' },
+  { value: 'displayName', label: 'Display name', stability: 'Low stability' },
 ];
 const form = reactive({
   displayName: '',
@@ -42,15 +43,22 @@ watch(
   { immediate: true },
 );
 
+const selectedIdentity = computed({
+  get: () => form[form.matchField],
+  set: (value: string) => {
+    form[form.matchField] = value;
+  },
+});
+const selectedMatch = computed(() => matchFields.find((field) => field.value === form.matchField));
+
 function submit(): void {
   const displayName = form.displayName.trim();
   if (displayName.length === 0) {
     validationError.value = 'Display name is required.';
     return;
   }
-  const selected = form[form.matchField].trim();
-  if (selected.length === 0) {
-    validationError.value = `A value is required for the selected ${form.matchField} match field.`;
+  if (form[form.matchField].trim().length === 0) {
+    validationError.value = `${selectedMatch.value?.label ?? 'Selected identity'} is required when selected as the match strategy.`;
     return;
   }
   validationError.value = '';
@@ -72,56 +80,125 @@ function optionalValue(value: string): string | null {
 </script>
 
 <template>
-  <form class="config-form config-form--grid" novalidate @submit.prevent="submit">
-    <label>
-      Display name
-      <input
-        v-model="form.displayName"
-        name="displayName"
-        autocomplete="off"
-        :disabled="submitting"
-      />
-    </label>
-    <label>
-      Remark name
-      <input
-        v-model="form.remarkName"
-        name="remarkName"
-        autocomplete="off"
-        :disabled="submitting"
-      />
-    </label>
-    <label>
-      Short ID
-      <input v-model="form.shortId" name="shortId" autocomplete="off" :disabled="submitting" />
-    </label>
-    <label>
-      Unique ID
-      <input v-model="form.uniqueId" name="uniqueId" autocomplete="off" :disabled="submitting" />
-    </label>
-    <label>
-      secUid
-      <input v-model="form.secUid" name="secUid" autocomplete="off" :disabled="submitting" />
-    </label>
-    <label>
-      Match field
-      <select v-model="form.matchField" name="matchField" :disabled="submitting">
-        <option v-for="field in matchFields" :key="field" :value="field">{{ field }}</option>
-      </select>
-      <small>Provide a value for {{ form.matchField }}; stable identifiers remain preferred.</small>
-    </label>
+  <form class="config-form" novalidate @submit.prevent="submit">
+    <FormField label="Display name" help-text="A human label for this local configuration.">
+      <template #default="{ fieldId, describedBy }">
+        <input
+          :id="fieldId"
+          v-model="form.displayName"
+          name="displayName"
+          autocomplete="off"
+          :aria-describedby="validationError || serverError ? 'friend-form-error' : describedBy"
+          :aria-invalid="Boolean(validationError || serverError)"
+          :disabled="submitting"
+        />
+      </template>
+    </FormField>
+
     <label class="checkbox-field">
       <input v-model="form.enabled" name="friendEnabled" type="checkbox" :disabled="submitting" />
       Friend enabled
     </label>
-    <p v-if="form.enabled && props.friend?.enabled === false" class="form-note">
-      Enabling this contact makes it eligible for future configured schedules; this form does not
-      run or send anything.
+    <small class="form-note">Only enabled friends participate in runs.</small>
+
+    <FormField
+      label="Match strategy"
+      help-text="Prefer Sec UID or Unique ID when those identifiers are available."
+    >
+      <template #default="{ fieldId, describedBy }">
+        <select
+          :id="fieldId"
+          v-model="form.matchField"
+          name="matchField"
+          :aria-describedby="validationError || serverError ? 'friend-form-error' : describedBy"
+          :disabled="submitting"
+        >
+          <option v-for="field in matchFields" :key="field.value" :value="field.value">
+            {{ field.label }} — {{ field.stability }}
+          </option>
+        </select>
+      </template>
+    </FormField>
+
+    <FormField
+      v-if="form.matchField !== 'displayName'"
+      :label="selectedMatch?.label ?? 'Selected identity'"
+      :help-text="`${selectedMatch?.stability ?? 'Selected strategy'} match value.`"
+    >
+      <template #default="{ fieldId, describedBy }">
+        <input
+          :id="fieldId"
+          v-model="selectedIdentity"
+          :name="form.matchField"
+          autocomplete="off"
+          :aria-describedby="validationError || serverError ? 'friend-form-error' : describedBy"
+          :aria-invalid="Boolean(validationError || serverError)"
+          :disabled="submitting"
+        />
+      </template>
+    </FormField>
+    <p v-else class="stability-notice stability-notice--low">
+      Display Name is a low-stability match strategy and may change or be ambiguous.
     </p>
-    <p v-if="validationError || serverError" class="form-error" role="alert">
+
+    <details class="advanced-fields">
+      <summary>Advanced identity fields</summary>
+      <div class="advanced-fields__grid">
+        <FormField v-if="form.matchField !== 'remarkName'" label="Remark name">
+          <template #default="{ fieldId, describedBy }">
+            <input
+              :id="fieldId"
+              v-model="form.remarkName"
+              name="remarkName"
+              autocomplete="off"
+              :aria-describedby="describedBy"
+              :disabled="submitting"
+            />
+          </template>
+        </FormField>
+        <FormField v-if="form.matchField !== 'shortId'" label="Short ID">
+          <template #default="{ fieldId, describedBy }">
+            <input
+              :id="fieldId"
+              v-model="form.shortId"
+              name="shortId"
+              autocomplete="off"
+              :aria-describedby="describedBy"
+              :disabled="submitting"
+            />
+          </template>
+        </FormField>
+        <FormField v-if="form.matchField !== 'uniqueId'" label="Unique ID">
+          <template #default="{ fieldId, describedBy }">
+            <input
+              :id="fieldId"
+              v-model="form.uniqueId"
+              name="uniqueId"
+              autocomplete="off"
+              :aria-describedby="describedBy"
+              :disabled="submitting"
+            />
+          </template>
+        </FormField>
+        <FormField v-if="form.matchField !== 'secUid'" label="Sec UID">
+          <template #default="{ fieldId, describedBy }">
+            <input
+              :id="fieldId"
+              v-model="form.secUid"
+              name="secUid"
+              autocomplete="off"
+              :aria-describedby="describedBy"
+              :disabled="submitting"
+            />
+          </template>
+        </FormField>
+      </div>
+    </details>
+
+    <p v-if="validationError || serverError" id="friend-form-error" class="form-error" role="alert">
       {{ validationError || serverError }}
     </p>
-    <div class="form-actions form-actions--full">
+    <div class="form-actions">
       <button class="button button--primary" type="submit" :disabled="submitting">
         {{ submitting ? 'Saving…' : 'Save friend' }}
       </button>
@@ -131,7 +208,7 @@ function optionalValue(value: string): string | null {
         :disabled="submitting"
         @click="$emit('cancel')"
       >
-        Reset
+        Cancel
       </button>
     </div>
   </form>

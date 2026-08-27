@@ -2,6 +2,7 @@
 import { reactive, ref, watch } from 'vue';
 
 import type { Account, CreateAccountInput } from '../types/api';
+import FormField from './FormField.vue';
 
 const props = defineProps<{
   account?: Account;
@@ -35,15 +36,29 @@ function submit(): void {
 
 <template>
   <form class="config-form" novalidate @submit.prevent="submit">
-    <label>
-      Account name
-      <input v-model="form.name" name="accountName" autocomplete="off" :disabled="submitting" />
-    </label>
+    <FormField label="Account name">
+      <template #default="{ fieldId, describedBy }">
+        <input
+          :id="fieldId"
+          v-model="form.name"
+          name="accountName"
+          autocomplete="off"
+          :aria-describedby="validationError || serverError ? 'account-form-error' : describedBy"
+          :aria-invalid="Boolean(validationError || serverError)"
+          :disabled="submitting"
+        />
+      </template>
+    </FormField>
     <label class="checkbox-field">
       <input v-model="form.enabled" name="accountEnabled" type="checkbox" :disabled="submitting" />
       Account enabled
     </label>
-    <p v-if="validationError || serverError" class="form-error" role="alert">
+    <p
+      v-if="validationError || serverError"
+      id="account-form-error"
+      class="form-error"
+      role="alert"
+    >
       {{ validationError || serverError }}
     </p>
     <div class="form-actions">
@@ -56,7 +71,7 @@ function submit(): void {
         :disabled="submitting"
         @click="$emit('cancel')"
       >
-        Reset
+        Cancel
       </button>
     </div>
   </form>

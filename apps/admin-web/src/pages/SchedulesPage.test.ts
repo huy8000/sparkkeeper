@@ -29,7 +29,7 @@ describe('Schedules', () => {
       .find((button) => button.text() === 'Edit')!
       .trigger('click');
     expect(wrapper.text()).toContain(
-      'does not enable the Runtime Scheduler or Real Send Authorization',
+      'does not change the runtime Scheduler or Real Send Authorization',
     );
     await wrapper.get('input[name="startTime"]').setValue('11:00');
     await wrapper.get('input[name="endTime"]').setValue('10:00');
