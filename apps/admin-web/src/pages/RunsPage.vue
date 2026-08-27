@@ -1,17 +1,18 @@
 <script setup lang="ts">
-import { reactive, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, reactive, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 import { useAdminApp } from '../appContext';
 import { invalidatesRunList } from '../api/realtimeInvalidation';
 import EmptyState from '../components/EmptyState.vue';
-import ErrorState from '../components/ErrorState.vue';
-import LoadingState from '../components/LoadingState.vue';
-import StatusBadge from '../components/StatusBadge.vue';
-import { useRequest } from '../composables/useRequest';
+import PageError from '../components/PageError.vue';
+import RunStatusBadge from '../components/RunStatusBadge.vue';
+import Skeleton from '../components/Skeleton.vue';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
+import { useRequest } from '../composables/useRequest';
+import { statusLabel } from '../statusLabels';
 import type { DailyRunStatus, RunFilters } from '../types/api';
-import { formatTimestamp, shortId } from '../utils/format';
+import { formatDuration, formatTimestamp } from '../utils/format';
 
 const RUN_STATUSES: readonly DailyRunStatus[] = [
   'READY',
@@ -20,13 +21,26 @@ const RUN_STATUSES: readonly DailyRunStatus[] = [
   'FAILED',
   'AUTH_EXPIRED',
 ];
+const LIMITS: readonly (25 | 50 | 100)[] = [25, 50, 100];
+
 const app = useAdminApp();
+const route = useRoute();
 const router = useRouter();
+
+function queryStatus(value: unknown): DailyRunStatus | '' {
+  return RUN_STATUSES.includes(value as DailyRunStatus) ? (value as DailyRunStatus) : '';
+}
+
+function queryLimit(value: unknown): 25 | 50 | 100 {
+  const parsed = Number(value);
+  return LIMITS.includes(parsed as 25 | 50 | 100) ? (parsed as 25 | 50 | 100) : 50;
+}
+
 const filters = reactive({
-  accountId: '',
-  businessDate: '',
-  status: '' as DailyRunStatus | '',
-  limit: 50 as 25 | 50 | 100,
+  accountId: typeof route.query.accountId === 'string' ? route.query.accountId : '',
+  businessDate: typeof route.query.businessDate === 'string' ? route.query.businessDate : '',
+  status: queryStatus(route.query.status) as DailyRunStatus | '',
+  limit: queryLimit(route.query.limit),
 });
 
 function currentFilters(): RunFilters {
@@ -38,15 +52,26 @@ function currentFilters(): RunFilters {
   };
 }
 
-const result = useRequest(async (signal) => {
-  const [accounts, runs] = await Promise.all([
-    app.api.listAccounts(signal),
-    app.api.listRuns(currentFilters(), signal),
-  ]);
-  return { accounts, runs };
+const hasActiveFilters = computed(
+  () => filters.accountId !== '' || filters.businessDate !== '' || filters.status !== '',
+);
+
+// Runs are primary; account lookup is a single bounded list request used only
+// for name resolution, so an accounts failure never destroys the run list.
+const runs = useRequest((signal) => app.api.listRuns(currentFilters(), signal));
+const accounts = useRequest((signal) => app.api.listAccounts(signal));
+
+watch(app.refreshVersion, () => {
+  void runs.load();
+  void accounts.load();
 });
-watch(app.refreshVersion, () => void result.load());
-useRealtimeRefresh(app.realtime, invalidatesRunList, () => void result.load());
+useRealtimeRefresh(app.realtime, invalidatesRunList, () => void runs.load());
+
+const accountById = computed(() => new Map((accounts.data.value ?? []).map((a) => [a.id, a])));
+
+function accountName(accountId: string): string {
+  return accountById.value.get(accountId)?.name ?? 'Unknown account';
+}
 
 async function applyFilters(): Promise<void> {
   await router.replace({
@@ -57,11 +82,16 @@ async function applyFilters(): Promise<void> {
       limit: String(filters.limit),
     },
   });
-  await result.load();
+  await runs.load();
 }
 
-function accountName(accountId: string): string {
-  return result.data.value?.accounts.find((account) => account.id === accountId)?.name ?? accountId;
+async function resetFilters(): Promise<void> {
+  filters.accountId = '';
+  filters.businessDate = '';
+  filters.status = '';
+  filters.limit = 50;
+  await router.replace({ query: {} });
+  await runs.load();
 }
 </script>
 
@@ -71,16 +101,18 @@ function accountName(accountId: string): string {
       <div>
         <p class="eyebrow">Runs</p>
         <h2>Daily run history</h2>
-        <p>Filter bounded, read-only execution history.</p>
+        <p>Recent executions across accounts. Read-only, filter bounded.</p>
       </div>
-      <button class="button button--secondary" type="button" @click="result.load">Refresh</button>
+      <button class="button button--secondary" type="button" @click="runs.load">Refresh</button>
     </header>
+
     <form class="filter-bar" aria-label="Run filters" @submit.prevent="applyFilters">
+      <label>Business date<input v-model="filters.businessDate" type="date" /></label>
       <label
         >Account<select v-model="filters.accountId">
           <option value="">All accounts</option>
           <option
-            v-for="account in result.data.value?.accounts ?? []"
+            v-for="account in accounts.data.value ?? []"
             :key="account.id"
             :value="account.id"
           >
@@ -88,61 +120,102 @@ function accountName(accountId: string): string {
           </option>
         </select></label
       >
-      <label>Business date<input v-model="filters.businessDate" type="date" /></label>
       <label
         >Status<select v-model="filters.status">
           <option value="">All statuses</option>
           <option v-for="status in RUN_STATUSES" :key="status" :value="status">
-            {{ status.replaceAll('_', ' ') }}
+            {{ statusLabel(status) }}
           </option>
         </select></label
       >
       <label
         >Limit<select v-model.number="filters.limit">
-          <option :value="25">25</option>
-          <option :value="50">50</option>
-          <option :value="100">100</option>
+          <option v-for="limit in LIMITS" :key="limit" :value="limit">{{ limit }}</option>
         </select></label
       >
-      <button class="button button--primary" type="submit">Apply filters</button>
+      <div class="filter-bar__actions">
+        <button class="button button--primary" type="submit">Apply</button>
+        <button class="button button--secondary" type="button" @click="resetFilters">Reset</button>
+      </div>
     </form>
-    <LoadingState v-if="result.loading.value && !result.data.value" label="Loading runs…" />
-    <ErrorState
-      v-else-if="result.error.value"
-      :message="result.error.value.message"
-      @retry="result.load"
+
+    <PageError
+      v-if="runs.error.value"
+      title="Unable to load runs"
+      :message="runs.error.value.message"
+      retry-label="Try loading again"
+      @retry="runs.load"
     />
+
+    <div
+      v-else-if="runs.loading.value && runs.data.value === null"
+      class="runs-skeleton"
+      aria-busy="true"
+    >
+      <Skeleton v-for="index in 5" :key="index" height="44px" label="Loading runs…" />
+    </div>
+
     <EmptyState
-      v-else-if="result.data.value?.runs.length === 0"
-      title="No runs"
-      description="No runs match the current filters."
+      v-else-if="runs.data.value?.length === 0 && hasActiveFilters"
+      title="No runs found"
+      description="No runs match the current filters. Adjust the filters and try again."
+    >
+      <template #action>
+        <button class="button button--secondary" type="button" @click="resetFilters">
+          Reset filters
+        </button>
+      </template>
+    </EmptyState>
+
+    <EmptyState
+      v-else-if="runs.data.value?.length === 0"
+      title="No runs yet"
+      description="Runs will appear after SparkKeeper executes."
     />
-    <div v-else-if="result.data.value" class="table-wrap">
+
+    <div v-else-if="runs.data.value" class="table-wrap">
       <table>
+        <caption class="visually-hidden">
+          Daily runs
+        </caption>
         <thead>
           <tr>
-            <th>Business date</th>
-            <th>Account</th>
-            <th>Status</th>
-            <th>Started</th>
-            <th>Finished</th>
-            <th>Run ID</th>
+            <th scope="col">BusinessDate</th>
+            <th scope="col">Account</th>
+            <th scope="col">Status</th>
+            <th scope="col">Started</th>
+            <th scope="col">Finished</th>
+            <th scope="col">Duration</th>
+            <th scope="col"><span class="visually-hidden">Actions</span></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="run in result.data.value.runs" :key="run.id">
+          <tr
+            v-for="run in runs.data.value"
+            :key="run.id"
+            :class="run.status === 'RUNNING' ? 'run-row--live' : undefined"
+          >
             <td>{{ run.businessDate }}</td>
             <td>{{ accountName(run.accountId) }}</td>
-            <td><StatusBadge :status="run.status" /></td>
+            <td>
+              <RunStatusBadge :status="run.status" />
+              <span v-if="run.status === 'RUNNING'" class="run-live-chip">
+                <span class="run-live-chip__pulse" aria-hidden="true" />
+                Live
+              </span>
+            </td>
             <td>{{ formatTimestamp(run.startedAt) }}</td>
             <td>{{ formatTimestamp(run.finishedAt) }}</td>
             <td>
-              <RouterLink
-                class="table-link identifier-link"
-                :to="`/runs/${run.id}`"
-                :title="run.id"
-              >
-                <code>{{ shortId(run.id) }}</code>
+              {{
+                run.status === 'RUNNING'
+                  ? 'In progress'
+                  : formatDuration(run.startedAt, run.finishedAt)
+              }}
+            </td>
+            <td>
+              <RouterLink class="button button--secondary button--compact" :to="`/runs/${run.id}`">
+                View
               </RouterLink>
             </td>
           </tr>
