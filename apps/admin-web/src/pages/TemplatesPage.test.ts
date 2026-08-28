@@ -400,6 +400,36 @@ describe('V3 Templates', () => {
     wrapper.unmount();
   });
 
+  it('retains the list after a background SSE refresh error without a toast storm', async () => {
+    let listReads = 0;
+    const fetchMock = installApiFetch((url) => {
+      if (url.pathname !== '/api/templates') return undefined;
+      listReads += 1;
+      return listReads === 1
+        ? success([templateSummaryFixture])
+        : failure('TEMPLATE_REFRESH_FAILED', 'Latest templates could not be loaded.', 503);
+    });
+    installEventSource();
+    const wrapper = await mountAdmin('/templates');
+    vi.useFakeTimers();
+    const source = FakeEventSource.instances[0]!;
+    source.emit('config-changed', configEvent('TEMPLATE', TEMPLATE_ID, undefined, 'e1'));
+    source.emit('config-changed', configEvent('TEMPLATE', TEMPLATE_ID, undefined, 'e2'));
+    source.emit('config-changed', configEvent('TEMPLATE', TEMPLATE_ID, undefined, 'e3'));
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    vi.useRealTimers();
+
+    expect(wrapper.text()).toContain(templateSummaryFixture.name);
+    expect(wrapper.text()).toContain('Latest templates could not be loaded.');
+    expect(wrapper.find('.stale-data-notice').exists()).toBe(true);
+    expect(wrapper.findAll('.toast')).toHaveLength(0);
+    expect(
+      fetchMock.mock.calls.filter(([input]) => String(input).endsWith('/api/templates')),
+    ).toHaveLength(2);
+    wrapper.unmount();
+  });
+
   it('refreshes an open clean editor after same-template CONFIG_CHANGED', async () => {
     const fetchMock = installApiFetch();
     installEventSource();
@@ -415,6 +445,31 @@ describe('V3 Templates', () => {
     expect(
       fetchMock.mock.calls.filter(([url]) => String(url).endsWith(`/api/templates/${TEMPLATE_ID}`)),
     ).toHaveLength(2);
+    wrapper.unmount();
+  });
+
+  it('refreshes the list but not Template A detail for Template B CONFIG_CHANGED', async () => {
+    const fetchMock = installApiFetch((url) =>
+      url.pathname === '/api/templates' ? success([templateSummaryFixture, summaryB()]) : undefined,
+    );
+    installEventSource();
+    const wrapper = await mountAdmin('/templates');
+    await wrapper.get(`button[aria-label="Edit ${templateSummaryFixture.name}"]`).trigger('click');
+    await flushPromises();
+    vi.useFakeTimers();
+    FakeEventSource.instances[0]!.emit('config-changed', configEvent('TEMPLATE', TEMPLATE_B_ID));
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    vi.useRealTimers();
+
+    expect(
+      fetchMock.mock.calls.filter(([input]) => String(input).endsWith('/api/templates')),
+    ).toHaveLength(2);
+    expect(
+      fetchMock.mock.calls.filter(([input]) =>
+        String(input).endsWith(`/api/templates/${TEMPLATE_ID}`),
+      ),
+    ).toHaveLength(1);
     wrapper.unmount();
   });
 
@@ -476,6 +531,34 @@ describe('V3 Templates', () => {
     expect(wrapper.text()).toContain(templateSummaryFixture.name);
     expect(editor.get('textarea').element).toHaveProperty('value', 'Unsaved during reconnect');
     expect(document.body.querySelector('.drawer')).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  it('bounds a successful mutation plus its SSE echo without duplicate toasts', async () => {
+    const fetchMock = installApiFetch();
+    installEventSource();
+    const wrapper = await mountAdmin('/templates');
+    await wrapper.get(`button[aria-label="Edit ${templateSummaryFixture.name}"]`).trigger('click');
+    await flushPromises();
+    const editor = wrapper.getComponent(TemplateEditor);
+    await editor.get('input[name="templateName"]').setValue('Saved Once');
+    await editor.get('form').trigger('submit');
+    await flushPromises();
+
+    vi.useFakeTimers();
+    FakeEventSource.instances[0]!.emit(
+      'config-changed',
+      configEvent('TEMPLATE', TEMPLATE_ID, undefined, 'echo'),
+    );
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    vi.useRealTimers();
+
+    expect(
+      fetchMock.mock.calls.filter(([input]) => String(input).endsWith('/api/templates')),
+    ).toHaveLength(3);
+    expect(wrapper.findAll('.toast')).toHaveLength(1);
+    expect(wrapper.find('.toast').text()).toContain('Template configuration saved.');
     wrapper.unmount();
   });
 

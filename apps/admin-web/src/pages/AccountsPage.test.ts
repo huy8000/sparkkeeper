@@ -1,10 +1,11 @@
 import { flushPromises } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import AccountForm from '../components/AccountForm.vue';
 import { ACCOUNT_ID, accountFixture } from '../test/fixtures';
 import { failure, installApiFetch, success } from '../test/http';
 import { mountAdmin } from '../test/mountAdmin';
+import { FakeEventSource, configEvent, installEventSource } from '../test/realtime';
 
 describe('Accounts and workspace shell', () => {
   it('renders the account list with human identity and a direct workspace link', async () => {
@@ -128,6 +129,33 @@ describe('Accounts and workspace shell', () => {
         .findAll('a[href="/accounts"]')
         .some((link) => link.text().includes('Back to Accounts')),
     ).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('does not overwrite dirty account settings after CONFIG_CHANGED', async () => {
+    const fetchMock = installApiFetch();
+    installEventSource();
+    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}/overview`);
+    await wrapper.get('.account-workspace__header button').trigger('click');
+    const form = wrapper.getComponent(AccountForm);
+    await form.get('input[name="accountName"]').setValue('Unsaved Account Name');
+
+    vi.useFakeTimers();
+    FakeEventSource.instances[0]!.emit('config-changed', configEvent('ACCOUNT', ACCOUNT_ID));
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    vi.useRealTimers();
+
+    expect(form.get('input[name="accountName"]').element).toHaveProperty(
+      'value',
+      'Unsaved Account Name',
+    );
+    expect(document.body.textContent).toContain('Account settings changed on the server.');
+    expect(
+      fetchMock.mock.calls.filter(([input]) =>
+        String(input).endsWith(`/api/accounts/${ACCOUNT_ID}`),
+      ),
+    ).toHaveLength(1);
     wrapper.unmount();
   });
 });

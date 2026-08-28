@@ -2,7 +2,9 @@
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 
 import { ApiError } from '../api/client';
+import { REALTIME_REFRESH_DELAY_MS } from '../api/realtimePolicy';
 import { useAdminApp } from '../appContext';
+import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
 import DangerConfirmation from '../components/DangerConfirmation.vue';
 import FormField from '../components/FormField.vue';
 import InlineError from '../components/InlineError.vue';
@@ -10,6 +12,7 @@ import NotificationTestResult from '../components/notification/NotificationTestR
 import PageError from '../components/PageError.vue';
 import Skeleton from '../components/Skeleton.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useDebouncedAction } from '../composables/useDebouncedAction';
 import { useRequest } from '../composables/useRequest';
 import { useToasts } from '../composables/useToasts';
@@ -79,7 +82,7 @@ const realtimeRefresh = useDebouncedAction(() => {
     return;
   }
   void configurationRequest.load();
-});
+}, REALTIME_REFRESH_DELAY_MS);
 const unsubscribeRealtime = app.realtime.subscribe((event) => {
   if (isNotificationConfigurationEvent(event)) realtimeRefresh.trigger();
 });
@@ -210,6 +213,13 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
+    <BackgroundRefreshIndicator v-if="configurationRequest.refreshing.value" />
+    <StaleDataNotice
+      v-if="configurationRequest.refreshError.value"
+      :message="configurationRequest.refreshError.value.message"
+      @retry="configurationRequest.load"
+    />
+
     <section class="template-privacy-note notification-privacy-note" aria-label="Webhook privacy">
       <span aria-hidden="true">◇</span>
       <p>
@@ -237,10 +247,6 @@ onBeforeUnmount(() => {
     />
 
     <template v-else-if="configuration">
-      <InlineError
-        v-if="configurationRequest.error.value"
-        :message="configurationRequest.error.value.message"
-      />
       <section v-if="serverChanged" class="notification-server-change" role="status">
         <div>
           <strong>Notification settings changed on the server.</strong>

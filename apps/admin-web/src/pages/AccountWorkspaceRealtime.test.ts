@@ -1,8 +1,8 @@
 import { flushPromises } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ACCOUNT_ID, RUN_ID } from '../test/fixtures';
-import { installApiFetch } from '../test/http';
+import { ACCOUNT_ID, RUN_ID, accountFixture, friendFixture } from '../test/fixtures';
+import { installApiFetch, success } from '../test/http';
 import { FakeEventSource, installEventSource, readyEvent } from '../test/realtime';
 import { mountAdmin } from '../test/mountAdmin';
 import FriendForm from '../components/FriendForm.vue';
@@ -91,6 +91,36 @@ describe('Account Workspace realtime', () => {
       'Retained During Reconnect',
     );
     expect(form.get('input[name="displayName"]').attributes('disabled')).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('switches Account A to Account B and ignores a late A tab response', async () => {
+    const accountB = '00000000-0000-4000-8000-000000000099';
+    let resolveAFriends!: (response: Response) => void;
+    const pendingAFriends = new Promise<Response>((resolve) => {
+      resolveAFriends = resolve;
+    });
+    installApiFetch((url) => {
+      if (url.pathname === `/api/accounts/${ACCOUNT_ID}/friends`) return pendingAFriends;
+      if (url.pathname === `/api/accounts/${accountB}`) {
+        return success({ ...accountFixture, id: accountB, name: 'Account B' });
+      }
+      if (url.pathname === `/api/accounts/${accountB}/friends`) {
+        return success([{ ...friendFixture, accountId: accountB, displayName: 'Friend B' }]);
+      }
+      return undefined;
+    });
+    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}/friends`);
+    const router = (wrapper.vm as unknown as { $router: { push: (path: string) => Promise<void> } })
+      .$router;
+    await router.push(`/accounts/${accountB}/friends`);
+    await flushPromises();
+    resolveAFriends(success([{ ...friendFixture, displayName: 'Late Friend A' }]));
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Account B');
+    expect(wrapper.text()).toContain('Friend B');
+    expect(wrapper.text()).not.toContain('Late Friend A');
     wrapper.unmount();
   });
 });

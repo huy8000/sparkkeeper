@@ -181,7 +181,7 @@ describe('Runs list', () => {
     unfiltered.unmount();
   });
 
-  it('shows a page error with preserved filter state and a loading retry', async () => {
+  it('keeps the previous list and filter state when a filtered background load fails', async () => {
     installApiFetch((url) =>
       url.pathname === '/api/runs' && url.search.includes('status=FAILED')
         ? failure('RUNS_UNAVAILABLE', 'Runs unavailable.', 500)
@@ -193,10 +193,73 @@ describe('Runs list', () => {
     await wrapper.find('form').trigger('submit');
     await flushPromises();
 
-    const error = wrapper.find('.page-error');
-    expect(error.exists()).toBe(true);
-    expect(error.text()).toContain('Try loading again');
+    expect(wrapper.find('.page-error').exists()).toBe(false);
+    expect(wrapper.get('.stale-data-notice').text()).toContain('Runs unavailable.');
+    expect(wrapper.text()).toContain('2026-01-02');
     expect((selects[1]!.element as HTMLSelectElement).value).toBe('FAILED');
+    wrapper.unmount();
+  });
+
+  it('shows a full page error when the initial Runs request fails', async () => {
+    installApiFetch((url) =>
+      url.pathname === '/api/runs'
+        ? failure('RUNS_UNAVAILABLE', 'Runs unavailable.', 500)
+        : undefined,
+    );
+    const wrapper = await mountAdmin('/runs');
+
+    expect(wrapper.get('.page-error').text()).toContain('Runs unavailable.');
+    expect(wrapper.text()).toContain('Try loading again');
+    expect(wrapper.find('.stale-data-notice').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('retains the run snapshot after a background refresh error', async () => {
+    let reads = 0;
+    installApiFetch((url) => {
+      if (url.pathname !== '/api/runs') return undefined;
+      reads += 1;
+      return reads === 1
+        ? success([runFixture])
+        : failure('RUNS_REFRESH_FAILED', 'Latest runs could not be loaded.', 503);
+    });
+    const wrapper = await mountAdmin('/runs');
+    await wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'Refresh')!
+      .trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('2026-01-02');
+    expect(wrapper.text()).toContain('Latest runs could not be loaded.');
+    expect(wrapper.find('.stale-data-notice').exists()).toBe(true);
+    expect(wrapper.find('.page-error').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('ignores a late filter response after a newer filter request wins', async () => {
+    let resolveFailed!: (response: Response) => void;
+    const failedPending = new Promise<Response>((resolve) => {
+      resolveFailed = resolve;
+    });
+    installApiFetch((url) => {
+      if (url.pathname !== '/api/runs') return undefined;
+      if (url.searchParams.get('status') === 'FAILED') return failedPending;
+      if (url.searchParams.get('status') === 'SUCCESS') return success([runWithStatus('SUCCESS')]);
+      return success([runFixture]);
+    });
+    const wrapper = await mountAdmin('/runs');
+    const status = wrapper.findAll('select')[1]!;
+    await status.setValue('FAILED');
+    await wrapper.find('form').trigger('submit');
+    await status.setValue('SUCCESS');
+    await wrapper.find('form').trigger('submit');
+    await flushPromises();
+    resolveFailed(success([runWithStatus('FAILED')]));
+    await flushPromises();
+
+    expect(wrapper.find('.status-badge').text()).toBe('Success');
+    expect(wrapper.find('tbody').text()).not.toContain('Failed');
     wrapper.unmount();
   });
 
@@ -279,4 +342,39 @@ describe('Runs list', () => {
     expect(filteredCalls.length).toBe(3);
     wrapper.unmount();
   });
+
+  it('bounds the complete runtime event storm to one Runs GET', async () => {
+    const fetchMock = installApiFetch();
+    installEventSource();
+    const wrapper = await mountAdmin('/runs');
+    const source = FakeEventSource.instances[0]!;
+    vi.useFakeTimers();
+    for (const [index, eventType] of [
+      'RUN_STARTED',
+      'FRIEND_RESOLVING',
+      'MESSAGE_BUILDING',
+      'MESSAGE_SENDING',
+      'VERIFYING',
+      'VERIFY_SUCCESS',
+      'RUN_FINISHED',
+    ].entries()) {
+      source.emit('runtime', runtimeEvent(RUN_ID, eventType, `storm-${index}`));
+    }
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    vi.useRealTimers();
+
+    expect(
+      fetchMock.mock.calls.filter(
+        ([input, init]) =>
+          new URL(String(input), 'http://127.0.0.1').pathname === '/api/runs' &&
+          (init?.method ?? 'GET') === 'GET',
+      ),
+    ).toHaveLength(2);
+    wrapper.unmount();
+  });
 });
+
+function runWithStatus(status: (typeof runFixture)['status']) {
+  return { ...runFixture, status };
+}

@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { flushPromises } from '@vue/test-utils';
+import { describe, expect, it, vi } from 'vitest';
 
 import { THEME_STORAGE_KEY } from '../composables/useTheme';
-import { runtimeFixture } from '../test/fixtures';
+import { RUN_ID, runtimeFixture } from '../test/fixtures';
 import { failure, installApiFetch, success } from '../test/http';
 import { mountAdmin } from '../test/mountAdmin';
-import { FakeEventSource, installEventSource } from '../test/realtime';
+import { FakeEventSource, installEventSource, readyEvent, runtimeEvent } from '../test/realtime';
 
 const NAVIGATION_LABELS = ['Overview', 'Accounts', 'Templates', 'Runs', 'Notifications', 'System'];
 
@@ -131,6 +132,56 @@ describe('SSE status', () => {
     expect(wrapper.find('.sse-status').text()).toBe('Offline');
     expect(wrapper.text()).toContain('Today at a glance');
     wrapper.unmount();
+  });
+
+  it('keeps one SSE connection across routes and performs one active-page reconnect generation', async () => {
+    const fetchMock = installApiFetch();
+    installEventSource();
+    const wrapper = await mountAdmin('/');
+    expect(FakeEventSource.instances).toHaveLength(1);
+
+    await wrapper
+      .findAll('.navigation a')
+      .find((link) => link.text() === 'Runs')!
+      .trigger('click');
+    await flushPromises();
+    expect(FakeEventSource.instances).toHaveLength(1);
+
+    const getCount = (path: string) =>
+      fetchMock.mock.calls.filter(
+        ([input, init]) =>
+          new URL(String(input), 'http://127.0.0.1').pathname === path &&
+          (init?.method ?? 'GET') === 'GET',
+      ).length;
+    const before = {
+      runtime: getCount('/api/runtime/status'),
+      runs: getCount('/api/runs'),
+      accounts: getCount('/api/accounts'),
+    };
+    const source = FakeEventSource.instances[0]!;
+    vi.useFakeTimers();
+    source.emit('runtime', runtimeEvent(RUN_ID, 'RUN_STARTED', 'route-cleanup'));
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    expect(getCount('/api/runs')).toBe(before.runs + 1);
+
+    const beforeReconnect = {
+      runtime: getCount('/api/runtime/status'),
+      runs: getCount('/api/runs'),
+      accounts: getCount('/api/accounts'),
+    };
+    source.emit('error');
+    source.emit('open');
+    source.emit('ready', readyEvent('recovered'));
+    await flushPromises();
+
+    expect(getCount('/api/runtime/status')).toBe(beforeReconnect.runtime + 1);
+    expect(getCount('/api/runs')).toBe(beforeReconnect.runs + 1);
+    expect(getCount('/api/accounts')).toBe(beforeReconnect.accounts + 1);
+    expect(FakeEventSource.instances).toHaveLength(1);
+    vi.useRealTimers();
+    wrapper.unmount();
+    expect(source.closed).toBe(true);
   });
 });
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
 import {
   MAX_MAX_ATTEMPTS,
@@ -20,7 +20,11 @@ const props = withDefaults(
   }>(),
   { schedule: undefined, defaultTimezone: 'UTC', serverError: '' },
 );
-const emit = defineEmits<{ submit: [value: ConfigureScheduleInput]; cancel: [] }>();
+const emit = defineEmits<{
+  submit: [value: ConfigureScheduleInput];
+  cancel: [];
+  dirtyChange: [dirty: boolean];
+}>();
 const form = reactive<ConfigureScheduleInput>({
   startTime: '09:00',
   endTime: '10:00',
@@ -30,6 +34,8 @@ const form = reactive<ConfigureScheduleInput>({
   retryIntervalSeconds: 60,
 });
 const validationError = ref('');
+const initialSnapshot = ref('');
+const dirty = computed(() => JSON.stringify(form) !== initialSnapshot.value);
 
 watch(
   [() => props.schedule, () => props.defaultTimezone],
@@ -42,10 +48,12 @@ watch(
       maxAttempts: schedule?.maxAttempts ?? 3,
       retryIntervalSeconds: schedule?.retryIntervalSeconds ?? 60,
     });
+    initialSnapshot.value = JSON.stringify(form);
     validationError.value = '';
   },
   { immediate: true },
 );
+watch(dirty, (value) => emit('dirtyChange', value), { immediate: true });
 
 function submit(): void {
   if (form.startTime >= form.endTime) {

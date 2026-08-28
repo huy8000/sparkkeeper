@@ -146,4 +146,41 @@ describe('Account Friends', () => {
     expect(wrapper.text()).toContain('Friend configuration could not be saved.');
     wrapper.unmount();
   });
+
+  it('retains the friend snapshot and marks it stale after a background refresh error', async () => {
+    let reads = 0;
+    installApiFetch((url) => {
+      if (url.pathname !== `/api/accounts/${ACCOUNT_ID}/friends`) return undefined;
+      reads += 1;
+      return reads === 1
+        ? success([friendFixture])
+        : failure('FRIENDS_REFRESH_FAILED', 'Latest friends could not be loaded.', 503);
+    });
+    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}/friends`);
+    await wrapper.get('.topbar .button').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain(friendFixture.displayName);
+    expect(wrapper.text()).toContain('Latest friends could not be loaded.');
+    expect(wrapper.find('.stale-data-notice').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('No friends configured');
+    wrapper.unmount();
+  });
+
+  it('keeps the friend snapshot visible while a background refresh is pending', async () => {
+    let reads = 0;
+    installApiFetch((url) => {
+      if (url.pathname !== `/api/accounts/${ACCOUNT_ID}/friends`) return undefined;
+      reads += 1;
+      return reads === 1 ? success([friendFixture]) : new Promise<Response>(() => undefined);
+    });
+    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}/friends`);
+    await wrapper.get('.topbar .button').trigger('click');
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).toContain(friendFixture.displayName);
+    expect(wrapper.find('.background-refresh-indicator').text()).toContain('Refreshing');
+    expect(wrapper.find('.section-loading').exists()).toBe(false);
+    wrapper.unmount();
+  });
 });

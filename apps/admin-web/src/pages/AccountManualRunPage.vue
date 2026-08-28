@@ -8,12 +8,14 @@ import {
 import { ApiError } from '../api/client';
 import { useAccountWorkspace } from '../accountWorkspaceContext';
 import { useAdminApp } from '../appContext';
+import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
 import DangerConfirmation from '../components/DangerConfirmation.vue';
 import EmptyState from '../components/EmptyState.vue';
 import FormField from '../components/FormField.vue';
 import InlineError from '../components/InlineError.vue';
 import SectionLoading from '../components/SectionLoading.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import StaleDataNotice from '../components/StaleDataNotice.vue';
 import ManualRunPreflight from '../components/account/ManualRunPreflight.vue';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
@@ -41,6 +43,17 @@ const selectedTemplate = computed(() =>
 watch(app.refreshVersion, () => {
   void templates.load();
   void refreshPreflight();
+});
+watch(workspace.accountId, () => {
+  cancelPreflight();
+  requestNumber += 1;
+  selectedTemplateId.value = '';
+  preflight.value = null;
+  preflightError.value = '';
+  acknowledged.value = false;
+  confirmationOpen.value = false;
+  accepted.value = null;
+  requestUncertain.value = false;
 });
 useRealtimeRefresh(app.realtime, invalidatesWorkspaceTemplates, () => void templates.load());
 useRealtimeRefresh(
@@ -166,12 +179,19 @@ onBeforeUnmount(cancelPreflight);
       <StatusBadge status="WARN" label="Confirmation required" />
     </section>
 
+    <BackgroundRefreshIndicator v-if="templates.refreshing.value" />
+    <StaleDataNotice
+      v-if="templates.refreshError.value"
+      :message="templates.refreshError.value.message"
+      @retry="templates.load"
+    />
+
     <SectionLoading
       v-if="templates.loading.value && templates.data.value === null"
       label="Loading templates…"
     />
-    <section v-else-if="templates.error.value" class="section-error-stack">
-      <InlineError :message="templates.error.value.message" />
+    <section v-else-if="templates.initialError.value" class="section-error-stack">
+      <InlineError :message="templates.initialError.value.message" />
       <button class="button button--secondary" type="button" @click="templates.load">Retry</button>
     </section>
     <EmptyState

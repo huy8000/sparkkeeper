@@ -4,10 +4,12 @@ import { useRoute, useRouter } from 'vue-router';
 
 import { useAdminApp } from '../appContext';
 import { invalidatesRunList } from '../api/realtimeInvalidation';
+import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
 import EmptyState from '../components/EmptyState.vue';
 import PageError from '../components/PageError.vue';
 import RunStatusBadge from '../components/RunStatusBadge.vue';
 import Skeleton from '../components/Skeleton.vue';
+import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
 import { statusLabel } from '../statusLabels';
@@ -139,19 +141,22 @@ async function resetFilters(): Promise<void> {
       </div>
     </form>
 
+    <BackgroundRefreshIndicator v-if="runs.refreshing.value" />
+    <StaleDataNotice
+      v-if="runs.refreshError.value"
+      :message="runs.refreshError.value.message"
+      @retry="runs.load"
+    />
+
     <PageError
-      v-if="runs.error.value"
+      v-if="runs.initialError.value"
       title="Unable to load runs"
-      :message="runs.error.value.message"
+      :message="runs.initialError.value.message"
       retry-label="Try loading again"
       @retry="runs.load"
     />
 
-    <div
-      v-else-if="runs.loading.value && runs.data.value === null"
-      class="runs-skeleton"
-      aria-busy="true"
-    >
+    <div v-else-if="runs.initialLoading.value" class="runs-skeleton" aria-busy="true">
       <Skeleton v-for="index in 5" :key="index" height="44px" label="Loading runs…" />
     </div>
 

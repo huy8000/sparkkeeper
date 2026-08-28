@@ -2,7 +2,9 @@
 import { onBeforeUnmount, ref, watch } from 'vue';
 
 import { ApiError } from '../api/client';
+import { REALTIME_REFRESH_DELAY_MS } from '../api/realtimePolicy';
 import { useAdminApp } from '../appContext';
+import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
 import DangerConfirmation from '../components/DangerConfirmation.vue';
 import Drawer from '../components/Drawer.vue';
 import EmptyState from '../components/EmptyState.vue';
@@ -11,6 +13,7 @@ import PageError from '../components/PageError.vue';
 import SectionLoading from '../components/SectionLoading.vue';
 import Skeleton from '../components/Skeleton.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import StaleDataNotice from '../components/StaleDataNotice.vue';
 import TemplateEditor from '../components/template/TemplateEditor.vue';
 import { useDebouncedAction } from '../composables/useDebouncedAction';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
@@ -49,7 +52,7 @@ watch(app.refreshVersion, () => {
 useRealtimeRefresh(app.realtime, isTemplateConfigurationEvent, () => void templates.load());
 const detailRefresh = useDebouncedAction(() => {
   if (drawerOpen.value && editorMode.value === 'edit' && !editorDirty.value) void loadDetail();
-});
+}, REALTIME_REFRESH_DELAY_MS);
 const unsubscribeRealtime = app.realtime.subscribe((event) => {
   if (
     !isTemplateConfigurationEvent(event) ||
@@ -209,8 +212,15 @@ onBeforeUnmount(() => {
       </p>
     </section>
 
+    <BackgroundRefreshIndicator v-if="templates.refreshing.value" />
+    <StaleDataNotice
+      v-if="templates.refreshError.value"
+      :message="templates.refreshError.value.message"
+      @retry="templates.load"
+    />
+
     <section
-      v-if="templates.loading.value && templates.data.value === null"
+      v-if="templates.initialLoading.value"
       class="template-list-skeleton"
       aria-label="Loading templates"
       aria-busy="true"
@@ -223,9 +233,9 @@ onBeforeUnmount(() => {
     </section>
 
     <PageError
-      v-else-if="templates.error.value"
+      v-else-if="templates.initialError.value"
       title="Unable to load templates"
-      :message="templates.error.value.message"
+      :message="templates.initialError.value.message"
       @retry="templates.load"
     />
 
@@ -303,7 +313,15 @@ onBeforeUnmount(() => {
         </div>
       </section>
       <template v-else>
-        <InlineError v-if="detailError" :message="detailError" />
+        <BackgroundRefreshIndicator
+          v-if="detailLoading && detail !== null"
+          label="Refreshing template editor…"
+        />
+        <StaleDataNotice
+          v-if="detailError && detail !== null"
+          :message="detailError"
+          @retry="loadDetail"
+        />
         <TemplateEditor
           :template="editorMode === 'edit' ? (detail ?? undefined) : undefined"
           :submitting="submitting"

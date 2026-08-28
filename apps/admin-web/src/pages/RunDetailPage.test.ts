@@ -14,6 +14,8 @@ import { FakeEventSource, installEventSource, readyEvent, runtimeEvent } from '.
 
 const RUN_PATH = `/runs/${RUN_ID}`;
 const RUN_API = `/api/runs/${RUN_ID}`;
+const RUN_B_ID = '00000000-0000-4000-8000-000000000099';
+const RUN_B_API = `/api/runs/${RUN_B_ID}`;
 const SECONDARY_PATHS = [
   `${RUN_API}/send-records`,
   `${RUN_API}/events`,
@@ -330,6 +332,29 @@ describe('Run detail', () => {
     withFriendsError.unmount();
   });
 
+  it('retains a secondary snapshot after a later section refresh fails', async () => {
+    let eventReads = 0;
+    installApiFetch((url) => {
+      if (url.pathname !== `${RUN_API}/events`) return undefined;
+      eventReads += 1;
+      return eventReads === 1
+        ? success([systemEventFixture])
+        : failure('EVENT_REFRESH_FAILED', 'Latest timeline could not be loaded.', 503);
+    });
+    const wrapper = await mountAdmin(RUN_PATH);
+    await wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'Refresh')!
+      .trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain(systemEventFixture.message);
+    expect(wrapper.text()).toContain('Latest timeline could not be loaded.');
+    expect(wrapper.find('.timeline').exists()).toBe(true);
+    expect(wrapper.find('.page-error').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it('survives every secondary failing at once without a blank page', async () => {
     installApiFetch((url) =>
       SECONDARY_PATHS.includes(url.pathname)
@@ -424,6 +449,54 @@ describe('Run detail', () => {
 
     expect(wrapper.text()).toContain('Verified Success');
     expect(wrapper.text()).not.toContain('Running · Live');
+    wrapper.unmount();
+  });
+
+  it('keeps REST authoritative when an SSE completion signal still refreshes to RUNNING', async () => {
+    const fetchMock = installApiFetch((url) =>
+      url.pathname === RUN_API ? success(runWith('RUNNING')) : undefined,
+    );
+    installEventSource();
+    const wrapper = await mountAdmin(RUN_PATH);
+    vi.useFakeTimers();
+    FakeEventSource.instances[0]!.emit('runtime', runtimeEvent(RUN_ID, 'RUN_FINISHED'));
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    vi.useRealTimers();
+
+    expect(runDetailCalls(fetchMock)).toHaveLength(2);
+    expect(wrapper.text()).toContain('Running · Live');
+    expect(wrapper.text()).not.toContain('Verified Success');
+    wrapper.unmount();
+  });
+
+  it('switches Run A to Run B and ignores a late A secondary response', async () => {
+    let resolveAEvents!: (response: Response) => void;
+    const pendingAEvents = new Promise<Response>((resolve) => {
+      resolveAEvents = resolve;
+    });
+    installApiFetch((url) => {
+      if (url.pathname === `${RUN_API}/events`) return pendingAEvents;
+      if (url.pathname === RUN_B_API) {
+        return success({ ...runFixture, id: RUN_B_ID, businessDate: '2026-01-03' });
+      }
+      if (url.pathname === `${RUN_B_API}/send-records`) return success([]);
+      if (url.pathname === `${RUN_B_API}/events`) {
+        return success([{ ...systemEventFixture, message: 'Run B event.' }]);
+      }
+      return undefined;
+    });
+    const wrapper = await mountAdmin(RUN_PATH);
+    const router = (wrapper.vm as unknown as { $router: { push: (path: string) => Promise<void> } })
+      .$router;
+    await router.push(`/runs/${RUN_B_ID}`);
+    await flushPromises();
+    resolveAEvents(success([{ ...systemEventFixture, message: 'Late Run A event.' }]));
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('2026-01-03');
+    expect(wrapper.text()).toContain('Run B event.');
+    expect(wrapper.text()).not.toContain('Late Run A event.');
     wrapper.unmount();
   });
 

@@ -33,6 +33,30 @@ describe('RealtimeClient', () => {
     expect(source.closed).toBe(true);
   });
 
+  it('shares one EventSource across multiple event and state subscribers', () => {
+    const source = new FakeEventSource('/api/events/stream');
+    const factory = vi.fn(() => source);
+    const client = new RealtimeClient('/api/events/stream', factory);
+    const first = vi.fn();
+    const second = vi.fn();
+    const firstState = vi.fn();
+    const secondState = vi.fn();
+    client.subscribe(first);
+    client.subscribe(second);
+    client.subscribeState(firstState);
+    client.subscribeState(secondState);
+
+    client.connect();
+    client.connect();
+    source.emit('runtime', runtimeEvent(RUN_ID));
+
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(firstState).toHaveBeenCalledWith('CONNECTING');
+    expect(secondState).toHaveBeenCalledWith('CONNECTING');
+  });
+
   it('ignores malformed, mismatched, and unknown events without exposing raw payloads', () => {
     const source = new FakeEventSource('/api/events/stream');
     const client = new RealtimeClient('/api/events/stream', () => source);

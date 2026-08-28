@@ -5,12 +5,14 @@ import { invalidatesWorkspaceFriends } from '../api/accountWorkspaceInvalidation
 import { ApiError } from '../api/client';
 import { useAccountWorkspace } from '../accountWorkspaceContext';
 import { useAdminApp } from '../appContext';
+import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
 import Drawer from '../components/Drawer.vue';
 import EmptyState from '../components/EmptyState.vue';
 import FriendForm from '../components/FriendForm.vue';
 import InlineError from '../components/InlineError.vue';
 import RunStatusBadge from '../components/RunStatusBadge.vue';
 import SectionLoading from '../components/SectionLoading.vue';
+import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
 import { useToasts } from '../composables/useToasts';
@@ -103,12 +105,19 @@ function identityConfigured(friend: Friend): boolean {
       <button class="button button--primary" type="button" @click="beginCreate">Add friend</button>
     </header>
 
+    <BackgroundRefreshIndicator v-if="friends.refreshing.value" />
+    <StaleDataNotice
+      v-if="friends.refreshError.value"
+      :message="friends.refreshError.value.message"
+      @retry="friends.load"
+    />
+
     <SectionLoading
       v-if="friends.loading.value && friends.data.value === null"
       label="Loading friends…"
     />
-    <section v-else-if="friends.error.value" class="section-error-stack">
-      <InlineError :message="friends.error.value.message" />
+    <section v-else-if="friends.initialError.value" class="section-error-stack">
+      <InlineError :message="friends.initialError.value.message" />
       <button class="button button--secondary" type="button" @click="friends.load">Retry</button>
     </section>
     <EmptyState

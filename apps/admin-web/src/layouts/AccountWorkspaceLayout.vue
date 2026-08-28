@@ -8,9 +8,12 @@ import { accountWorkspaceContextKey } from '../accountWorkspaceContext';
 import { useAdminApp } from '../appContext';
 import AccountForm from '../components/AccountForm.vue';
 import AuthStatusBadge from '../components/AuthStatusBadge.vue';
+import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
+import DangerConfirmation from '../components/DangerConfirmation.vue';
 import Drawer from '../components/Drawer.vue';
 import PageError from '../components/PageError.vue';
 import Skeleton from '../components/Skeleton.vue';
+import StaleDataNotice from '../components/StaleDataNotice.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
@@ -25,15 +28,24 @@ const account = useRequest((signal) => app.api.getAccount(accountId.value, signa
 const settingsOpen = ref(false);
 const submitting = ref(false);
 const formError = ref('');
+const formDirty = ref(false);
+const serverChanged = ref(false);
+const reloadConfirmationOpen = ref(false);
 
 provide(accountWorkspaceContextKey, { accountId, account });
 
-watch(accountId, () => void account.load());
-watch(app.refreshVersion, () => void account.load());
+watch(accountId, () => {
+  settingsOpen.value = false;
+  formDirty.value = false;
+  serverChanged.value = false;
+  account.reset();
+  void account.load();
+});
+watch(app.refreshVersion, () => void refreshAccount());
 useRealtimeRefresh(
   app.realtime,
   (event) => invalidatesWorkspaceAccount(event, accountId.value),
-  () => void account.load(),
+  () => void refreshAccount(),
 );
 
 const tabs = computed(() => [
@@ -46,6 +58,8 @@ const tabs = computed(() => [
 
 function openSettings(): void {
   formError.value = '';
+  formDirty.value = false;
+  serverChanged.value = false;
   settingsOpen.value = true;
 }
 
@@ -53,6 +67,28 @@ function closeSettings(): void {
   if (submitting.value) return;
   settingsOpen.value = false;
   formError.value = '';
+  formDirty.value = false;
+  serverChanged.value = false;
+  reloadConfirmationOpen.value = false;
+}
+
+async function refreshAccount(force = false): Promise<void> {
+  if (!force && settingsOpen.value && formDirty.value) {
+    serverChanged.value = true;
+    return;
+  }
+  await account.load();
+}
+
+function requestServerReload(): void {
+  if (formDirty.value) reloadConfirmationOpen.value = true;
+  else void refreshAccount(true);
+}
+
+async function confirmServerReload(): Promise<void> {
+  reloadConfirmationOpen.value = false;
+  await refreshAccount(true);
+  if (account.error.value === null) serverChanged.value = false;
 }
 
 async function saveAccount(input: CreateAccountInput): Promise<void> {
@@ -61,7 +97,7 @@ async function saveAccount(input: CreateAccountInput): Promise<void> {
   formError.value = '';
   try {
     await app.api.updateAccount(accountId.value, input);
-    await account.load();
+    await refreshAccount(true);
     settingsOpen.value = false;
     toasts.notify('success', 'Account settings saved.');
   } catch (error) {
@@ -105,7 +141,18 @@ async function saveAccount(input: CreateAccountInput): Promise<void> {
       </div>
     </header>
 
-    <nav v-if="account.error.value === null" class="account-tabs" aria-label="Account workspace">
+    <BackgroundRefreshIndicator v-if="account.refreshing.value" />
+    <StaleDataNotice
+      v-if="account.refreshError.value"
+      :message="account.refreshError.value.message"
+      @retry="refreshAccount(true)"
+    />
+
+    <nav
+      v-if="account.initialError.value === null"
+      class="account-tabs"
+      aria-label="Account workspace"
+    >
       <RouterLink
         v-for="tab in tabs"
         :key="tab.path"
@@ -118,18 +165,20 @@ async function saveAccount(input: CreateAccountInput): Promise<void> {
     </nav>
 
     <PageError
-      v-if="account.error.value"
+      v-if="account.initialError.value"
       :title="
-        account.error.value.httpStatus === 404 ? 'Account not found' : 'Unable to load account'
+        account.initialError.value.httpStatus === 404
+          ? 'Account not found'
+          : 'Unable to load account'
       "
       :message="
-        account.error.value.httpStatus === 404
+        account.initialError.value.httpStatus === 404
           ? 'This account is not available.'
-          : account.error.value.message
+          : account.initialError.value.message
       "
       @retry="account.load"
     />
-    <RouterLink v-if="account.error.value" class="button button--secondary" to="/accounts">
+    <RouterLink v-if="account.initialError.value" class="button button--secondary" to="/accounts">
       Back to Accounts
     </RouterLink>
     <RouterView v-else-if="account.data.value" />
@@ -137,6 +186,19 @@ async function saveAccount(input: CreateAccountInput): Promise<void> {
     <Drawer :open="settingsOpen" title="Account settings" @close="closeSettings">
       <p class="drawer-intro">Only the account name and enabled state can be changed.</p>
       <p class="form-note">Login status is runtime state and cannot be edited here.</p>
+      <section v-if="serverChanged" class="notification-server-change" role="status">
+        <div>
+          <strong>Account settings changed on the server.</strong>
+          <span>Your unsaved values have not been replaced.</span>
+        </div>
+        <button
+          class="button button--secondary button--compact"
+          type="button"
+          @click="requestServerReload"
+        >
+          Reload
+        </button>
+      </section>
       <AccountForm
         v-if="account.data.value"
         :account="account.data.value"
@@ -144,7 +206,18 @@ async function saveAccount(input: CreateAccountInput): Promise<void> {
         :server-error="formError"
         @submit="saveAccount"
         @cancel="closeSettings"
+        @dirty-change="formDirty = $event"
       />
     </Drawer>
+
+    <DangerConfirmation
+      :open="reloadConfirmationOpen"
+      title="Reload account settings?"
+      description="Reloading will replace your unsaved values with the latest server configuration."
+      confirm-label="Discard and reload"
+      cancel-label="Keep editing"
+      @close="reloadConfirmationOpen = false"
+      @confirm="confirmServerReload"
+    />
   </div>
 </template>

@@ -9,10 +9,12 @@ import {
 import { useAccountWorkspace } from '../accountWorkspaceContext';
 import { useAdminApp } from '../appContext';
 import AuthStatusBadge from '../components/AuthStatusBadge.vue';
+import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
 import InlineError from '../components/InlineError.vue';
 import RunStatusBadge from '../components/RunStatusBadge.vue';
 import SectionLoading from '../components/SectionLoading.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
 import { formatTimestamp } from '../utils/format';
@@ -56,6 +58,20 @@ const latestRun = computed(() => {
     (right.startedAt ?? right.createdAt).localeCompare(left.startedAt ?? left.createdAt),
   )[0]!;
 });
+const isRefreshing = computed(
+  () =>
+    friends.refreshing.value ||
+    schedules.refreshing.value ||
+    runs.refreshing.value ||
+    app.runtime.refreshing.value,
+);
+const hasRefreshError = computed(
+  () =>
+    friends.refreshError.value !== null ||
+    schedules.refreshError.value !== null ||
+    runs.refreshError.value !== null ||
+    app.runtime.refreshError.value !== null,
+);
 </script>
 
 <template>
@@ -109,6 +125,13 @@ const latestRun = computed(() => {
       </div>
     </section>
 
+    <BackgroundRefreshIndicator v-if="isRefreshing" />
+    <StaleDataNotice
+      v-if="hasRefreshError"
+      message="Unable to refresh one or more account sections. Showing the last successful snapshots."
+      @retry="app.refresh"
+    />
+
     <div class="account-summary-grid">
       <section class="account-summary-card" aria-labelledby="friends-summary-title">
         <p class="eyebrow">Configuration</p>
@@ -117,7 +140,10 @@ const latestRun = computed(() => {
           v-if="friends.loading.value && friends.data.value === null"
           label="Loading friends summary…"
         />
-        <InlineError v-else-if="friends.error.value" :message="friends.error.value.message" />
+        <InlineError
+          v-else-if="friends.initialError.value"
+          :message="friends.initialError.value.message"
+        />
         <template v-else>
           <strong class="account-summary-card__value">{{ enabledFriendCount ?? 0 }}</strong>
           <span>enabled of {{ friends.data.value?.length ?? 0 }} configured</span>
@@ -134,7 +160,10 @@ const latestRun = computed(() => {
           v-if="schedules.loading.value && schedules.data.value === null"
           label="Loading schedule summary…"
         />
-        <InlineError v-else-if="schedules.error.value" :message="schedules.error.value.message" />
+        <InlineError
+          v-else-if="schedules.initialError.value"
+          :message="schedules.initialError.value.message"
+        />
         <template v-else-if="schedule">
           <StatusBadge :status="schedule.enabled ? 'ENABLED' : 'DISABLED'" />
           <strong>{{ schedule.startTime }}–{{ schedule.endTime }}</strong>
@@ -159,7 +188,10 @@ const latestRun = computed(() => {
           v-if="runs.loading.value && runs.data.value === null"
           label="Loading latest run…"
         />
-        <InlineError v-else-if="runs.error.value" :message="runs.error.value.message" />
+        <InlineError
+          v-else-if="runs.initialError.value"
+          :message="runs.initialError.value.message"
+        />
         <template v-else-if="latestRun">
           <RunStatusBadge :status="latestRun.status" />
           <strong>{{ latestRun.businessDate }}</strong>
@@ -183,8 +215,8 @@ const latestRun = computed(() => {
           label="Loading browser summary…"
         />
         <InlineError
-          v-else-if="app.runtime.error.value"
-          :message="app.runtime.error.value.message"
+          v-else-if="app.runtime.initialError.value"
+          :message="app.runtime.initialError.value.message"
         />
         <template v-else-if="app.runtime.data.value">
           <StatusBadge

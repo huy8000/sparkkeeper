@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import { realtimeConnectionLabel } from '../api/realtimePolicy';
 import type { RealtimeConnectionState } from '../types/api';
 
 const props = defineProps<{ state: RealtimeConnectionState }>();
@@ -10,9 +11,16 @@ const props = defineProps<{ state: RealtimeConnectionState }>();
  * "Reconnecting". A dropped realtime link never blocks REST pages.
  */
 const indicator = computed(() => {
-  if (props.state === 'CONNECTED') return { label: 'Live', className: 'sse-status--live' };
-  if (props.state === 'DISCONNECTED') return { label: 'Offline', className: 'sse-status--offline' };
-  return { label: 'Reconnecting', className: 'sse-status--reconnecting' };
+  if (props.state === 'CONNECTED') {
+    return { label: realtimeConnectionLabel(props.state), className: 'sse-status--live' };
+  }
+  if (props.state === 'DISCONNECTED') {
+    return { label: realtimeConnectionLabel(props.state), className: 'sse-status--offline' };
+  }
+  return {
+    label: realtimeConnectionLabel(props.state),
+    className: 'sse-status--reconnecting',
+  };
 });
 </script>
 
