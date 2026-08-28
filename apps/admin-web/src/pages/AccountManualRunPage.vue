@@ -19,10 +19,12 @@ import StaleDataNotice from '../components/StaleDataNotice.vue';
 import ManualRunPreflight from '../components/account/ManualRunPreflight.vue';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
+import { useTranslation } from '../i18n';
 import type { ManualRunAccepted, ManualRunPreflight as ManualRunPreflightDto } from '../types/api';
 
 const app = useAdminApp();
 const workspace = useAccountWorkspace();
+const { t } = useTranslation();
 const templates = useRequest((signal) => app.api.listTemplates(signal));
 const selectedTemplateId = ref('');
 const preflight = ref<ManualRunPreflightDto | null>(null);
@@ -103,7 +105,7 @@ async function refreshPreflight(): Promise<void> {
       !(error instanceof ApiError && error.kind === 'ABORT')
     ) {
       preflightError.value =
-        error instanceof ApiError ? error.message : 'Unable to complete Manual Run preflight.';
+        error instanceof ApiError ? error.message : t('manualRunPage.preflightGenericError');
     }
   } finally {
     if (currentRequest === requestNumber) preflightLoading.value = false;
@@ -161,22 +163,21 @@ onBeforeUnmount(cancelPreflight);
   <div class="page-stack account-tab-page">
     <header class="account-tab-heading">
       <div>
-        <p class="eyebrow">Manual Run</p>
-        <h3>Server-authorized execution</h3>
-        <p>Preflight is authoritative. This page never bypasses server gates or idempotency.</p>
+        <p class="eyebrow">{{ t('manualRunPage.eyebrow') }}</p>
+        <h3>{{ t('manualRunPage.title') }}</h3>
+        <p>{{ t('manualRunPage.subtitle') }}</p>
       </div>
     </header>
 
     <section class="manual-run-safety" aria-labelledby="manual-run-safety-title">
       <div>
-        <p class="eyebrow">Real external side effect</p>
-        <h3 id="manual-run-safety-title">A Manual Run may send real messages</h3>
+        <p class="eyebrow">{{ t('manualRunPage.safetyEyebrow') }}</p>
+        <h3 id="manual-run-safety-title">{{ t('manualRunPage.safetyTitle') }}</h3>
         <p>
-          Select a template to ask the server whether this account can run. No run starts until you
-          acknowledge the effect and confirm the final action.
+          {{ t('manualRunPage.safetyDescription') }}
         </p>
       </div>
-      <StatusBadge status="WARN" label="Confirmation required" />
+      <StatusBadge status="WARN" :label="t('manualRunPage.confirmationRequired')" />
     </section>
 
     <BackgroundRefreshIndicator v-if="templates.refreshing.value" />
@@ -188,25 +189,29 @@ onBeforeUnmount(cancelPreflight);
 
     <SectionLoading
       v-if="templates.loading.value && templates.data.value === null"
-      label="Loading templates…"
+      :label="t('manualRunPage.templatesLoading')"
     />
     <section v-else-if="templates.initialError.value" class="section-error-stack">
       <InlineError :message="templates.initialError.value.message" />
-      <button class="button button--secondary" type="button" @click="templates.load">Retry</button>
+      <button class="button button--secondary" type="button" @click="templates.load">
+        {{ t('common.retry') }}
+      </button>
     </section>
     <EmptyState
       v-else-if="templates.data.value?.length === 0"
-      title="No templates configured"
-      description="Configure a template before requesting Manual Run preflight."
+      :title="t('manualRunPage.templatesEmptyTitle')"
+      :description="t('manualRunPage.templatesEmptyDescription')"
     >
       <template #action>
-        <RouterLink class="button button--secondary" to="/templates">Manage templates</RouterLink>
+        <RouterLink class="button button--secondary" to="/templates">{{
+          t('manualRunPage.manageTemplates')
+        }}</RouterLink>
       </template>
     </EmptyState>
     <template v-else>
       <FormField
-        label="Template"
-        help-text="Disabled templates remain visible; server preflight decides whether the selection can run."
+        :label="t('manualRunPage.templateLabel')"
+        :help-text="t('manualRunPage.templateHelp')"
       >
         <template #default="{ fieldId, describedBy }">
           <select
@@ -217,35 +222,37 @@ onBeforeUnmount(cancelPreflight);
             :disabled="submitting || requestUncertain || accepted !== null"
             @change="chooseTemplate"
           >
-            <option value="">Select a template</option>
+            <option value="">{{ t('manualRunPage.selectTemplate') }}</option>
             <option
               v-for="template in templates.data.value ?? []"
               :key="template.id"
               :value="template.id"
             >
-              {{ template.name }}{{ template.enabled ? '' : ' — Disabled' }}
+              {{ template.name }}{{ template.enabled ? '' : t('manualRunPage.disabledSuffix') }}
             </option>
           </select>
         </template>
       </FormField>
 
-      <SectionLoading v-if="preflightLoading" label="Checking Manual Run preflight…" />
+      <SectionLoading v-if="preflightLoading" :label="t('manualRunPage.preflightChecking')" />
       <InlineError v-if="preflightError" :message="preflightError" />
 
       <section v-if="requestUncertain" class="manual-result manual-result--uncertain" role="alert">
-        <p class="eyebrow">Manual Run request</p>
-        <h3>Request result is uncertain.</h3>
-        <p>Do not retry automatically.</p>
-        <p>Check Runs to confirm whether a run was accepted.</p>
-        <RouterLink class="button button--secondary" to="/runs">View Runs</RouterLink>
+        <p class="eyebrow">{{ t('manualRunPage.uncertainEyebrow') }}</p>
+        <h3>{{ t('manualRunPage.uncertainTitle') }}</h3>
+        <p>{{ t('manualRunPage.uncertainNoRetry') }}</p>
+        <p>{{ t('manualRunPage.uncertainCheckRuns') }}</p>
+        <RouterLink class="button button--secondary" to="/runs">{{
+          t('manualRunPage.viewRuns')
+        }}</RouterLink>
       </section>
 
       <section v-else-if="accepted" class="manual-result manual-result--accepted" role="status">
         <p class="eyebrow">202 Accepted</p>
-        <h3>Run accepted</h3>
-        <p>The background task is now managed by the server. Acceptance does not prove delivery.</p>
+        <h3>{{ t('manualRunPage.acceptedTitle') }}</h3>
+        <p>{{ t('manualRunPage.acceptedDescription') }}</p>
         <RouterLink class="button button--primary" :to="`/runs/${accepted.runId}`">
-          View live run
+          {{ t('manualRunPage.viewLiveRun') }}
         </RouterLink>
       </section>
 
@@ -253,33 +260,35 @@ onBeforeUnmount(cancelPreflight);
         v-else-if="preflight"
         v-model:acknowledged="acknowledged"
         :preflight="preflight"
-        :account-name="workspace.account.data.value?.name ?? 'Account'"
-        :template-name="selectedTemplate?.name ?? 'Selected template'"
+        :account-name="workspace.account.data.value?.name ?? t('manualRunPage.accountFallback')"
+        :template-name="selectedTemplate?.name ?? t('manualRunPage.templateFallback')"
         @start="reviewStart"
       />
     </template>
 
     <DangerConfirmation
       :open="confirmationOpen"
-      title="Start Manual Run?"
-      description="This action may send real messages. Confirm the reviewed account, template, and enabled friend count before starting."
-      :confirm-label="submitting ? 'Starting…' : 'Start Manual Run'"
-      cancel-label="Cancel"
+      :title="t('manualRunPage.confirmTitle')"
+      :description="t('manualRunPage.confirmDescription')"
+      :confirm-label="
+        submitting ? t('manualRunPage.confirmStarting') : t('manualRunPage.confirmStart')
+      "
+      :cancel-label="t('common.cancel')"
       :pending="submitting"
       @close="closeConfirmation"
       @confirm="startManualRun"
     >
       <dl v-if="preflight" class="confirmation-summary">
         <div>
-          <dt>Account</dt>
-          <dd>{{ workspace.account.data.value?.name ?? 'Account' }}</dd>
+          <dt>{{ t('common.account') }}</dt>
+          <dd>{{ workspace.account.data.value?.name ?? t('manualRunPage.accountFallback') }}</dd>
         </div>
         <div>
-          <dt>Template</dt>
-          <dd>{{ selectedTemplate?.name ?? 'Selected template' }}</dd>
+          <dt>{{ t('manualRunPage.summaryTemplate') }}</dt>
+          <dd>{{ selectedTemplate?.name ?? t('manualRunPage.templateFallback') }}</dd>
         </div>
         <div>
-          <dt>Enabled friends</dt>
+          <dt>{{ t('manualRunPage.summaryEnabledFriends') }}</dt>
           <dd>{{ preflight.enabledFriendCount }}</dd>
         </div>
       </dl>

@@ -10,9 +10,11 @@ import OverviewQuickActions from '../components/overview/OverviewQuickActions.vu
 import OverviewRuntimeSummary from '../components/overview/OverviewRuntimeSummary.vue';
 import OverviewTodaySummary from '../components/overview/OverviewTodaySummary.vue';
 import { useOverview } from '../composables/useOverview';
+import { currentLocale, useTranslation } from '../i18n';
 
 const app = useAdminApp();
 const overview = useOverview();
+const { t } = useTranslation();
 
 const todayError = computed(
   () =>
@@ -47,21 +49,21 @@ const sortedRuns = computed(() =>
 const timezone = computed(() => app.runtime.data.value?.timezone ?? null);
 const dateLabel = computed(() =>
   overview.businessDate.value === null
-    ? 'Business date unavailable'
+    ? t('overview.hero.businessDateUnavailable')
     : formatBusinessDate(overview.businessDate.value),
 );
 const greeting = computed(() => greetingForTimeZone(new Date(), timezone.value));
 
 function formatBusinessDate(value: string): string {
   const [year, month, day] = value.split('-').map(Number);
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(currentLocale(), {
     dateStyle: 'full',
     timeZone: 'UTC',
   }).format(new Date(Date.UTC(year!, month! - 1, day!)));
 }
 
 function greetingForTimeZone(now: Date, timeZone: string | null): string {
-  if (timeZone === null) return 'Welcome back.';
+  if (timeZone === null) return t('overview.hero.welcome');
   const hour = Number(
     new Intl.DateTimeFormat('en-US', {
       timeZone,
@@ -69,9 +71,9 @@ function greetingForTimeZone(now: Date, timeZone: string | null): string {
       hourCycle: 'h23',
     }).format(now),
   );
-  if (hour < 12) return 'Good morning.';
-  if (hour < 18) return 'Good afternoon.';
-  return 'Good evening.';
+  if (hour < 12) return t('overview.hero.greetingMorning');
+  if (hour < 18) return t('overview.hero.greetingAfternoon');
+  return t('overview.hero.greetingEvening');
 }
 </script>
 
@@ -79,14 +81,15 @@ function greetingForTimeZone(now: Date, timeZone: string | null): string {
   <div class="page-stack overview-page">
     <header class="overview-hero">
       <div>
-        <p class="eyebrow">Overview</p>
+        <p class="eyebrow">{{ t('overview.hero.eyebrow') }}</p>
         <h2>{{ greeting }}</h2>
-        <p>Here’s how SparkKeeper is running today.</p>
+        <p>{{ t('overview.hero.subtitle') }}</p>
       </div>
-      <div class="overview-hero__date" aria-label="Business date and timezone">
+      <div class="overview-hero__date" :aria-label="t('overview.hero.dateAria')">
         <strong>{{ dateLabel }}</strong>
         <span
-          >{{ overview.businessDate.value ?? '—' }} · {{ timezone ?? 'Timezone unavailable' }}</span
+          >{{ overview.businessDate.value ?? '—' }} ·
+          {{ timezone ?? t('overview.hero.timezoneUnavailable') }}</span
         >
       </div>
     </header>

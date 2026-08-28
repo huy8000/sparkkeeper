@@ -1,23 +1,33 @@
+<script setup lang="ts">
+import { useTranslation } from '../../i18n';
+
+const { t } = useTranslation();
+</script>
+
 <template>
   <section class="overview-section" aria-labelledby="quick-actions-title">
     <header class="overview-section__heading">
       <div>
-        <p class="eyebrow">Quick actions</p>
-        <h3 id="quick-actions-title">Go to</h3>
+        <p class="eyebrow">{{ t('overview.quickActions.eyebrow') }}</p>
+        <h3 id="quick-actions-title">{{ t('overview.quickActions.title') }}</h3>
       </div>
     </header>
-    <nav class="quick-actions" aria-label="Overview quick actions">
+    <nav class="quick-actions" :aria-label="t('overview.quickActions.navAria')">
       <RouterLink to="/accounts"
-        ><strong>Manage accounts</strong><span>Account settings and login state</span></RouterLink
+        ><strong>{{ t('overview.quickActions.accountsTitle') }}</strong
+        ><span>{{ t('overview.quickActions.accountsDescription') }}</span></RouterLink
       >
       <RouterLink to="/templates"
-        ><strong>Manage templates</strong><span>Safe message configuration</span></RouterLink
+        ><strong>{{ t('overview.quickActions.templatesTitle') }}</strong
+        ><span>{{ t('overview.quickActions.templatesDescription') }}</span></RouterLink
       >
       <RouterLink to="/runs"
-        ><strong>View runs</strong><span>Read-only execution history</span></RouterLink
+        ><strong>{{ t('overview.quickActions.runsTitle') }}</strong
+        ><span>{{ t('overview.quickActions.runsDescription') }}</span></RouterLink
       >
       <RouterLink to="/operations/system"
-        ><strong>System status</strong><span>Technical health and readiness</span></RouterLink
+        ><strong>{{ t('overview.quickActions.systemTitle') }}</strong
+        ><span>{{ t('overview.quickActions.systemDescription') }}</span></RouterLink
       >
     </nav>
   </section>

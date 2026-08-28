@@ -1,23 +1,36 @@
 import { describe, expect, it } from 'vitest';
 
-import { statusLabel, statusTone } from './statusLabels';
+import { i18n } from './i18n';
+import { statusFallbackLabel, statusLabelKey, statusTone } from './statusLabels';
 
-describe('status labels', () => {
-  it('maps every documented run and auth enum to human text', () => {
-    expect(statusLabel('SUCCESS')).toBe('Success');
-    expect(statusLabel('RUNNING')).toBe('Running');
-    expect(statusLabel('READY')).toBe('Ready');
-    expect(statusLabel('FAILED')).toBe('Failed');
-    expect(statusLabel('AUTH_EXPIRED')).toBe('Login expired');
-    expect(statusLabel('DELIVERY_UNKNOWN')).toBe('Delivery uncertain');
-    expect(statusLabel('RETRY_WAIT')).toBe('Waiting to retry');
-    expect(statusLabel('UNKNOWN')).toBe('Unknown');
-    expect(statusLabel('EMPTY')).toBe('No runs yet');
+describe('status label key map', () => {
+  it('maps every documented run and auth enum to a translation key', () => {
+    expect(statusLabelKey('SUCCESS')).toBe('status.success');
+    expect(statusLabelKey('RUNNING')).toBe('status.running');
+    expect(statusLabelKey('READY')).toBe('status.ready');
+    expect(statusLabelKey('FAILED')).toBe('status.failed');
+    expect(statusLabelKey('AUTH_EXPIRED')).toBe('status.authExpired');
+    expect(statusLabelKey('DELIVERY_UNKNOWN')).toBe('status.deliveryUnknown');
+    expect(statusLabelKey('RETRY_WAIT')).toBe('status.retryWait');
+    expect(statusLabelKey('UNKNOWN')).toBe('status.unknown');
+    expect(statusLabelKey('EMPTY')).toBe('status.empty');
+  });
+
+  it('resolves safety-critical labels in both locales from the single map', () => {
+    const t = i18n.global.t;
+    expect(t(statusLabelKey('AUTH_EXPIRED')!)).toBe('Login expired');
+    expect(t(statusLabelKey('DELIVERY_UNKNOWN')!)).toBe('Delivery uncertain');
+    expect(t(statusLabelKey('RETRY_WAIT')!)).toBe('Waiting to retry');
+    i18n.global.locale.value = 'zh-CN';
+    expect(t(statusLabelKey('AUTH_EXPIRED')!)).toBe('登录已失效');
+    expect(t(statusLabelKey('DELIVERY_UNKNOWN')!)).toBe('发送结果不确定');
+    expect(t(statusLabelKey('RETRY_WAIT')!)).toBe('等待重试');
   });
 
   it('prettifies unknown statuses instead of dropping them', () => {
-    expect(statusLabel('SOME_FUTURE_STATE')).toBe('Some future state');
-    expect(statusLabel('')).toBe('Unknown');
+    expect(statusLabelKey('SOME_FUTURE_STATE')).toBeUndefined();
+    expect(statusFallbackLabel('SOME_FUTURE_STATE')).toBe('Some future state');
+    expect(statusFallbackLabel('')).toBe('');
   });
 
   it('maps every documented enum to a presentation tone', () => {

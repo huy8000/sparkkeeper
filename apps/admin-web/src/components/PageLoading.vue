@@ -1,5 +1,9 @@
 <script setup lang="ts">
-withDefaults(defineProps<{ label?: string }>(), { label: 'Loading page…' });
+import { useTranslation } from '../i18n';
+
+defineProps<{ label?: string }>();
+
+const { t } = useTranslation();
 </script>
 
 <template>
@@ -10,6 +14,6 @@ withDefaults(defineProps<{ label?: string }>(), { label: 'Loading page…' });
       <span class="skeleton skeleton--block" />
       <span class="skeleton skeleton--block" />
     </div>
-    <p class="page-loading__label">{{ label }}</p>
+    <p class="page-loading__label">{{ label ?? t('common.loadingPage') }}</p>
   </div>
 </template>

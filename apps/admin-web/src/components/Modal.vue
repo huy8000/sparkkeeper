@@ -3,6 +3,8 @@
 /* global document, HTMLElement, KeyboardEvent */
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
 
+import { useTranslation } from '../i18n';
+
 const props = defineProps<{
   open: boolean;
   title: string;
@@ -10,6 +12,7 @@ const props = defineProps<{
   compact?: boolean;
 }>();
 const emit = defineEmits<{ close: [] }>();
+const { t } = useTranslation();
 const dialog = ref<HTMLElement | null>(null);
 let previousFocus: HTMLElement | null = null;
 
@@ -59,7 +62,7 @@ onBeforeUnmount(() => {
           <button
             class="modal-card__dismiss"
             type="button"
-            aria-label="Close dialog"
+            :aria-label="t('common.closeDialog')"
             @click="$emit('close')"
           >
             ×

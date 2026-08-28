@@ -18,11 +18,13 @@ import StatusBadge from '../components/StatusBadge.vue';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
 import { useToasts } from '../composables/useToasts';
+import { useTranslation } from '../i18n';
 import type { CreateAccountInput } from '../types/api';
 
 const app = useAdminApp();
 const route = useRoute();
 const toasts = useToasts();
+const { t } = useTranslation();
 const accountId = computed(() => String(route.params.accountId));
 const account = useRequest((signal) => app.api.getAccount(accountId.value, signal));
 const settingsOpen = ref(false);
@@ -49,11 +51,11 @@ useRealtimeRefresh(
 );
 
 const tabs = computed(() => [
-  { label: 'Overview', path: `/accounts/${accountId.value}/overview` },
-  { label: 'Friends', path: `/accounts/${accountId.value}/friends` },
-  { label: 'Schedule', path: `/accounts/${accountId.value}/schedule` },
-  { label: 'Manual Run', path: `/accounts/${accountId.value}/manual-run` },
-  { label: 'History', path: `/accounts/${accountId.value}/history` },
+  { labelKey: 'nav.overview', path: `/accounts/${accountId.value}/overview` },
+  { labelKey: 'account.friendsTab', path: `/accounts/${accountId.value}/friends` },
+  { labelKey: 'account.scheduleTab', path: `/accounts/${accountId.value}/schedule` },
+  { labelKey: 'account.manualRunTab', path: `/accounts/${accountId.value}/manual-run` },
+  { labelKey: 'account.historyTab', path: `/accounts/${accountId.value}/history` },
 ]);
 
 function openSettings(): void {
@@ -99,11 +101,10 @@ async function saveAccount(input: CreateAccountInput): Promise<void> {
     await app.api.updateAccount(accountId.value, input);
     await refreshAccount(true);
     settingsOpen.value = false;
-    toasts.notify('success', 'Account settings saved.');
+    toasts.notify('success', t('account.savedToast'));
   } catch (error) {
-    formError.value =
-      error instanceof ApiError ? error.message : 'Account settings could not be saved.';
-    toasts.notify('error', 'Account settings could not be saved.');
+    formError.value = error instanceof ApiError ? error.message : t('account.saveErrorToast');
+    toasts.notify('error', t('account.saveErrorToast'));
   } finally {
     submitting.value = false;
   }
@@ -112,32 +113,34 @@ async function saveAccount(input: CreateAccountInput): Promise<void> {
 
 <template>
   <div class="page-stack account-workspace">
-    <RouterLink class="account-workspace__back" to="/accounts">← Accounts</RouterLink>
+    <RouterLink class="account-workspace__back" to="/accounts">{{
+      t('account.backToAccounts')
+    }}</RouterLink>
 
     <header class="account-workspace__header">
       <div
         v-if="account.loading.value && account.data.value === null"
         class="account-header-loading"
       >
-        <Skeleton width="240px" height="30px" label="Loading account header…" />
+        <Skeleton width="240px" height="30px" :label="t('account.headerLoading')" />
         <Skeleton width="180px" />
       </div>
       <template v-else-if="account.data.value">
         <div>
-          <p class="eyebrow">Account workspace</p>
+          <p class="eyebrow">{{ t('account.workspaceEyebrow') }}</p>
           <h2>{{ account.data.value.name }}</h2>
-          <div class="account-workspace__statuses" aria-label="Account status">
+          <div class="account-workspace__statuses" :aria-label="t('account.statusAria')">
             <AuthStatusBadge :status="account.data.value.loginStatus" />
             <StatusBadge :status="account.data.value.enabled ? 'ENABLED' : 'DISABLED'" />
           </div>
         </div>
         <button class="button button--secondary" type="button" @click="openSettings">
-          Account settings
+          {{ t('account.settings') }}
         </button>
       </template>
       <div v-else>
-        <p class="eyebrow">Account workspace</p>
-        <h2>Account unavailable</h2>
+        <p class="eyebrow">{{ t('account.workspaceEyebrow') }}</p>
+        <h2>{{ t('account.unavailableTitle') }}</h2>
       </div>
     </header>
 
@@ -151,7 +154,7 @@ async function saveAccount(input: CreateAccountInput): Promise<void> {
     <nav
       v-if="account.initialError.value === null"
       class="account-tabs"
-      aria-label="Account workspace"
+      :aria-label="t('account.workspaceEyebrow')"
     >
       <RouterLink
         v-for="tab in tabs"
@@ -160,7 +163,7 @@ async function saveAccount(input: CreateAccountInput): Promise<void> {
         class="account-tabs__link"
         exact-active-class="account-tabs__link--active"
       >
-        {{ tab.label }}
+        {{ t(tab.labelKey) }}
       </RouterLink>
     </nav>
 
@@ -168,35 +171,35 @@ async function saveAccount(input: CreateAccountInput): Promise<void> {
       v-if="account.initialError.value"
       :title="
         account.initialError.value.httpStatus === 404
-          ? 'Account not found'
-          : 'Unable to load account'
+          ? t('account.notFoundTitle')
+          : t('account.errorTitle')
       "
       :message="
         account.initialError.value.httpStatus === 404
-          ? 'This account is not available.'
+          ? t('account.notFoundMessage')
           : account.initialError.value.message
       "
       @retry="account.load"
     />
     <RouterLink v-if="account.initialError.value" class="button button--secondary" to="/accounts">
-      Back to Accounts
+      {{ t('account.backToList') }}
     </RouterLink>
     <RouterView v-else-if="account.data.value" />
 
-    <Drawer :open="settingsOpen" title="Account settings" @close="closeSettings">
-      <p class="drawer-intro">Only the account name and enabled state can be changed.</p>
-      <p class="form-note">Login status is runtime state and cannot be edited here.</p>
+    <Drawer :open="settingsOpen" :title="t('account.settings')" @close="closeSettings">
+      <p class="drawer-intro">{{ t('account.settingsIntro') }}</p>
+      <p class="form-note">{{ t('account.loginStatusNote') }}</p>
       <section v-if="serverChanged" class="notification-server-change" role="status">
         <div>
-          <strong>Account settings changed on the server.</strong>
-          <span>Your unsaved values have not been replaced.</span>
+          <strong>{{ t('account.serverChangedTitle') }}</strong>
+          <span>{{ t('account.serverChangedBody') }}</span>
         </div>
         <button
           class="button button--secondary button--compact"
           type="button"
           @click="requestServerReload"
         >
-          Reload
+          {{ t('account.reload') }}
         </button>
       </section>
       <AccountForm
@@ -212,10 +215,10 @@ async function saveAccount(input: CreateAccountInput): Promise<void> {
 
     <DangerConfirmation
       :open="reloadConfirmationOpen"
-      title="Reload account settings?"
-      description="Reloading will replace your unsaved values with the latest server configuration."
-      confirm-label="Discard and reload"
-      cancel-label="Keep editing"
+      :title="t('account.reloadConfirmTitle')"
+      :description="t('account.reloadConfirmDescription')"
+      :confirm-label="t('account.reloadConfirmButton')"
+      :cancel-label="t('account.keepEditing')"
       @close="reloadConfirmationOpen = false"
       @confirm="confirmServerReload"
     />

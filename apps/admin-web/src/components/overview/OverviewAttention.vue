@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTranslation } from '../../i18n';
 import type { OverviewAttentionItem } from '../../overview/classifyOverviewState';
 import type { Account } from '../../types/api';
 import InlineError from '../InlineError.vue';
@@ -13,27 +14,31 @@ const props = defineProps<{
   errorMessage: string | null;
 }>();
 
+const { t } = useTranslation();
+
 function accountName(accountId: string): string {
-  return props.accounts.find((account) => account.id === accountId)?.name ?? 'Unknown account';
+  return (
+    props.accounts.find((account) => account.id === accountId)?.name ?? t('common.unknownAccount')
+  );
 }
 
 function itemTitle(item: OverviewAttentionItem): string {
-  if (item.kind === 'AUTH_EXPIRED') return 'Login expired';
-  if (item.kind === 'DELIVERY_UNKNOWN') return 'Delivery uncertain';
-  return 'Run failed';
+  if (item.kind === 'AUTH_EXPIRED') return t('overview.attention.authExpiredTitle');
+  if (item.kind === 'DELIVERY_UNKNOWN') return t('overview.attention.deliveryUnknownTitle');
+  return t('overview.attention.failedTitle');
 }
 
 function itemDescription(item: OverviewAttentionItem): string {
   if (item.kind === 'AUTH_EXPIRED') {
-    return 'SparkKeeper stopped the current safe send flow.';
+    return t('overview.attention.authExpiredDescription');
   }
   if (item.kind === 'DELIVERY_UNKNOWN') {
-    return 'A send action could not be verified. Do not retry automatically.';
+    return t('overview.attention.deliveryUnknownDescription');
   }
   if (item.detailUnavailable) {
-    return 'The run failed. Unable to determine detailed failure reason.';
+    return t('overview.attention.failedDetailUnavailable');
   }
-  return 'The run ended with a confirmed failure.';
+  return t('overview.attention.failedDescription');
 }
 </script>
 
@@ -41,22 +46,19 @@ function itemDescription(item: OverviewAttentionItem): string {
   <section class="overview-section" aria-labelledby="attention-title">
     <header class="overview-section__heading">
       <div>
-        <p class="eyebrow">Needs attention</p>
-        <h3 id="attention-title">Actionable issues</h3>
+        <p class="eyebrow">{{ t('overview.attention.eyebrow') }}</p>
+        <h3 id="attention-title">{{ t('overview.attention.title') }}</h3>
       </div>
       <span v-if="items.length > 0" class="count">{{ items.length }}</span>
     </header>
-    <SectionLoading v-if="loading" label="Checking for actionable issues…" />
-    <InlineError
-      v-else-if="errorMessage"
-      message="Unable to determine whether any items need attention."
-    />
+    <SectionLoading v-if="loading" :label="t('overview.attention.loading')" />
+    <InlineError v-else-if="errorMessage" :message="t('overview.attention.errorMessage')" />
     <InlineError v-else-if="warning" :message="warning" />
     <div v-else-if="items.length === 0" class="overview-quiet-state">
       <span class="overview-quiet-state__mark" aria-hidden="true">✓</span>
       <div>
-        <strong>Nothing needs your attention</strong>
-        <p>SparkKeeper has no actionable issues to report.</p>
+        <strong>{{ t('overview.attention.quietTitle') }}</strong>
+        <p>{{ t('overview.attention.quietDescription') }}</p>
       </div>
     </div>
     <ol v-else class="attention-list">
@@ -77,7 +79,11 @@ function itemDescription(item: OverviewAttentionItem): string {
               : `/runs/${item.runId}`
           "
         >
-          {{ item.kind === 'AUTH_EXPIRED' ? 'View account' : 'View run' }}
+          {{
+            item.kind === 'AUTH_EXPIRED'
+              ? t('overview.attention.viewAccount')
+              : t('overview.attention.viewRun')
+          }}
         </RouterLink>
       </li>
     </ol>

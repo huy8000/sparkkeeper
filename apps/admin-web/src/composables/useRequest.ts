@@ -10,6 +10,7 @@ import {
 } from 'vue';
 
 import { ApiError } from '../api/client';
+import { useTranslation } from '../i18n';
 
 export interface RequestState<T> {
   readonly data: ShallowRef<T | null>;
@@ -28,7 +29,12 @@ export interface RequestState<T> {
 function safeError(error: unknown): ApiError {
   return error instanceof ApiError
     ? error
-    : new ApiError('UNEXPECTED_ERROR', 'Something went wrong. Please try again.', 0, 'MALFORMED');
+    : new ApiError(
+        'UNEXPECTED_ERROR',
+        useTranslation().t('common.unexpectedError'),
+        0,
+        'MALFORMED',
+      );
 }
 
 export function useRequest<T>(loader: (signal: AbortSignal) => Promise<T>): RequestState<T> {

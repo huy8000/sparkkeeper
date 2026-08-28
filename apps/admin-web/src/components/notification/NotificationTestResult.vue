@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import { useTranslation } from '../../i18n';
 import type { NotificationDeliveryResult } from '../../types/api';
 import StatusBadge from '../StatusBadge.vue';
 
@@ -9,11 +10,13 @@ const props = defineProps<{
   uncertain: boolean;
 }>();
 
+const { t } = useTranslation();
+
 const title = computed(() => {
-  if (props.uncertain) return 'Test request result is uncertain';
-  if (props.result?.status === 'SENT') return 'Test notification sent';
-  if (props.result?.status === 'FAILED') return 'Test notification failed';
-  if (props.result?.status === 'BLOCKED') return 'Test notification blocked';
+  if (props.uncertain) return t('notificationTest.uncertainTitle');
+  if (props.result?.status === 'SENT') return t('notificationTest.sentTitle');
+  if (props.result?.status === 'FAILED') return t('notificationTest.failedTitle');
+  if (props.result?.status === 'BLOCKED') return t('notificationTest.blockedTitle');
   return '';
 });
 
@@ -34,27 +37,27 @@ const tone = computed(() => {
   >
     <header class="notification-test-result__header">
       <div>
-        <p class="eyebrow">Latest test</p>
+        <p class="eyebrow">{{ t('notificationTest.latest') }}</p>
         <h3>{{ title }}</h3>
       </div>
       <StatusBadge v-if="props.result" :status="props.result.status" />
-      <StatusBadge v-else status="UNKNOWN" label="Uncertain" />
+      <StatusBadge v-else status="UNKNOWN" :label="t('notificationTest.uncertainBadge')" />
     </header>
 
     <p v-if="props.uncertain">
-      Check the receiver before sending another test. The first request may already have arrived.
+      {{ t('notificationTest.uncertainBody') }}
     </p>
     <dl v-else-if="props.result" class="notification-test-result__meta">
       <div>
-        <dt>Attempts</dt>
+        <dt>{{ t('notificationTest.attempts') }}</dt>
         <dd>{{ props.result.attempts }}</dd>
       </div>
       <div v-if="'httpStatus' in props.result && props.result.httpStatus !== undefined">
-        <dt>HTTP status</dt>
+        <dt>{{ t('notificationTest.httpStatus') }}</dt>
         <dd>{{ props.result.httpStatus }}</dd>
       </div>
       <div v-if="'failureCode' in props.result">
-        <dt>Failure code</dt>
+        <dt>{{ t('notificationTest.failureCode') }}</dt>
         <dd>{{ props.result.failureCode }}</dd>
       </div>
     </dl>

@@ -17,10 +17,12 @@ import StatusBadge from '../components/StatusBadge.vue';
 import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
+import { useTranslation } from '../i18n';
 import { formatTimestamp } from '../utils/format';
 
 const app = useAdminApp();
 const workspace = useAccountWorkspace();
+const { t } = useTranslation();
 const friends = useRequest((signal) => app.api.listFriends(workspace.accountId.value, signal));
 const schedules = useRequest((signal) => app.api.listSchedules(workspace.accountId.value, signal));
 const runs = useRequest((signal) =>
@@ -78,9 +80,9 @@ const hasRefreshError = computed(
   <div class="page-stack account-tab-page">
     <header class="account-tab-heading">
       <div>
-        <p class="eyebrow">Overview</p>
-        <h3>Account readiness</h3>
-        <p>Confirm this account is configured and understand its latest activity.</p>
+        <p class="eyebrow">{{ t('accountOverviewTab.eyebrow') }}</p>
+        <h3>{{ t('accountOverviewTab.title') }}</h3>
+        <p>{{ t('accountOverviewTab.subtitle') }}</p>
       </div>
     </header>
 
@@ -90,27 +92,24 @@ const hasRefreshError = computed(
       aria-labelledby="account-readiness-title"
     >
       <div>
-        <p class="eyebrow">Current state</p>
+        <p class="eyebrow">{{ t('accountOverviewTab.readinessEyebrow') }}</p>
         <h3 id="account-readiness-title">
           <template v-if="workspace.account.data.value?.loginStatus === 'AUTH_EXPIRED'">
-            Login expired
+            {{ t('accountOverviewTab.readiness.authExpiredTitle') }}
           </template>
           <template v-else-if="workspace.account.data.value?.loginStatus === 'UNKNOWN'">
-            Login status needs attention
+            {{ t('accountOverviewTab.readiness.unknownTitle') }}
           </template>
-          <template v-else>Ready for configured automation</template>
+          <template v-else>{{ t('accountOverviewTab.readiness.readyTitle') }}</template>
         </h3>
         <p v-if="workspace.account.data.value?.loginStatus === 'AUTH_EXPIRED'">
-          SparkKeeper has stopped the safe sending flow for this account. Login maintenance must be
-          completed outside this page.
+          {{ t('accountOverviewTab.readiness.authExpiredDescription') }}
         </p>
         <p v-else-if="workspace.account.data.value?.loginStatus === 'UNKNOWN'">
-          SparkKeeper cannot currently confirm the persistent browser session. Unknown is not
-          treated as ready.
+          {{ t('accountOverviewTab.readiness.unknownDescription') }}
         </p>
         <p v-else>
-          Login state is ready. Automation still follows the account, friend, schedule, and server
-          gates shown below.
+          {{ t('accountOverviewTab.readiness.readyDescription') }}
         </p>
       </div>
       <div class="account-readiness-card__badges">
@@ -128,17 +127,17 @@ const hasRefreshError = computed(
     <BackgroundRefreshIndicator v-if="isRefreshing" />
     <StaleDataNotice
       v-if="hasRefreshError"
-      message="Unable to refresh one or more account sections. Showing the last successful snapshots."
+      :message="t('accountOverviewTab.staleSections')"
       @retry="app.refresh"
     />
 
     <div class="account-summary-grid">
       <section class="account-summary-card" aria-labelledby="friends-summary-title">
-        <p class="eyebrow">Configuration</p>
-        <h3 id="friends-summary-title">Friends</h3>
+        <p class="eyebrow">{{ t('accountOverviewTab.friends.eyebrow') }}</p>
+        <h3 id="friends-summary-title">{{ t('accountOverviewTab.friends.title') }}</h3>
         <SectionLoading
           v-if="friends.loading.value && friends.data.value === null"
-          label="Loading friends summary…"
+          :label="t('accountOverviewTab.friends.loading')"
         />
         <InlineError
           v-else-if="friends.initialError.value"
@@ -146,19 +145,24 @@ const hasRefreshError = computed(
         />
         <template v-else>
           <strong class="account-summary-card__value">{{ enabledFriendCount ?? 0 }}</strong>
-          <span>enabled of {{ friends.data.value?.length ?? 0 }} configured</span>
-          <RouterLink :to="`/accounts/${workspace.accountId.value}/friends`"
-            >Manage friends →</RouterLink
-          >
+          <span>{{
+            t('accountOverviewTab.friends.summary', {
+              enabled: enabledFriendCount ?? 0,
+              total: friends.data.value?.length ?? 0,
+            })
+          }}</span>
+          <RouterLink :to="`/accounts/${workspace.accountId.value}/friends`">{{
+            t('accountOverviewTab.friends.manage')
+          }}</RouterLink>
         </template>
       </section>
 
       <section class="account-summary-card" aria-labelledby="schedule-summary-title">
-        <p class="eyebrow">Configuration</p>
-        <h3 id="schedule-summary-title">Schedule</h3>
+        <p class="eyebrow">{{ t('accountOverviewTab.schedule.eyebrow') }}</p>
+        <h3 id="schedule-summary-title">{{ t('accountOverviewTab.schedule.title') }}</h3>
         <SectionLoading
           v-if="schedules.loading.value && schedules.data.value === null"
-          label="Loading schedule summary…"
+          :label="t('accountOverviewTab.schedule.loading')"
         />
         <InlineError
           v-else-if="schedules.initialError.value"
@@ -168,25 +172,25 @@ const hasRefreshError = computed(
           <StatusBadge :status="schedule.enabled ? 'ENABLED' : 'DISABLED'" />
           <strong>{{ schedule.startTime }}–{{ schedule.endTime }}</strong>
           <span>{{ schedule.timezone }}</span>
-          <RouterLink :to="`/accounts/${workspace.accountId.value}/schedule`"
-            >View schedule →</RouterLink
-          >
+          <RouterLink :to="`/accounts/${workspace.accountId.value}/schedule`">{{
+            t('accountOverviewTab.schedule.view')
+          }}</RouterLink>
         </template>
         <template v-else>
-          <strong>Not configured</strong>
-          <span>A schedule is required before server preflight can allow a Manual Run.</span>
-          <RouterLink :to="`/accounts/${workspace.accountId.value}/schedule`"
-            >Configure schedule →</RouterLink
-          >
+          <strong>{{ t('accountOverviewTab.schedule.notConfigured') }}</strong>
+          <span>{{ t('accountOverviewTab.schedule.notConfiguredHint') }}</span>
+          <RouterLink :to="`/accounts/${workspace.accountId.value}/schedule`">{{
+            t('accountOverviewTab.schedule.configure')
+          }}</RouterLink>
         </template>
       </section>
 
       <section class="account-summary-card" aria-labelledby="latest-run-title">
-        <p class="eyebrow">Today & history</p>
-        <h3 id="latest-run-title">Latest run</h3>
+        <p class="eyebrow">{{ t('accountOverviewTab.latestRun.eyebrow') }}</p>
+        <h3 id="latest-run-title">{{ t('accountOverviewTab.latestRun.title') }}</h3>
         <SectionLoading
           v-if="runs.loading.value && runs.data.value === null"
-          label="Loading latest run…"
+          :label="t('accountOverviewTab.latestRun.loading')"
         />
         <InlineError
           v-else-if="runs.initialError.value"
@@ -196,23 +200,25 @@ const hasRefreshError = computed(
           <RunStatusBadge :status="latestRun.status" />
           <strong>{{ latestRun.businessDate }}</strong>
           <span>{{ formatTimestamp(latestRun.startedAt ?? latestRun.createdAt) }}</span>
-          <RouterLink :to="`/runs/${latestRun.id}`">View run →</RouterLink>
+          <RouterLink :to="`/runs/${latestRun.id}`">{{
+            t('accountOverviewTab.latestRun.view')
+          }}</RouterLink>
         </template>
         <template v-else>
-          <strong>No runs yet</strong>
-          <span>Runs will appear after SparkKeeper executes this account.</span>
-          <RouterLink :to="`/accounts/${workspace.accountId.value}/history`"
-            >View history →</RouterLink
-          >
+          <strong>{{ t('accountOverviewTab.latestRun.empty') }}</strong>
+          <span>{{ t('accountOverviewTab.latestRun.emptyHint') }}</span>
+          <RouterLink :to="`/accounts/${workspace.accountId.value}/history`">{{
+            t('accountOverviewTab.latestRun.viewHistory')
+          }}</RouterLink>
         </template>
       </section>
 
       <section class="account-summary-card" aria-labelledby="browser-summary-title">
-        <p class="eyebrow">Persistent browser</p>
-        <h3 id="browser-summary-title">Session summary</h3>
+        <p class="eyebrow">{{ t('accountOverviewTab.browser.eyebrow') }}</p>
+        <h3 id="browser-summary-title">{{ t('accountOverviewTab.browser.title') }}</h3>
         <SectionLoading
           v-if="app.runtime.loading.value && app.runtime.data.value === null"
-          label="Loading browser summary…"
+          :label="t('accountOverviewTab.browser.loading')"
         />
         <InlineError
           v-else-if="app.runtime.initialError.value"
@@ -223,15 +229,15 @@ const hasRefreshError = computed(
             :status="app.runtime.data.value.browserProfileConfigured ? 'READY' : 'NOT_READY'"
             :label="
               app.runtime.data.value.browserProfileConfigured
-                ? 'Profile configured'
-                : 'Profile not configured'
+                ? t('accountOverviewTab.browser.profileConfigured')
+                : t('accountOverviewTab.browser.profileNotConfigured')
             "
           />
           <AuthStatusBadge
             v-if="workspace.account.data.value"
             :status="workspace.account.data.value.loginStatus"
           />
-          <span>Browser profile paths, cookies, tokens, and session files are never shown.</span>
+          <span>{{ t('accountOverviewTab.browser.privacyNote') }}</span>
         </template>
       </section>
     </div>

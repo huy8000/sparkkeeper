@@ -19,6 +19,7 @@ import { useDebouncedAction } from '../composables/useDebouncedAction';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
 import { useToasts } from '../composables/useToasts';
+import { useTranslation } from '../i18n';
 import type { MessageTemplateDetail, MessageTemplateInput, RealtimeEvent } from '../types/api';
 import { formatTimestamp } from '../utils/format';
 
@@ -27,6 +28,7 @@ type ConfirmationAction = 'close' | 'reload';
 
 const app = useAdminApp();
 const toasts = useToasts();
+const { t } = useTranslation();
 const templates = useRequest((signal) => app.api.listTemplates(signal));
 const drawerOpen = ref(false);
 const editorMode = ref<EditorMode>('create');
@@ -124,7 +126,7 @@ async function loadDetail(): Promise<void> {
       !(error instanceof ApiError && error.kind === 'ABORT')
     ) {
       detailError.value =
-        error instanceof ApiError ? error.message : 'Unable to load the template editor.';
+        error instanceof ApiError ? error.message : t('templatesPage.loadEditorError');
     }
   } finally {
     if (requestNumber === detailRequestNumber) detailLoading.value = false;
@@ -175,11 +177,11 @@ async function saveTemplate(input: MessageTemplateInput): Promise<void> {
     else await app.api.updateTemplate(editingTemplateId.value, input);
     closeEditor();
     await templates.load();
-    toasts.notify('success', 'Template configuration saved.');
+    toasts.notify('success', t('templatesPage.savedToast'));
   } catch (error) {
     mutationError.value =
-      error instanceof ApiError ? error.message : 'Template configuration could not be saved.';
-    toasts.notify('error', 'Template configuration could not be saved.');
+      error instanceof ApiError ? error.message : t('templatesPage.saveErrorToast');
+    toasts.notify('error', t('templatesPage.saveErrorToast'));
   } finally {
     submitting.value = false;
   }
@@ -195,20 +197,19 @@ onBeforeUnmount(() => {
   <div class="page-stack templates-page">
     <header class="page-heading templates-heading">
       <div>
-        <p class="eyebrow">Templates</p>
-        <h2>Message templates</h2>
-        <p>Configure the exact message content available to SparkKeeper runs.</p>
+        <p class="eyebrow">{{ t('nav.templates') }}</p>
+        <h2>{{ t('templatesPage.title') }}</h2>
+        <p>{{ t('templatesPage.subtitle') }}</p>
       </div>
       <button class="button button--primary" type="button" @click="beginCreate">
-        + New template
+        {{ t('templatesPage.new') }}
       </button>
     </header>
 
-    <section class="template-privacy-note" aria-label="Template privacy">
+    <section class="template-privacy-note" :aria-label="t('templatesPage.privacyAria')">
       <span aria-hidden="true">◇</span>
       <p>
-        Message text is loaded only when you open an editor. List summaries never request or expose
-        message content.
+        {{ t('templatesPage.privacyNote') }}
       </p>
     </section>
 
@@ -222,71 +223,86 @@ onBeforeUnmount(() => {
     <section
       v-if="templates.initialLoading.value"
       class="template-list-skeleton"
-      aria-label="Loading templates"
+      :aria-label="t('templatesPage.loadingAria')"
       aria-busy="true"
     >
       <article v-for="index in 3" :key="index" class="template-card">
-        <Skeleton width="42%" height="18px" label="Loading template name" />
-        <Skeleton width="68%" height="13px" label="Loading template summary" />
-        <Skeleton width="100%" height="42px" label="Loading template metadata" />
+        <Skeleton width="42%" height="18px" :label="t('templatesPage.skeletonName')" />
+        <Skeleton width="68%" height="13px" :label="t('templatesPage.skeletonSummary')" />
+        <Skeleton width="100%" height="42px" :label="t('templatesPage.skeletonMeta')" />
       </article>
     </section>
 
     <PageError
       v-else-if="templates.initialError.value"
-      title="Unable to load templates"
+      :title="t('templatesPage.errorTitle')"
       :message="templates.initialError.value.message"
       @retry="templates.load"
     />
 
     <EmptyState
       v-else-if="templates.data.value?.length === 0"
-      title="No templates yet"
-      description="Create a template before running SparkKeeper."
+      :title="t('templatesPage.emptyTitle')"
+      :description="t('templatesPage.emptyDescription')"
     >
       <template #action>
         <button class="button button--primary" type="button" @click="beginCreate">
-          + New template
+          {{ t('templatesPage.new') }}
         </button>
       </template>
     </EmptyState>
 
-    <ul v-else-if="templates.data.value" class="template-list" aria-label="Configured templates">
+    <ul
+      v-else-if="templates.data.value"
+      class="template-list"
+      :aria-label="t('templatesPage.listAria')"
+    >
       <li v-for="template in templates.data.value" :key="template.id">
         <article class="template-card" :class="{ 'template-card--disabled': !template.enabled }">
           <header class="template-card__header">
             <div>
-              <p class="eyebrow">{{ template.providerType === 'STATIC' ? 'Static' : 'Random' }}</p>
+              <p class="eyebrow">
+                {{
+                  template.providerType === 'STATIC'
+                    ? t('templateEditor.providerStatic')
+                    : t('templateEditor.providerRandom')
+                }}
+              </p>
               <h3>{{ template.name }}</h3>
             </div>
             <StatusBadge :status="template.enabled ? 'ENABLED' : 'DISABLED'" />
           </header>
           <dl class="template-card__meta">
             <div>
-              <dt>Provider</dt>
-              <dd>{{ template.providerType === 'STATIC' ? 'Static' : 'Random' }}</dd>
-            </div>
-            <div>
-              <dt>Messages</dt>
+              <dt>{{ t('templatesPage.columnProvider') }}</dt>
               <dd>
-                {{ template.messageCount }}
-                {{ template.messageCount === 1 ? 'message' : 'messages' }}
+                {{
+                  template.providerType === 'STATIC'
+                    ? t('templateEditor.providerStatic')
+                    : t('templateEditor.providerRandom')
+                }}
               </dd>
             </div>
             <div>
-              <dt>Updated</dt>
+              <dt>{{ t('templatesPage.columnMessages') }}</dt>
+              <dd>
+                {{ t('templatesPage.messageCount', template.messageCount) }}
+              </dd>
+            </div>
+            <div>
+              <dt>{{ t('templatesPage.columnUpdated') }}</dt>
               <dd>{{ formatTimestamp(template.updatedAt) }}</dd>
             </div>
           </dl>
           <footer class="template-card__footer">
-            <span>Configured messages are available only through the editor.</span>
+            <span>{{ t('templatesPage.footerNote') }}</span>
             <button
               class="button button--secondary button--compact"
               type="button"
-              :aria-label="`Edit ${template.name}`"
+              :aria-label="t('templatesPage.editAria', { name: template.name })"
               @click="beginEdit(template.id)"
             >
-              Edit
+              {{ t('common.edit') }}
             </button>
           </footer>
         </article>
@@ -295,12 +311,16 @@ onBeforeUnmount(() => {
 
     <Drawer
       :open="drawerOpen"
-      :title="editorMode === 'create' ? 'Create template' : 'Edit template'"
+      :title="
+        editorMode === 'create'
+          ? t('templatesPage.drawerCreateTitle')
+          : t('templatesPage.drawerEditTitle')
+      "
       @close="requestClose"
     >
       <SectionLoading
         v-if="editorMode === 'edit' && detailLoading && detail === null"
-        label="Loading template editor…"
+        :label="t('templatesPage.editorLoading')"
       />
       <section
         v-else-if="editorMode === 'edit' && detailError && detail === null"
@@ -308,14 +328,18 @@ onBeforeUnmount(() => {
       >
         <InlineError :message="detailError" />
         <div class="form-actions">
-          <button class="button button--secondary" type="button" @click="loadDetail">Retry</button>
-          <button class="button button--secondary" type="button" @click="closeEditor">Close</button>
+          <button class="button button--secondary" type="button" @click="loadDetail">
+            {{ t('common.retry') }}
+          </button>
+          <button class="button button--secondary" type="button" @click="closeEditor">
+            {{ t('common.close') }}
+          </button>
         </div>
       </section>
       <template v-else>
         <BackgroundRefreshIndicator
           v-if="detailLoading && detail !== null"
-          label="Refreshing template editor…"
+          :label="t('templatesPage.editorRefreshing')"
         />
         <StaleDataNotice
           v-if="detailError && detail !== null"
@@ -337,14 +361,18 @@ onBeforeUnmount(() => {
 
     <DangerConfirmation
       :open="confirmationAction !== null"
-      :title="confirmationAction === 'reload' ? 'Reload from server?' : 'Discard unsaved changes?'"
+      :title="
+        confirmationAction === 'reload'
+          ? t('templatesPage.reloadConfirmTitle')
+          : t('templatesPage.discardConfirmTitle')
+      "
       :description="
         confirmationAction === 'reload'
-          ? 'Reloading will replace your current unsaved editor values with the latest server configuration.'
-          : 'Closing the editor will discard your current unsaved changes.'
+          ? t('templatesPage.reloadConfirmDescription')
+          : t('templatesPage.discardConfirmDescription')
       "
-      confirm-label="Discard changes"
-      cancel-label="Keep editing"
+      :confirm-label="t('templatesPage.discardChanges')"
+      :cancel-label="t('account.keepEditing')"
       @close="cancelConfirmation"
       @confirm="confirmDiscard"
     />

@@ -17,9 +17,12 @@ import type {
   MessageTemplateDetail,
   MessageTemplateInput,
 } from '../../types/api';
+import { useTranslation } from '../../i18n';
 import FormField from '../FormField.vue';
 import InlineError from '../InlineError.vue';
 import Modal from '../Modal.vue';
+
+const { t } = useTranslation();
 
 const props = withDefaults(
   defineProps<{
@@ -110,24 +113,27 @@ function submit(): void {
 <template>
   <form class="config-form template-editor" novalidate @submit.prevent="submit">
     <p class="drawer-intro">
-      Saving changes updates local configuration only. It does not render, send, or run a message.
+      {{ t('templateEditor.intro') }}
     </p>
 
     <section v-if="props.serverChanged" class="template-server-change" role="alert">
       <div>
-        <strong>Server configuration changed while you were editing.</strong>
-        <p>Your unsaved messages are preserved. Reload only when you are ready to discard them.</p>
+        <strong>{{ t('templateEditor.serverChangedTitle') }}</strong>
+        <p>{{ t('templateEditor.serverChangedBody') }}</p>
       </div>
       <button
         class="button button--secondary button--compact"
         type="button"
         @click="emit('reload')"
       >
-        Reload from server
+        {{ t('templateEditor.reloadFromServer') }}
       </button>
     </section>
 
-    <FormField label="Template name" :error="validation.name">
+    <FormField
+      :label="t('templateEditor.nameLabel')"
+      :error="validation.name === '' ? '' : t(validation.name)"
+    >
       <template #default="{ fieldId, describedBy }">
         <input
           :id="fieldId"
@@ -142,8 +148,8 @@ function submit(): void {
     </FormField>
 
     <FormField
-      label="Provider type"
-      help-text="Static uses one message. Random chooses from one or more configured candidates at runtime."
+      :label="t('templateEditor.providerLabel')"
+      :help-text="t('templateEditor.providerHelp')"
     >
       <template #default="{ fieldId, describedBy }">
         <select
@@ -154,34 +160,42 @@ function submit(): void {
           :disabled="props.submitting"
           @change="requestProvider"
         >
-          <option value="STATIC">Static</option>
-          <option value="RANDOM">Random</option>
+          <option value="STATIC">{{ t('templateEditor.providerStatic') }}</option>
+          <option value="RANDOM">{{ t('templateEditor.providerRandom') }}</option>
         </select>
       </template>
     </FormField>
 
     <fieldset class="template-message-editor">
-      <legend>{{ form.providerType === 'STATIC' ? 'Message' : 'Configured messages' }}</legend>
+      <legend>
+        {{
+          form.providerType === 'STATIC'
+            ? t('templateEditor.messagesLegendStatic')
+            : t('templateEditor.messagesLegendRandom')
+        }}
+      </legend>
       <p class="template-message-editor__help">
         {{
           form.providerType === 'STATIC'
-            ? 'Static templates contain exactly one message.'
-            : 'Random templates keep candidate order and require at least one message.'
+            ? t('templateEditor.staticHelp')
+            : t('templateEditor.randomHelp')
         }}
       </p>
       <div v-for="(_message, index) in form.messages" :key="index" class="template-message-item">
         <div class="template-message-item__heading">
-          <label :for="`template-message-${index}`">Message {{ index + 1 }}</label>
+          <label :for="`template-message-${index}`">{{
+            t('templateEditor.messageIndexLabel', { index: index + 1 })
+          }}</label>
           <button
             v-if="form.providerType === 'RANDOM'"
             class="button button--secondary button--compact"
             type="button"
-            :aria-label="`Remove Message ${index + 1}`"
-            :title="form.messages.length === 1 ? 'A Random template must keep one message.' : ''"
+            :aria-label="t('templateEditor.removeMessageAria', { index: index + 1 })"
+            :title="form.messages.length === 1 ? t('templateEditor.removeDisabledTitle') : ''"
             :disabled="props.submitting || form.messages.length === 1"
             @click="removeMessage(index)"
           >
-            Remove
+            {{ t('templateEditor.remove') }}
           </button>
         </div>
         <textarea
@@ -203,7 +217,7 @@ function submit(): void {
           class="form-field__error"
           role="alert"
         >
-          {{ validation.messages[index] }}
+          {{ t(validation.messages[index]!) }}
         </small>
       </div>
       <button
@@ -213,7 +227,7 @@ function submit(): void {
         :disabled="props.submitting"
         @click="addMessage"
       >
-        + Add message
+        {{ t('templateEditor.addMessage') }}
       </button>
     </fieldset>
 
@@ -224,19 +238,18 @@ function submit(): void {
         type="checkbox"
         :disabled="props.submitting"
       />
-      Template enabled
+      {{ t('templateEditor.templateEnabled') }}
     </label>
     <p class="form-note">
-      Disabled templates remain editable and visible in Manual Run; server preflight decides whether
-      they can run.
+      {{ t('templateEditor.enabledNote') }}
     </p>
 
-    <InlineError v-if="validation.summary" :message="validation.summary" />
+    <InlineError v-if="validation.summary" :message="t(validation.summary)" />
     <InlineError v-if="props.serverError" :message="props.serverError" />
 
     <div class="form-actions template-editor__actions">
       <button class="button button--primary" type="submit" :disabled="props.submitting">
-        {{ props.submitting ? 'Saving…' : 'Save template' }}
+        {{ props.submitting ? t('templateEditor.saving') : t('templateEditor.save') }}
       </button>
       <button
         class="button button--secondary"
@@ -244,34 +257,36 @@ function submit(): void {
         :disabled="props.submitting"
         @click="emit('cancel')"
       >
-        Cancel
+        {{ t('common.cancel') }}
       </button>
     </div>
   </form>
 
   <Modal
     :open="staticSelectionOpen"
-    title="Choose the Static message"
+    :title="t('templateEditor.staticModalTitle')"
     labelled-by="static-message-selection-title"
     compact
     @close="cancelStaticSelection"
   >
     <div class="template-static-selection">
-      <p><strong>Static templates can contain only one message.</strong></p>
-      <p>Select the message to keep. No server change occurs until you save the template.</p>
+      <p>
+        <strong>{{ t('templateEditor.staticModalEmphasis') }}</strong>
+      </p>
+      <p>{{ t('templateEditor.staticModalDescription') }}</p>
       <fieldset>
-        <legend>Message to keep</legend>
+        <legend>{{ t('templateEditor.staticModalLegend') }}</legend>
         <label v-for="(_message, index) in form.messages" :key="index">
           <input v-model="staticMessageIndex" type="radio" name="staticMessage" :value="index" />
-          <span>Keep Message {{ index + 1 }}</span>
+          <span>{{ t('templateEditor.keepMessage', { index: index + 1 }) }}</span>
         </label>
       </fieldset>
       <div class="modal-actions">
         <button class="button button--secondary" type="button" @click="cancelStaticSelection">
-          Cancel
+          {{ t('common.cancel') }}
         </button>
         <button class="button button--primary" type="button" @click="confirmStaticSelection">
-          Keep selected message
+          {{ t('templateEditor.keepSelected') }}
         </button>
       </div>
     </div>

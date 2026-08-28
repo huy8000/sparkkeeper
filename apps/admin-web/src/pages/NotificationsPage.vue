@@ -16,6 +16,7 @@ import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useDebouncedAction } from '../composables/useDebouncedAction';
 import { useRequest } from '../composables/useRequest';
 import { useToasts } from '../composables/useToasts';
+import { useTranslation } from '../i18n';
 import {
   isNotificationConfigured,
   notificationDraftFrom,
@@ -32,6 +33,8 @@ import type {
 
 const app = useAdminApp();
 const toasts = useToasts();
+const { t } = useTranslation();
+const WEBHOOK_REQUIRED_KEY = 'notificationsPage.validation.webhookRequired';
 const configurationRequest = useRequest((signal) => app.api.getNotificationConfiguration(signal));
 const configuration = ref<NotificationConfiguration | null>(null);
 const form = reactive<NotificationDraft>({
@@ -60,6 +63,9 @@ const configured = computed(
   () => configuration.value !== null && isNotificationConfigured(configuration.value),
 );
 const canTest = computed(() => configured.value && !testing.value && !saving.value);
+const webhookFieldError = computed(() =>
+  saveError.value === WEBHOOK_REQUIRED_KEY ? t(WEBHOOK_REQUIRED_KEY) : '',
+);
 
 watch(configurationRequest.data, (next) => {
   if (next === null) return;
@@ -115,11 +121,11 @@ async function saveConfiguration(): Promise<void> {
     testResult.value = null;
     testUncertain.value = false;
     testError.value = '';
-    toasts.notify('success', 'Notification settings saved.');
+    toasts.notify('success', t('notificationsPage.savedToast'));
   } catch (error) {
     saveError.value =
-      error instanceof ApiError ? error.message : 'Notification settings could not be saved.';
-    toasts.notify('error', 'Notification settings could not be saved.');
+      error instanceof ApiError ? error.message : t('notificationsPage.saveErrorToast');
+    toasts.notify('error', t('notificationsPage.saveErrorToast'));
   } finally {
     saving.value = false;
   }
@@ -153,17 +159,18 @@ async function sendTestNotification(): Promise<void> {
   try {
     const result = await app.api.sendTestNotification();
     testResult.value = result;
-    if (result.status === 'SENT') toasts.notify('success', 'Test notification sent.');
-    else if (result.status === 'FAILED') toasts.notify('error', 'Test notification failed.');
-    else toasts.notify('warning', 'Test notification blocked.');
+    if (result.status === 'SENT') toasts.notify('success', t('notificationsPage.testSentToast'));
+    else if (result.status === 'FAILED')
+      toasts.notify('error', t('notificationsPage.testFailedToast'));
+    else toasts.notify('warning', t('notificationsPage.testBlockedToast'));
   } catch (error) {
     if (error instanceof ApiError && error.kind === 'NETWORK') {
       testUncertain.value = true;
-      toasts.notify('warning', 'Test request result is uncertain.');
+      toasts.notify('warning', t('notificationsPage.testUncertainToast'));
     } else {
       testError.value =
-        error instanceof ApiError ? error.message : 'The test notification could not be sent.';
-      toasts.notify('error', 'The test notification could not be sent.');
+        error instanceof ApiError ? error.message : t('notificationsPage.testSendError');
+      toasts.notify('error', t('notificationsPage.testSendError'));
     }
   } finally {
     testing.value = false;
@@ -180,9 +187,9 @@ onBeforeUnmount(() => {
   <div class="page-stack notifications-page">
     <header class="page-heading">
       <div>
-        <p class="eyebrow">Operations</p>
-        <h2>Notifications</h2>
-        <p>Configure webhook notifications for important SparkKeeper events.</p>
+        <p class="eyebrow">{{ t('nav.operations') }}</p>
+        <h2>{{ t('nav.notifications') }}</h2>
+        <p>{{ t('notificationsPage.subtitle') }}</p>
       </div>
       <button
         class="button button--secondary"
@@ -190,25 +197,31 @@ onBeforeUnmount(() => {
         :disabled="configurationRequest.loading.value"
         @click="configurationRequest.load"
       >
-        Refresh
+        {{ t('common.refresh') }}
       </button>
     </header>
 
-    <section class="notification-summary" aria-label="Notification configuration summary">
+    <section class="notification-summary" :aria-label="t('notificationsPage.summaryAria')">
       <div>
-        <span>Notifications</span>
-        <StatusBadge v-if="configuration === null" status="UNKNOWN" label="Checking…" />
+        <span>{{ t('notificationsPage.summaryNotifications') }}</span>
+        <StatusBadge
+          v-if="configuration === null"
+          status="UNKNOWN"
+          :label="t('notificationsPage.checking')"
+        />
         <StatusBadge v-else :status="configuration.enabled ? 'ENABLED' : 'DISABLED'" />
       </div>
       <div>
-        <span>Provider</span>
+        <span>{{ t('notificationsPage.provider') }}</span>
         <strong>Webhook</strong>
       </div>
       <div>
-        <span>Destination</span>
+        <span>{{ t('notificationsPage.destination') }}</span>
         <StatusBadge
           :status="configured ? 'READY' : 'NOT_READY'"
-          :label="configured ? 'Configured' : 'Not configured'"
+          :label="
+            configured ? t('notificationsPage.configured') : t('notificationsPage.notConfigured')
+          "
         />
       </div>
     </section>
@@ -220,28 +233,30 @@ onBeforeUnmount(() => {
       @retry="configurationRequest.load"
     />
 
-    <section class="template-privacy-note notification-privacy-note" aria-label="Webhook privacy">
+    <section
+      class="template-privacy-note notification-privacy-note"
+      :aria-label="t('notificationsPage.privacyAria')"
+    >
       <span aria-hidden="true">◇</span>
       <p>
-        Webhook URLs may contain sensitive tokens. They are shown only in this local editor and are
-        never copied into status summaries, test results, routes, or notifications.
+        {{ t('notificationsPage.privacyNote') }}
       </p>
     </section>
 
     <section
       v-if="configurationRequest.loading.value && configuration === null"
       class="notification-skeleton"
-      aria-label="Loading notification configuration"
+      :aria-label="t('notificationsPage.loadingAria')"
       aria-busy="true"
     >
-      <Skeleton width="34%" height="20px" label="Loading notification heading…" />
-      <Skeleton height="52px" label="Loading notification destination…" />
-      <Skeleton height="180px" label="Loading notification events…" />
+      <Skeleton width="34%" height="20px" :label="t('notificationsPage.loadingHeading')" />
+      <Skeleton height="52px" :label="t('notificationsPage.loadingDestination')" />
+      <Skeleton height="180px" :label="t('notificationsPage.loadingEvents')" />
     </section>
 
     <PageError
       v-else-if="configurationRequest.error.value && configuration === null"
-      title="Unable to load notification settings"
+      :title="t('notificationsPage.errorTitle')"
       :message="configurationRequest.error.value.message"
       @retry="configurationRequest.load"
     />
@@ -249,39 +264,47 @@ onBeforeUnmount(() => {
     <template v-else-if="configuration">
       <section v-if="serverChanged" class="notification-server-change" role="status">
         <div>
-          <strong>Notification settings changed on the server.</strong>
-          <span>Your unsaved values have not been replaced.</span>
+          <strong>{{ t('notificationsPage.serverChangedTitle') }}</strong>
+          <span>{{ t('notificationsPage.serverChangedBody') }}</span>
         </div>
         <button
           class="button button--secondary button--compact"
           type="button"
           @click="requestServerReload"
         >
-          Reload
+          {{ t('account.reload') }}
         </button>
       </section>
 
       <section class="card notification-config-card" aria-labelledby="notification-settings-title">
         <header class="card__header">
           <div>
-            <p class="eyebrow">{{ configured ? 'Configured' : 'Setup required' }}</p>
-            <h3 id="notification-settings-title">Webhook configuration</h3>
+            <p class="eyebrow">
+              {{
+                configured
+                  ? t('notificationsPage.configured')
+                  : t('notificationsPage.cardEyebrowSetup')
+              }}
+            </p>
+            <h3 id="notification-settings-title">{{ t('notificationsPage.cardTitle') }}</h3>
             <p>
               {{
                 configured
-                  ? 'Save explicitly after making changes.'
-                  : 'Add a destination before sending a test notification.'
+                  ? t('notificationsPage.cardDescriptionConfigured')
+                  : t('notificationsPage.cardDescriptionSetup')
               }}
             </p>
           </div>
-          <span v-if="dirty" class="unsaved-indicator" role="status">Unsaved changes</span>
+          <span v-if="dirty" class="unsaved-indicator" role="status">{{
+            t('notificationsPage.unsaved')
+          }}</span>
         </header>
 
         <form class="notification-form" novalidate @submit.prevent="saveConfiguration">
           <label class="notification-enable-card">
             <span>
-              <strong>Notifications enabled</strong>
-              <small>Allow selected runtime events to use the configured webhook.</small>
+              <strong>{{ t('notificationsPage.enabledLabel') }}</strong>
+              <small>{{ t('notificationsPage.enabledHint') }}</small>
             </span>
             <input
               v-model="form.enabled"
@@ -292,7 +315,10 @@ onBeforeUnmount(() => {
           </label>
 
           <div class="notification-destination-grid">
-            <FormField label="Provider" help-text="The current backend supports Webhook only.">
+            <FormField
+              :label="t('notificationsPage.providerLabel')"
+              :help-text="t('notificationsPage.providerHelp')"
+            >
               <template #default="{ fieldId, describedBy }">
                 <select
                   :id="fieldId"
@@ -306,9 +332,9 @@ onBeforeUnmount(() => {
               </template>
             </FormField>
             <FormField
-              label="Webhook URL"
-              help-text="HTTP(S) only. Private and unsafe destinations are rejected by the server."
-              :error="saveError.includes('Webhook URL is required') ? saveError : ''"
+              :label="t('notificationsPage.webhookLabel')"
+              :help-text="t('notificationsPage.webhookHelp')"
+              :error="webhookFieldError"
             >
               <template #default="{ fieldId, describedBy }">
                 <input
@@ -328,7 +354,7 @@ onBeforeUnmount(() => {
           </div>
 
           <fieldset class="notification-events">
-            <legend>Events</legend>
+            <legend>{{ t('notificationsPage.eventsLegend') }}</legend>
             <label>
               <input
                 v-model="form.notifyAuthExpired"
@@ -336,7 +362,10 @@ onBeforeUnmount(() => {
                 type="checkbox"
                 :disabled="saving"
               />
-              <span><strong>Login expired</strong><small>AUTH_EXPIRED</small></span>
+              <span
+                ><strong>{{ t('notificationsPage.notifyAuthExpired') }}</strong
+                ><small>AUTH_EXPIRED</small></span
+              >
             </label>
             <label>
               <input
@@ -345,7 +374,10 @@ onBeforeUnmount(() => {
                 type="checkbox"
                 :disabled="saving"
               />
-              <span><strong>Run task failed</strong><small>TASK_FAILED</small></span>
+              <span
+                ><strong>{{ t('notificationsPage.notifyTaskFailed') }}</strong
+                ><small>TASK_FAILED</small></span
+              >
             </label>
             <label>
               <input
@@ -355,7 +387,7 @@ onBeforeUnmount(() => {
                 :disabled="saving"
               />
               <span
-                ><strong>Consecutive run failures</strong
+                ><strong>{{ t('notificationsPage.notifyConsecutiveFailure') }}</strong
                 ><small>CONSECUTIVE_RUN_FAILURE</small></span
               >
             </label>
@@ -366,17 +398,20 @@ onBeforeUnmount(() => {
                 type="checkbox"
                 :disabled="saving"
               />
-              <span><strong>Delivery uncertain</strong><small>DELIVERY_UNKNOWN</small></span>
+              <span
+                ><strong>{{ t('notificationsPage.notifyDeliveryUnknown') }}</strong
+                ><small>DELIVERY_UNKNOWN</small></span
+              >
             </label>
           </fieldset>
 
           <InlineError
-            v-if="saveError && !saveError.includes('Webhook URL is required')"
+            v-if="saveError && saveError !== WEBHOOK_REQUIRED_KEY"
             :message="saveError"
           />
           <div class="form-actions">
             <button class="button button--primary" type="submit" :disabled="saving || !dirty">
-              {{ saving ? 'Saving…' : 'Save settings' }}
+              {{ saving ? t('notificationsPage.saving') : t('notificationsPage.save') }}
             </button>
             <button
               class="button button--secondary"
@@ -384,7 +419,7 @@ onBeforeUnmount(() => {
               :disabled="saving || !dirty"
               @click="resetForm"
             >
-              Reset saved values
+              {{ t('notificationsPage.reset') }}
             </button>
           </div>
         </form>
@@ -393,9 +428,9 @@ onBeforeUnmount(() => {
       <section class="card notification-test-card" aria-labelledby="notification-test-title">
         <header class="card__header">
           <div>
-            <p class="eyebrow">Test notification</p>
-            <h3 id="notification-test-title">Verify the saved destination</h3>
-            <p>This sends a real webhook request when connected to a real runtime.</p>
+            <p class="eyebrow">{{ t('notificationsPage.testEyebrow') }}</p>
+            <h3 id="notification-test-title">{{ t('notificationsPage.testTitle') }}</h3>
+            <p>{{ t('notificationsPage.testDescription') }}</p>
           </div>
           <button
             class="button button--secondary"
@@ -403,15 +438,14 @@ onBeforeUnmount(() => {
             :disabled="!canTest"
             @click="sendTestNotification"
           >
-            {{ testing ? 'Sending test…' : 'Send test notification' }}
+            {{ testing ? t('notificationsPage.testSending') : t('notificationsPage.testSend') }}
           </button>
         </header>
         <p class="form-note">
-          The server sends one fixed SparkKeeper test summary to the currently saved URL. Unsaved
-          form values are never used.
+          {{ t('notificationsPage.testNote') }}
         </p>
         <p v-if="!configured" class="notification-test-hint">
-          Save a valid webhook URL before sending a test.
+          {{ t('notificationsPage.testHint') }}
         </p>
         <InlineError v-if="testError" :message="testError" />
         <NotificationTestResult :result="testResult" :uncertain="testUncertain" />
@@ -420,10 +454,10 @@ onBeforeUnmount(() => {
 
     <DangerConfirmation
       :open="reloadConfirmationOpen"
-      title="Reload notification settings?"
-      description="Reloading will replace your unsaved values with the latest server configuration."
-      confirm-label="Discard and reload"
-      cancel-label="Keep editing"
+      :title="t('notificationsPage.reloadConfirmTitle')"
+      :description="t('notificationsPage.reloadConfirmDescription')"
+      :confirm-label="t('notificationsPage.reloadConfirmButton')"
+      :cancel-label="t('account.keepEditing')"
       @close="reloadConfirmationOpen = false"
       @confirm="confirmServerReload"
     />

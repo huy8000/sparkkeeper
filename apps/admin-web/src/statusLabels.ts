@@ -1,30 +1,31 @@
 /**
- * V3 shared status presentation: the single enum → human text and tone mapping.
- * Pages must never re-implement their own status label maps.
+ * V3 shared status presentation: the single enum → translation key and tone
+ * mapping. Pages must never re-implement their own status label maps, and
+ * locale switching must never fork this map into per-language copies.
  */
 
 export type StatusTone = 'positive' | 'warning' | 'danger' | 'neutral';
 
-const STATUS_LABELS: Record<string, string> = {
-  SUCCESS: 'Success',
-  RUNNING: 'Running',
-  READY: 'Ready',
-  FAILED: 'Failed',
-  AUTH_EXPIRED: 'Login expired',
-  DELIVERY_UNKNOWN: 'Delivery uncertain',
-  RETRY_WAIT: 'Waiting to retry',
-  UNKNOWN: 'Unknown',
-  DEGRADED: 'Degraded',
-  ENABLED: 'Enabled',
-  DISABLED: 'Disabled',
-  UNAVAILABLE: 'Unavailable',
-  NOT_READY: 'Not ready',
-  SENT: 'Sent',
-  BLOCKED: 'Blocked',
-  INFO: 'Info',
-  WARN: 'Warning',
-  ERROR: 'Error',
-  EMPTY: 'No runs yet',
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  SUCCESS: 'status.success',
+  RUNNING: 'status.running',
+  READY: 'status.ready',
+  FAILED: 'status.failed',
+  AUTH_EXPIRED: 'status.authExpired',
+  DELIVERY_UNKNOWN: 'status.deliveryUnknown',
+  RETRY_WAIT: 'status.retryWait',
+  UNKNOWN: 'status.unknown',
+  DEGRADED: 'status.degraded',
+  ENABLED: 'status.enabled',
+  DISABLED: 'status.disabled',
+  UNAVAILABLE: 'status.unavailable',
+  NOT_READY: 'status.notReady',
+  SENT: 'status.sent',
+  BLOCKED: 'status.blocked',
+  INFO: 'status.info',
+  WARN: 'status.warning',
+  ERROR: 'status.error',
+  EMPTY: 'status.empty',
 };
 
 const STATUS_TONES: Record<string, StatusTone> = {
@@ -49,12 +50,19 @@ const STATUS_TONES: Record<string, StatusTone> = {
   EMPTY: 'neutral',
 };
 
-/** Human-readable label for a backend status enum; unknown values are prettified, never dropped. */
-export function statusLabel(status: string): string {
-  const known = STATUS_LABELS[status];
-  if (known !== undefined) return known;
+/** Translation key for a known backend status enum; unknown values return undefined. */
+export function statusLabelKey(status: string): string | undefined {
+  return STATUS_LABEL_KEYS[status];
+}
+
+/**
+ * Presentation fallback for unknown future enums: the raw technical value is
+ * prettified, never translated and never dropped. Empty input yields '' so the
+ * caller can substitute the generic "unknown" label.
+ */
+export function statusFallbackLabel(status: string): string {
   const words = status.replaceAll('_', ' ').trim();
-  if (words.length === 0) return 'Unknown';
+  if (words.length === 0) return '';
   return words.charAt(0).toUpperCase() + words.slice(1).toLowerCase();
 }
 

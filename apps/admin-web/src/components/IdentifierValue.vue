@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
+import { useTranslation } from '../i18n';
+
 const props = defineProps<{ value: string; compact?: boolean }>();
 const copied = ref(false);
+
+const { t } = useTranslation();
 
 async function copy(): Promise<void> {
   if (globalThis.navigator.clipboard === undefined) return;
@@ -20,10 +24,10 @@ async function copy(): Promise<void> {
     <button
       class="copy-button"
       type="button"
-      :aria-label="`Copy identifier ${value}`"
+      :aria-label="t('common.copyIdentifier', { value })"
       @click="copy"
     >
-      {{ copied ? 'Copied' : 'Copy' }}
+      {{ copied ? t('common.copied') : t('common.copy') }}
     </button>
   </span>
 </template>

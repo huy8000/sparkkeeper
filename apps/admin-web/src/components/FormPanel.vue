@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import { useTranslation } from '../i18n';
+
 defineProps<{ title: string; description?: string }>();
 defineEmits<{ cancel: [] }>();
+
+const { t } = useTranslation();
 </script>
 
 <template>
@@ -11,7 +15,7 @@ defineEmits<{ cancel: [] }>();
         <p v-if="description">{{ description }}</p>
       </div>
       <button class="button button--secondary" type="button" @click="$emit('cancel')">
-        Cancel
+        {{ t('common.cancel') }}
       </button>
     </header>
     <slot />

@@ -12,10 +12,12 @@ import SectionLoading from '../components/SectionLoading.vue';
 import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
+import { useTranslation } from '../i18n';
 import { formatDuration, formatTimestamp } from '../utils/format';
 
 const app = useAdminApp();
 const workspace = useAccountWorkspace();
+const { t } = useTranslation();
 const runs = useRequest((signal) =>
   app.api.listRuns({ accountId: workspace.accountId.value, limit: 50 }, signal),
 );
@@ -32,11 +34,19 @@ useRealtimeRefresh(
   <div class="page-stack account-tab-page">
     <header class="account-tab-heading">
       <div>
-        <p class="eyebrow">History</p>
-        <h3>{{ workspace.account.data.value?.name ?? 'Account' }} run history</h3>
-        <p>Bounded, read-only DailyRun history for this account.</p>
+        <p class="eyebrow">{{ t('historyTab.eyebrow') }}</p>
+        <h3>
+          {{
+            t('historyTab.title', {
+              account: workspace.account.data.value?.name ?? t('common.account'),
+            })
+          }}
+        </h3>
+        <p>{{ t('historyTab.subtitle') }}</p>
       </div>
-      <button class="button button--secondary" type="button" @click="runs.load">Refresh</button>
+      <button class="button button--secondary" type="button" @click="runs.load">
+        {{ t('common.refresh') }}
+      </button>
     </header>
 
     <BackgroundRefreshIndicator v-if="runs.refreshing.value" />
@@ -48,26 +58,28 @@ useRealtimeRefresh(
 
     <SectionLoading
       v-if="runs.loading.value && runs.data.value === null"
-      label="Loading account history…"
+      :label="t('historyTab.loading')"
     />
     <section v-else-if="runs.initialError.value" class="section-error-stack">
       <InlineError :message="runs.initialError.value.message" />
-      <button class="button button--secondary" type="button" @click="runs.load">Retry</button>
+      <button class="button button--secondary" type="button" @click="runs.load">
+        {{ t('common.retry') }}
+      </button>
     </section>
     <EmptyState
       v-else-if="runs.data.value?.length === 0"
-      title="No runs yet"
-      description="Runs will appear after SparkKeeper executes this account."
+      :title="t('historyTab.emptyTitle')"
+      :description="t('historyTab.emptyDescription')"
     />
     <div v-else-if="runs.data.value" class="table-wrap">
       <table>
         <thead>
           <tr>
             <th>BusinessDate</th>
-            <th>Status</th>
-            <th>Started</th>
-            <th>Finished</th>
-            <th>Duration</th>
+            <th>{{ t('common.status') }}</th>
+            <th>{{ t('historyTab.columnStarted') }}</th>
+            <th>{{ t('historyTab.columnFinished') }}</th>
+            <th>{{ t('historyTab.columnDuration') }}</th>
           </tr>
         </thead>
         <tbody>

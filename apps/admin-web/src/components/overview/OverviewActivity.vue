@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { statusLabel } from '../../statusLabels';
+import { useStatusText } from '../../composables/useStatusText';
+import { useTranslation } from '../../i18n';
 import type { Account, DailyRun } from '../../types/api';
 import { formatTimestamp } from '../../utils/format';
 import EmptyState from '../EmptyState.vue';
@@ -16,12 +17,17 @@ const props = defineProps<{
 
 defineEmits<{ retry: [] }>();
 
+const { t } = useTranslation();
+const statusText = useStatusText();
+
 function accountName(accountId: string): string {
-  return props.accounts.find((account) => account.id === accountId)?.name ?? 'Unknown account';
+  return (
+    props.accounts.find((account) => account.id === accountId)?.name ?? t('common.unknownAccount')
+  );
 }
 
 function resultSummary(run: DailyRun): string {
-  return run.status === 'RUNNING' ? 'Live' : statusLabel(run.status);
+  return run.status === 'RUNNING' ? t('realtime.live') : statusText(run.status);
 }
 </script>
 
@@ -29,12 +35,14 @@ function resultSummary(run: DailyRun): string {
   <section class="overview-section" aria-labelledby="activity-title" :aria-busy="loading">
     <header class="overview-section__heading">
       <div>
-        <p class="eyebrow">Today's activity</p>
-        <h3 id="activity-title">Daily runs</h3>
+        <p class="eyebrow">{{ t('overview.activity.eyebrow') }}</p>
+        <h3 id="activity-title">{{ t('overview.activity.title') }}</h3>
       </div>
-      <RouterLink class="overview-section__link" to="/runs">View all runs →</RouterLink>
+      <RouterLink class="overview-section__link" to="/runs">{{
+        t('overview.activity.viewAll')
+      }}</RouterLink>
     </header>
-    <SectionLoading v-if="loading && runs === null" label="Loading today's activity…" />
+    <SectionLoading v-if="loading && runs === null" :label="t('overview.activity.loading')" />
     <div v-else-if="errorMessage" class="overview-inline-retry">
       <InlineError :message="errorMessage" />
       <button
@@ -42,23 +50,23 @@ function resultSummary(run: DailyRun): string {
         type="button"
         @click="$emit('retry')"
       >
-        Retry
+        {{ t('common.retry') }}
       </button>
     </div>
     <EmptyState
       v-else-if="runs?.length === 0"
-      title="No runs yet today"
-      description="Results will appear here after a task runs."
+      :title="t('overview.activity.emptyTitle')"
+      :description="t('overview.activity.emptyDescription')"
     />
     <div v-else-if="runs" class="activity-table-wrap">
       <table class="activity-table">
         <thead>
           <tr>
-            <th>Account</th>
-            <th>Status</th>
-            <th>Business date</th>
-            <th>Timing</th>
-            <th>Result</th>
+            <th>{{ t('common.account') }}</th>
+            <th>{{ t('common.status') }}</th>
+            <th>{{ t('common.businessDate') }}</th>
+            <th>{{ t('overview.activity.timing') }}</th>
+            <th>{{ t('overview.activity.result') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -72,7 +80,9 @@ function resultSummary(run: DailyRun): string {
             <td>{{ run.businessDate }}</td>
             <td>
               <span>{{ formatTimestamp(run.startedAt) }}</span>
-              <small v-if="run.finishedAt">Finished {{ formatTimestamp(run.finishedAt) }}</small>
+              <small v-if="run.finishedAt">{{
+                t('overview.activity.finishedAt', { time: formatTimestamp(run.finishedAt) })
+              }}</small>
             </td>
             <td>
               <span :class="{ 'activity-live': run.status === 'RUNNING' }">{{

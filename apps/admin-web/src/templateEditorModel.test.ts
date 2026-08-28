@@ -56,7 +56,9 @@ describe('template editor model', () => {
       providerType: 'RANDOM' as const,
       messages: ['Message A', '   '],
     };
-    expect(validateTemplateDraft(invalid).summary).toContain('Every configured message');
+    expect(validateTemplateDraft(invalid).summary).toBe(
+      'templateEditor.validation.allMessagesRequired',
+    );
 
     const valid = { ...invalid, messages: ['  Message A  ', 'Message B'] };
     expect(validateTemplateDraft(valid).summary).toBe('');
