@@ -16,12 +16,14 @@ import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
 import { useToasts } from '../composables/useToasts';
+import { useTranslation } from '../i18n';
 import type { Friend, FriendConfigurationInput } from '../types/api';
 import { formatTimestamp } from '../utils/format';
 
 const app = useAdminApp();
 const workspace = useAccountWorkspace();
 const toasts = useToasts();
+const { t } = useTranslation();
 const friends = useRequest((signal) => app.api.listFriends(workspace.accountId.value, signal));
 const drawerOpen = ref(false);
 const editingFriend = ref<Friend | null>(null);
@@ -67,11 +69,10 @@ async function saveFriend(input: FriendConfigurationInput): Promise<void> {
     await friends.load();
     drawerOpen.value = false;
     editingFriend.value = null;
-    toasts.notify('success', 'Friend configuration saved.');
+    toasts.notify('success', t('friendsPage.savedToast'));
   } catch (error) {
-    formError.value =
-      error instanceof ApiError ? error.message : 'Friend configuration could not be saved.';
-    toasts.notify('error', 'Friend configuration could not be saved.');
+    formError.value = error instanceof ApiError ? error.message : t('friendsPage.saveErrorToast');
+    toasts.notify('error', t('friendsPage.saveErrorToast'));
   } finally {
     submitting.value = false;
   }
@@ -79,13 +80,13 @@ async function saveFriend(input: FriendConfigurationInput): Promise<void> {
 
 function matchFieldLabel(value: Friend['matchField']): string {
   const labels: Record<Friend['matchField'], string> = {
-    secUid: 'Sec UID',
-    uniqueId: 'Unique ID',
-    shortId: 'Short ID',
-    remarkName: 'Remark name',
-    displayName: 'Display name',
+    secUid: 'friendMatchField.secUid',
+    uniqueId: 'friendMatchField.uniqueId',
+    shortId: 'friendMatchField.shortId',
+    remarkName: 'friendMatchField.remarkName',
+    displayName: 'friendMatchField.displayName',
   };
-  return labels[value];
+  return t(labels[value]);
 }
 
 function identityConfigured(friend: Friend): boolean {
@@ -98,11 +99,13 @@ function identityConfigured(friend: Friend): boolean {
   <div class="page-stack account-tab-page">
     <header class="account-tab-heading">
       <div>
-        <p class="eyebrow">Friends</p>
-        <h3>Configured friends</h3>
-        <p>Only enabled friends participate in runs.</p>
+        <p class="eyebrow">{{ t('friendsPage.eyebrow') }}</p>
+        <h3>{{ t('friendsPage.title') }}</h3>
+        <p>{{ t('friendsPage.subtitle') }}</p>
       </div>
-      <button class="button button--primary" type="button" @click="beginCreate">Add friend</button>
+      <button class="button button--primary" type="button" @click="beginCreate">
+        {{ t('friendsPage.add') }}
+      </button>
     </header>
 
     <BackgroundRefreshIndicator v-if="friends.refreshing.value" />
@@ -114,20 +117,22 @@ function identityConfigured(friend: Friend): boolean {
 
     <SectionLoading
       v-if="friends.loading.value && friends.data.value === null"
-      label="Loading friends…"
+      :label="t('friendsPage.loading')"
     />
     <section v-else-if="friends.initialError.value" class="section-error-stack">
       <InlineError :message="friends.initialError.value.message" />
-      <button class="button button--secondary" type="button" @click="friends.load">Retry</button>
+      <button class="button button--secondary" type="button" @click="friends.load">
+        {{ t('common.retry') }}
+      </button>
     </section>
     <EmptyState
       v-else-if="friends.data.value?.length === 0"
-      title="No friends configured"
-      description="Only enabled friends participate in runs."
+      :title="t('friendsPage.emptyTitle')"
+      :description="t('friendsPage.subtitle')"
     >
       <template #action>
         <button class="button button--primary" type="button" @click="beginCreate">
-          Add friend
+          {{ t('friendsPage.add') }}
         </button>
       </template>
     </EmptyState>
@@ -135,12 +140,12 @@ function identityConfigured(friend: Friend): boolean {
       <table>
         <thead>
           <tr>
-            <th>Display name</th>
-            <th>Enabled</th>
-            <th>Match strategy</th>
-            <th>Identity configured</th>
-            <th>Updated</th>
-            <th>Actions</th>
+            <th>{{ t('friendsPage.columnDisplayName') }}</th>
+            <th>{{ t('friendsPage.columnEnabled') }}</th>
+            <th>{{ t('friendsPage.columnMatchStrategy') }}</th>
+            <th>{{ t('friendsPage.columnIdentity') }}</th>
+            <th>{{ t('friendsPage.columnUpdated') }}</th>
+            <th>{{ t('friendsPage.columnActions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -152,10 +157,16 @@ function identityConfigured(friend: Friend): boolean {
             <td>
               <span>{{ matchFieldLabel(friend.matchField) }}</span>
               <small v-if="friend.matchField === 'displayName'" class="table-cell-note">
-                Low stability
+                {{ t('friendStability.low') }}
               </small>
             </td>
-            <td>{{ identityConfigured(friend) ? 'Configured' : 'Missing' }}</td>
+            <td>
+              {{
+                identityConfigured(friend)
+                  ? t('friendsPage.identityConfigured')
+                  : t('friendsPage.identityMissing')
+              }}
+            </td>
             <td>{{ formatTimestamp(friend.updatedAt) }}</td>
             <td>
               <button
@@ -163,7 +174,7 @@ function identityConfigured(friend: Friend): boolean {
                 type="button"
                 @click="beginEdit(friend)"
               >
-                Edit
+                {{ t('common.edit') }}
               </button>
             </td>
           </tr>
@@ -173,11 +184,13 @@ function identityConfigured(friend: Friend): boolean {
 
     <Drawer
       :open="drawerOpen"
-      :title="editingFriend === null ? 'Add friend' : 'Edit friend'"
+      :title="
+        editingFriend === null ? t('friendsPage.drawerAddTitle') : t('friendsPage.drawerEditTitle')
+      "
       @close="closeDrawer"
     >
       <p class="drawer-intro">
-        This stores local identity configuration only and does not contact the platform.
+        {{ t('friendsPage.drawerIntro') }}
       </p>
       <FriendForm
         :friend="editingFriend ?? undefined"

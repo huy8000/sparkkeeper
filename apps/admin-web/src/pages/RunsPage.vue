@@ -10,9 +10,10 @@ import PageError from '../components/PageError.vue';
 import RunStatusBadge from '../components/RunStatusBadge.vue';
 import Skeleton from '../components/Skeleton.vue';
 import StaleDataNotice from '../components/StaleDataNotice.vue';
+import { useStatusText } from '../composables/useStatusText';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
-import { statusLabel } from '../statusLabels';
+import { useTranslation } from '../i18n';
 import type { DailyRunStatus, RunFilters } from '../types/api';
 import { formatDuration, formatTimestamp } from '../utils/format';
 
@@ -28,6 +29,9 @@ const LIMITS: readonly (25 | 50 | 100)[] = [25, 50, 100];
 const app = useAdminApp();
 const route = useRoute();
 const router = useRouter();
+
+const { t } = useTranslation();
+const statusText = useStatusText();
 
 function queryStatus(value: unknown): DailyRunStatus | '' {
   return RUN_STATUSES.includes(value as DailyRunStatus) ? (value as DailyRunStatus) : '';
@@ -72,7 +76,7 @@ useRealtimeRefresh(app.realtime, invalidatesRunList, () => void runs.load());
 const accountById = computed(() => new Map((accounts.data.value ?? []).map((a) => [a.id, a])));
 
 function accountName(accountId: string): string {
-  return accountById.value.get(accountId)?.name ?? 'Unknown account';
+  return accountById.value.get(accountId)?.name ?? t('common.unknownAccount');
 }
 
 async function applyFilters(): Promise<void> {
@@ -101,18 +105,23 @@ async function resetFilters(): Promise<void> {
   <div class="page-stack">
     <header class="page-heading">
       <div>
-        <p class="eyebrow">Runs</p>
-        <h2>Daily run history</h2>
-        <p>Recent executions across accounts. Read-only, filter bounded.</p>
+        <p class="eyebrow">{{ t('runs.eyebrow') }}</p>
+        <h2>{{ t('runs.title') }}</h2>
+        <p>{{ t('runs.subtitle') }}</p>
       </div>
-      <button class="button button--secondary" type="button" @click="runs.load">Refresh</button>
+      <button class="button button--secondary" type="button" @click="runs.load">
+        {{ t('common.refresh') }}
+      </button>
     </header>
 
-    <form class="filter-bar" aria-label="Run filters" @submit.prevent="applyFilters">
-      <label>Business date<input v-model="filters.businessDate" type="date" /></label>
+    <form class="filter-bar" :aria-label="t('runs.filtersAria')" @submit.prevent="applyFilters">
       <label
-        >Account<select v-model="filters.accountId">
-          <option value="">All accounts</option>
+        >{{ t('common.businessDate') }}<input v-model="filters.businessDate" type="date"
+      /></label>
+      <label
+        >{{ t('common.account')
+        }}<select v-model="filters.accountId">
+          <option value="">{{ t('runs.allAccounts') }}</option>
           <option
             v-for="account in accounts.data.value ?? []"
             :key="account.id"
@@ -123,21 +132,25 @@ async function resetFilters(): Promise<void> {
         </select></label
       >
       <label
-        >Status<select v-model="filters.status">
-          <option value="">All statuses</option>
+        >{{ t('common.status')
+        }}<select v-model="filters.status">
+          <option value="">{{ t('runs.allStatuses') }}</option>
           <option v-for="status in RUN_STATUSES" :key="status" :value="status">
-            {{ statusLabel(status) }}
+            {{ statusText(status) }}
           </option>
         </select></label
       >
       <label
-        >Limit<select v-model.number="filters.limit">
+        >{{ t('runs.limit')
+        }}<select v-model.number="filters.limit">
           <option v-for="limit in LIMITS" :key="limit" :value="limit">{{ limit }}</option>
         </select></label
       >
       <div class="filter-bar__actions">
-        <button class="button button--primary" type="submit">Apply</button>
-        <button class="button button--secondary" type="button" @click="resetFilters">Reset</button>
+        <button class="button button--primary" type="submit">{{ t('runs.apply') }}</button>
+        <button class="button button--secondary" type="button" @click="resetFilters">
+          {{ t('runs.reset') }}
+        </button>
       </div>
     </form>
 
@@ -150,48 +163,52 @@ async function resetFilters(): Promise<void> {
 
     <PageError
       v-if="runs.initialError.value"
-      title="Unable to load runs"
+      :title="t('runs.errorTitle')"
       :message="runs.initialError.value.message"
-      retry-label="Try loading again"
+      :retry-label="t('runs.tryAgain')"
       @retry="runs.load"
     />
 
     <div v-else-if="runs.initialLoading.value" class="runs-skeleton" aria-busy="true">
-      <Skeleton v-for="index in 5" :key="index" height="44px" label="Loading runs…" />
+      <Skeleton v-for="index in 5" :key="index" height="44px" :label="t('runs.skeleton')" />
     </div>
 
     <EmptyState
       v-else-if="runs.data.value?.length === 0 && hasActiveFilters"
-      title="No runs found"
-      description="No runs match the current filters. Adjust the filters and try again."
+      :title="t('runs.emptyFilteredTitle')"
+      :description="t('runs.emptyFilteredDescription')"
     >
       <template #action>
         <button class="button button--secondary" type="button" @click="resetFilters">
-          Reset filters
+          {{ t('runs.resetFilters') }}
         </button>
       </template>
     </EmptyState>
 
     <EmptyState
       v-else-if="runs.data.value?.length === 0"
-      title="No runs yet"
-      description="Runs will appear after SparkKeeper executes."
+      :title="t('runs.emptyTitle')"
+      :description="t('runs.emptyDescription')"
     />
 
     <div v-else-if="runs.data.value" class="table-wrap">
       <table>
         <caption class="visually-hidden">
-          Daily runs
+          {{
+            t('runs.caption')
+          }}
         </caption>
         <thead>
           <tr>
-            <th scope="col">BusinessDate</th>
-            <th scope="col">Account</th>
-            <th scope="col">Status</th>
-            <th scope="col">Started</th>
-            <th scope="col">Finished</th>
-            <th scope="col">Duration</th>
-            <th scope="col"><span class="visually-hidden">Actions</span></th>
+            <th scope="col">{{ t('common.businessDate') }}</th>
+            <th scope="col">{{ t('common.account') }}</th>
+            <th scope="col">{{ t('common.status') }}</th>
+            <th scope="col">{{ t('runs.started') }}</th>
+            <th scope="col">{{ t('runs.finished') }}</th>
+            <th scope="col">{{ t('runs.duration') }}</th>
+            <th scope="col">
+              <span class="visually-hidden">{{ t('common.actions') }}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -206,7 +223,7 @@ async function resetFilters(): Promise<void> {
               <RunStatusBadge :status="run.status" />
               <span v-if="run.status === 'RUNNING'" class="run-live-chip">
                 <span class="run-live-chip__pulse" aria-hidden="true" />
-                Live
+                {{ t('runs.live') }}
               </span>
             </td>
             <td>{{ formatTimestamp(run.startedAt) }}</td>
@@ -214,13 +231,13 @@ async function resetFilters(): Promise<void> {
             <td>
               {{
                 run.status === 'RUNNING'
-                  ? 'In progress'
+                  ? t('runs.inProgress')
                   : formatDuration(run.startedAt, run.finishedAt)
               }}
             </td>
             <td>
               <RouterLink class="button button--secondary button--compact" :to="`/runs/${run.id}`">
-                View
+                {{ t('common.view') }}
               </RouterLink>
             </td>
           </tr>

@@ -24,7 +24,7 @@ describe('notification form model', () => {
   it('uses trim for validation and outbound URL normalization', () => {
     const draft = notificationDraftFrom(notificationConfigurationFixture);
     draft.webhookUrl = '   ';
-    expect(validateNotificationDraft(draft)).toContain('Webhook URL is required');
+    expect(validateNotificationDraft(draft)).toBe('notificationsPage.validation.webhookRequired');
     draft.enabled = false;
     expect(validateNotificationDraft(draft)).toBe('');
     expect(notificationInputFrom(draft).webhookUrl).toBeNull();

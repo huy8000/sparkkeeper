@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* global Event, HTMLInputElement */
-import { manualRunBlockedReasonLabel } from '../../manualRunLabels';
+import { useTranslation } from '../../i18n';
+import { manualRunBlockedReasonKey } from '../../manualRunLabels';
 import type { ManualRunPreflight } from '../../types/api';
 import RunStatusBadge from '../RunStatusBadge.vue';
 import StatusBadge from '../StatusBadge.vue';
@@ -13,6 +14,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ 'update:acknowledged': [value: boolean]; start: [] }>();
 
+const { t } = useTranslation();
+
 function updateAcknowledged(event: Event): void {
   emit('update:acknowledged', (event.target as HTMLInputElement).checked);
 }
@@ -22,56 +25,59 @@ function updateAcknowledged(event: Event): void {
   <section class="manual-preflight" aria-labelledby="manual-preflight-title">
     <header class="manual-preflight__header">
       <div>
-        <p class="eyebrow">Server preflight</p>
+        <p class="eyebrow">{{ t('manualRun.eyebrow') }}</p>
         <h3 id="manual-preflight-title">
-          {{ props.preflight.canRun ? 'Ready to run' : 'Manual Run blocked' }}
+          {{ props.preflight.canRun ? t('manualRun.readyTitle') : t('manualRun.blockedTitle') }}
         </h3>
       </div>
-      <StatusBadge
-        :status="props.preflight.canRun ? 'READY' : 'BLOCKED'"
-        :label="props.preflight.canRun ? 'Ready' : 'Blocked'"
-      />
+      <StatusBadge :status="props.preflight.canRun ? 'READY' : 'BLOCKED'" />
     </header>
 
     <dl class="manual-preflight-grid">
       <div>
-        <dt>Account</dt>
+        <dt>{{ t('common.account') }}</dt>
         <dd>{{ props.accountName }}</dd>
       </div>
       <div>
-        <dt>Template</dt>
+        <dt>{{ t('manualRun.template') }}</dt>
         <dd>{{ props.templateName }}</dd>
       </div>
       <div>
-        <dt>Enabled friends</dt>
+        <dt>{{ t('manualRun.enabledFriends') }}</dt>
         <dd>{{ props.preflight.enabledFriendCount }}</dd>
       </div>
       <div>
-        <dt>Schedule</dt>
-        <dd>{{ props.preflight.scheduleConfigured ? 'Configured' : 'Not configured' }}</dd>
+        <dt>{{ t('manualRun.schedule') }}</dt>
+        <dd>
+          {{
+            props.preflight.scheduleConfigured
+              ? t('manualRun.scheduleConfigured')
+              : t('manualRun.scheduleNotConfiguredValue')
+          }}
+        </dd>
       </div>
       <div>
-        <dt>BusinessDate</dt>
-        <dd>{{ props.preflight.businessDate ?? 'Unavailable' }}</dd>
+        <dt>{{ t('manualRun.businessDate') }}</dt>
+        <dd>{{ props.preflight.businessDate ?? t('status.unavailable') }}</dd>
       </div>
       <div>
-        <dt>Today’s run</dt>
+        <dt>{{ t('manualRun.todayRun') }}</dt>
         <dd>
           <RunStatusBadge
             v-if="props.preflight.currentDailyRunStatus"
             :status="props.preflight.currentDailyRunStatus"
           />
-          <span v-else>Not started</span>
+          <span v-else>{{ t('manualRun.notStarted') }}</span>
         </dd>
       </div>
       <div>
-        <dt>Manual Run gate</dt>
+        <dt>{{ t('manualRun.gate') }}</dt>
         <dd>
           <StatusBadge :status="props.preflight.manualRunEnabled ? 'ENABLED' : 'DISABLED'" />
         </dd>
       </div>
       <div>
-        <dt>Real send authorization</dt>
+        <dt>{{ t('manualRun.realSendAuth') }}</dt>
         <dd>
           <StatusBadge
             :status="props.preflight.realSendAuthorizationEnabled ? 'ENABLED' : 'DISABLED'"
@@ -82,19 +88,18 @@ function updateAcknowledged(event: Event): void {
 
     <ul v-if="props.preflight.blockedReasons.length > 0" class="manual-blockers" role="alert">
       <li v-for="reason in props.preflight.blockedReasons" :key="reason">
-        <strong>{{ manualRunBlockedReasonLabel(reason) }}</strong>
+        <strong>{{ t(manualRunBlockedReasonKey(reason)) }}</strong>
         <code>{{ reason }}</code>
       </li>
     </ul>
 
     <template v-if="props.preflight.canRun">
       <p class="manual-preflight__warning">
-        This run may send real messages to {{ props.preflight.enabledFriendCount }} enabled
-        {{ props.preflight.enabledFriendCount === 1 ? 'friend' : 'friends' }}.
+        {{ t('manualRun.realSendWarning', props.preflight.enabledFriendCount) }}
       </p>
       <label class="confirmation-row">
         <input :checked="props.acknowledged" type="checkbox" @change="updateAcknowledged" />
-        <span>I understand this action may send real messages.</span>
+        <span>{{ t('manualRun.acknowledge') }}</span>
       </label>
       <button
         class="button button--danger"
@@ -102,7 +107,7 @@ function updateAcknowledged(event: Event): void {
         :disabled="!props.acknowledged"
         @click="$emit('start')"
       >
-        Review and start
+        {{ t('manualRun.reviewAndStart') }}
       </button>
     </template>
   </section>

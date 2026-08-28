@@ -1,10 +1,18 @@
+import { currentLocale } from '../i18n';
+
+/**
+ * Locale-aware timestamp presentation (e.g. zh-CN “2026年8月29日 14:30:05”,
+ * en-US “Aug 29, 2026, 14:30:05”). Reads the reactive app locale, so rendered
+ * dates re-evaluate on language switch. 24-hour clock in both languages.
+ */
 export function formatTimestamp(value: string | null): string {
   if (value === null) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(currentLocale(), {
     dateStyle: 'medium',
     timeStyle: 'medium',
+    hourCycle: 'h23',
   }).format(date);
 }
 

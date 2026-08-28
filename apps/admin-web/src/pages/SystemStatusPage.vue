@@ -11,10 +11,12 @@ import Skeleton from '../components/Skeleton.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useRequest } from '../composables/useRequest';
+import { useTranslation } from '../i18n';
 import { classifyRuntimeReadiness, classifySystemSummary } from '../operations/runtimeReadiness';
 import { formatTimestamp } from '../utils/format';
 
 const app = useAdminApp();
+const { t } = useTranslation();
 const health = useRequest((signal) => app.api.getHealth(signal));
 
 watch(app.refreshVersion, () => void health.load());
@@ -48,18 +50,18 @@ function retryAll(): void {
   <div class="page-stack system-page">
     <header class="page-heading system-heading">
       <div>
-        <p class="eyebrow">Operations</p>
-        <h2>System</h2>
-        <p>Runtime health and safety status.</p>
+        <p class="eyebrow">{{ t('nav.operations') }}</p>
+        <h2>{{ t('nav.system') }}</h2>
+        <p>{{ t('systemPage.subtitle') }}</p>
       </div>
       <RuntimeStatus :status="systemSummary" />
     </header>
 
     <PageError
       v-if="fullError"
-      title="System status unavailable"
-      message="Health and runtime status could not be loaded."
-      retry-label="Try loading again"
+      :title="t('systemPage.unavailableTitle')"
+      :message="t('systemPage.unavailableMessage')"
+      :retry-label="t('runs.tryAgain')"
       @retry="retryAll"
     />
 
@@ -72,9 +74,9 @@ function retryAll(): void {
         >
           <header class="card__header">
             <div>
-              <p class="eyebrow">Health</p>
-              <h3 id="system-health-title">SparkKeeper Server</h3>
-              <p>Service response and foundational persistence checks.</p>
+              <p class="eyebrow">{{ t('systemPage.healthEyebrow') }}</p>
+              <h3 id="system-health-title">{{ t('systemPage.healthTitle') }}</h3>
+              <p>{{ t('systemPage.healthSubtitle') }}</p>
             </div>
             <StatusBadge v-if="health.data.value" :status="health.data.value.status" />
           </header>
@@ -83,8 +85,8 @@ function retryAll(): void {
             v-if="health.loading.value && health.data.value === null"
             class="system-section-loading"
           >
-            <Skeleton height="18px" width="38%" label="Loading server status…" />
-            <Skeleton height="74px" label="Loading health checks…" />
+            <Skeleton height="18px" width="38%" :label="t('systemPage.loadingServer')" />
+            <Skeleton height="74px" :label="t('systemPage.loadingHealth')" />
           </div>
           <div
             v-else-if="health.error.value && health.data.value === null"
@@ -96,11 +98,14 @@ function retryAll(): void {
               type="button"
               @click="health.load"
             >
-              Retry
+              {{ t('common.retry') }}
             </button>
           </div>
           <template v-else-if="health.data.value">
-            <BackgroundRefreshIndicator v-if="health.refreshing.value" label="Refreshing Health…" />
+            <BackgroundRefreshIndicator
+              v-if="health.refreshing.value"
+              :label="t('systemPage.refreshingHealth')"
+            />
             <StaleDataNotice
               v-if="health.refreshError.value"
               :message="health.refreshError.value.message"
@@ -108,23 +113,23 @@ function retryAll(): void {
             />
             <dl class="system-definition-list">
               <div>
-                <dt>Server</dt>
+                <dt>{{ t('systemPage.server') }}</dt>
                 <dd><StatusBadge :status="health.data.value.status" /></dd>
               </div>
               <div>
-                <dt>Database</dt>
+                <dt>{{ t('systemPage.database') }}</dt>
                 <dd><StatusBadge :status="health.data.value.database.status" /></dd>
               </div>
               <div>
-                <dt>Migration</dt>
+                <dt>{{ t('systemPage.migration') }}</dt>
                 <dd><StatusBadge :status="health.data.value.migration.status" /></dd>
               </div>
               <div>
-                <dt>Version</dt>
+                <dt>{{ t('systemPage.version') }}</dt>
                 <dd>{{ health.data.value.version }}</dd>
               </div>
               <div>
-                <dt>Reported</dt>
+                <dt>{{ t('systemPage.reported') }}</dt>
                 <dd>{{ formatTimestamp(health.data.value.timestamp) }}</dd>
               </div>
             </dl>
@@ -138,9 +143,9 @@ function retryAll(): void {
         >
           <header class="card__header">
             <div>
-              <p class="eyebrow">Runtime status</p>
-              <h3 id="system-runtime-title">Runtime dependencies</h3>
-              <p>Readiness reported by the current runtime snapshot.</p>
+              <p class="eyebrow">{{ t('systemPage.runtimeEyebrow') }}</p>
+              <h3 id="system-runtime-title">{{ t('systemPage.runtimeTitle') }}</h3>
+              <p>{{ t('systemPage.runtimeSubtitle') }}</p>
             </div>
             <StatusBadge v-if="runtimeReadiness" :status="runtimeReadiness" />
           </header>
@@ -149,8 +154,8 @@ function retryAll(): void {
             v-if="app.runtime.loading.value && app.runtime.data.value === null"
             class="system-section-loading"
           >
-            <Skeleton height="18px" width="38%" label="Loading runtime status…" />
-            <Skeleton height="120px" label="Loading runtime dependencies…" />
+            <Skeleton height="18px" width="38%" :label="t('systemPage.loadingRuntimeStatus')" />
+            <Skeleton height="120px" :label="t('systemPage.loadingRuntime')" />
           </div>
           <div
             v-else-if="app.runtime.error.value && app.runtime.data.value === null"
@@ -162,13 +167,13 @@ function retryAll(): void {
               type="button"
               @click="app.runtime.load"
             >
-              Retry
+              {{ t('common.retry') }}
             </button>
           </div>
           <template v-else-if="app.runtime.data.value">
             <BackgroundRefreshIndicator
               v-if="app.runtime.refreshing.value"
-              label="Refreshing Runtime…"
+              :label="t('systemPage.refreshingRuntime')"
             />
             <StaleDataNotice
               v-if="app.runtime.refreshError.value"
@@ -177,7 +182,7 @@ function retryAll(): void {
             />
             <dl class="system-definition-list">
               <div>
-                <dt>Database</dt>
+                <dt>{{ t('systemPage.database') }}</dt>
                 <dd>
                   <StatusBadge
                     :status="app.runtime.data.value.databaseReady ? 'READY' : 'NOT_READY'"
@@ -185,7 +190,7 @@ function retryAll(): void {
                 </dd>
               </div>
               <div>
-                <dt>Migration</dt>
+                <dt>{{ t('systemPage.migration') }}</dt>
                 <dd>
                   <StatusBadge
                     :status="app.runtime.data.value.migrationReady ? 'READY' : 'NOT_READY'"
@@ -193,7 +198,7 @@ function retryAll(): void {
                 </dd>
               </div>
               <div>
-                <dt>Observability</dt>
+                <dt>{{ t('systemPage.observability') }}</dt>
                 <dd>
                   <StatusBadge
                     :status="app.runtime.data.value.observabilityReady ? 'READY' : 'NOT_READY'"
@@ -201,7 +206,7 @@ function retryAll(): void {
                 </dd>
               </div>
               <div>
-                <dt>Browser profile</dt>
+                <dt>{{ t('systemPage.browserProfile') }}</dt>
                 <dd>
                   <StatusBadge
                     :status="
@@ -209,22 +214,22 @@ function retryAll(): void {
                     "
                     :label="
                       app.runtime.data.value.browserProfileConfigured
-                        ? 'Configured'
-                        : 'Not configured'
+                        ? t('notificationsPage.configured')
+                        : t('notificationsPage.notConfigured')
                     "
                   />
                 </dd>
               </div>
               <div>
-                <dt>Business timezone</dt>
+                <dt>{{ t('systemPage.businessTimezone') }}</dt>
                 <dd>{{ app.runtime.data.value.timezone }}</dd>
               </div>
               <div>
-                <dt>Version</dt>
+                <dt>{{ t('systemPage.version') }}</dt>
                 <dd>{{ app.runtime.data.value.version }}</dd>
               </div>
               <div>
-                <dt>Reported</dt>
+                <dt>{{ t('systemPage.reported') }}</dt>
                 <dd>{{ formatTimestamp(app.runtime.data.value.timestamp) }}</dd>
               </div>
             </dl>
@@ -238,8 +243,8 @@ function retryAll(): void {
         role="status"
       >
         <div>
-          <strong>Real message delivery is authorized.</strong>
-          <span>This operator-controlled runtime gate is enabled outside Admin.</span>
+          <strong>{{ t('systemPage.criticalTitle') }}</strong>
+          <span>{{ t('systemPage.criticalBody') }}</span>
         </div>
         <StatusBadge status="ENABLED" />
       </section>
@@ -247,16 +252,16 @@ function retryAll(): void {
       <section class="card system-section system-gates" aria-labelledby="system-gates-title">
         <header class="card__header">
           <div>
-            <p class="eyebrow">Safety gates</p>
-            <h3 id="system-gates-title">Runtime authorization</h3>
-            <p>Configured outside Admin. These values are observation-only.</p>
+            <p class="eyebrow">{{ t('systemPage.gatesEyebrow') }}</p>
+            <h3 id="system-gates-title">{{ t('systemPage.gatesTitle') }}</h3>
+            <p>{{ t('systemPage.gatesSubtitle') }}</p>
           </div>
-          <span class="read-only-chip">Read only</span>
+          <span class="read-only-chip">{{ t('systemPage.readOnly') }}</span>
         </header>
 
         <SectionLoading
           v-if="app.runtime.loading.value && app.runtime.data.value === null"
-          label="Loading safety gates…"
+          :label="t('systemPage.loadingGates')"
         />
         <InlineError
           v-else-if="app.runtime.error.value && app.runtime.data.value === null"
@@ -264,27 +269,27 @@ function retryAll(): void {
         />
         <dl v-else-if="app.runtime.data.value" class="system-gate-grid">
           <div>
-            <dt>Scheduler</dt>
+            <dt>{{ t('systemPage.scheduler') }}</dt>
             <dd>
               <StatusBadge
                 :status="app.runtime.data.value.schedulerEnabled ? 'ENABLED' : 'DISABLED'"
               />
             </dd>
-            <p>Operator-controlled. Enabled does not mean a send is currently running.</p>
+            <p>{{ t('systemPage.schedulerNote') }}</p>
           </div>
           <div :class="{ 'system-gate--warning': app.runtime.data.value.manualRunEnabled }">
-            <dt>Manual Run</dt>
+            <dt>{{ t('systemPage.manualRun') }}</dt>
             <dd>
               <StatusBadge
                 :status="app.runtime.data.value.manualRunEnabled ? 'ENABLED' : 'DISABLED'"
               />
             </dd>
-            <p>Configured outside Admin. Runs are initiated only from Account Workspace.</p>
+            <p>{{ t('systemPage.manualRunNote') }}</p>
           </div>
           <div
             :class="{ 'system-gate--warning': app.runtime.data.value.realSendAuthorizationEnabled }"
           >
-            <dt>Real Send Authorization</dt>
+            <dt>{{ t('systemPage.realSend') }}</dt>
             <dd>
               <StatusBadge
                 :status="
@@ -292,7 +297,7 @@ function retryAll(): void {
                 "
               />
             </dd>
-            <p>Operator-controlled. No send or test action is available on this page.</p>
+            <p>{{ t('systemPage.realSendNote') }}</p>
           </div>
         </dl>
       </section>

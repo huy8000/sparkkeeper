@@ -17,11 +17,13 @@ import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
 import { useToasts } from '../composables/useToasts';
+import { useTranslation } from '../i18n';
 import type { ConfigureScheduleInput } from '../types/api';
 
 const app = useAdminApp();
 const workspace = useAccountWorkspace();
 const toasts = useToasts();
+const { t } = useTranslation();
 const schedules = useRequest((signal) => app.api.listSchedules(workspace.accountId.value, signal));
 const drawerOpen = ref(false);
 const submitting = ref(false);
@@ -88,11 +90,10 @@ async function saveSchedule(input: ConfigureScheduleInput): Promise<void> {
     await app.api.configureSchedule(workspace.accountId.value, input);
     await refreshSchedules(true);
     drawerOpen.value = false;
-    toasts.notify('success', 'Schedule configuration saved.');
+    toasts.notify('success', t('scheduleTab.savedToast'));
   } catch (error) {
-    formError.value =
-      error instanceof ApiError ? error.message : 'Schedule configuration could not be saved.';
-    toasts.notify('error', 'Schedule configuration could not be saved.');
+    formError.value = error instanceof ApiError ? error.message : t('scheduleTab.saveErrorToast');
+    toasts.notify('error', t('scheduleTab.saveErrorToast'));
   } finally {
     submitting.value = false;
   }
@@ -103,44 +104,42 @@ async function saveSchedule(input: ConfigureScheduleInput): Promise<void> {
   <div class="page-stack account-tab-page">
     <header class="account-tab-heading">
       <div>
-        <p class="eyebrow">Schedule</p>
-        <h3>Automatic execution window</h3>
-        <p>The account has zero or one schedule configuration.</p>
+        <p class="eyebrow">{{ t('scheduleTab.eyebrow') }}</p>
+        <h3>{{ t('scheduleTab.title') }}</h3>
+        <p>{{ t('scheduleTab.subtitle') }}</p>
       </div>
       <button class="button button--primary" type="button" @click="openForm">
-        {{ schedule ? 'Edit schedule' : 'Configure schedule' }}
+        {{ schedule ? t('scheduleTab.edit') : t('scheduleTab.configure') }}
       </button>
     </header>
 
     <section class="schedule-semantics" aria-labelledby="schedule-semantics-title">
       <div>
-        <p class="eyebrow">Important</p>
-        <h3 id="schedule-semantics-title">Automatic Scheduler semantics</h3>
+        <p class="eyebrow">{{ t('scheduleTab.semanticsEyebrow') }}</p>
+        <h3 id="schedule-semantics-title">{{ t('scheduleTab.semanticsTitle') }}</h3>
         <p>
-          The schedule window constrains automatic Scheduler execution. Manual Run uses server
-          preflight for the same BusinessDate and does not require the current time to be inside the
-          window.
+          {{ t('scheduleTab.semanticsDescription') }}
         </p>
       </div>
       <dl class="schedule-runtime-gates">
         <div>
-          <dt>Runtime Scheduler</dt>
+          <dt>{{ t('scheduleTab.runtimeScheduler') }}</dt>
           <dd>
             <StatusBadge
               v-if="app.runtime.data.value"
               :status="app.runtime.data.value.schedulerEnabled ? 'ENABLED' : 'DISABLED'"
             />
-            <span v-else>Unavailable</span>
+            <span v-else>{{ t('scheduleTab.unavailable') }}</span>
           </dd>
         </div>
         <div>
-          <dt>Real send authorization</dt>
+          <dt>{{ t('scheduleTab.realSendAuthorization') }}</dt>
           <dd>
             <StatusBadge
               v-if="app.runtime.data.value"
               :status="app.runtime.data.value.realSendAuthorizationEnabled ? 'ENABLED' : 'DISABLED'"
             />
-            <span v-else>Unavailable</span>
+            <span v-else>{{ t('scheduleTab.unavailable') }}</span>
           </dd>
         </div>
       </dl>
@@ -155,73 +154,75 @@ async function saveSchedule(input: ConfigureScheduleInput): Promise<void> {
 
     <SectionLoading
       v-if="schedules.loading.value && schedules.data.value === null"
-      label="Loading schedule…"
+      :label="t('scheduleTab.loading')"
     />
     <section v-else-if="schedules.initialError.value" class="section-error-stack">
       <InlineError :message="schedules.initialError.value.message" />
-      <button class="button button--secondary" type="button" @click="schedules.load">Retry</button>
+      <button class="button button--secondary" type="button" @click="schedules.load">
+        {{ t('common.retry') }}
+      </button>
     </section>
     <EmptyState
       v-else-if="schedule === null"
-      title="No schedule configured"
-      description="Configure an automatic execution window and retry policy for this account."
+      :title="t('scheduleTab.emptyTitle')"
+      :description="t('scheduleTab.emptyDescription')"
     >
       <template #action>
         <button class="button button--primary" type="button" @click="openForm">
-          Configure schedule
+          {{ t('scheduleTab.configure') }}
         </button>
       </template>
     </EmptyState>
     <section v-else class="schedule-configuration" aria-labelledby="schedule-config-title">
       <header class="card__header">
         <div>
-          <p class="eyebrow">Current configuration</p>
+          <p class="eyebrow">{{ t('scheduleTab.currentEyebrow') }}</p>
           <h3 id="schedule-config-title">{{ schedule.startTime }}–{{ schedule.endTime }}</h3>
         </div>
         <StatusBadge :status="schedule.enabled ? 'ENABLED' : 'DISABLED'" />
       </header>
-      <div class="schedule-window-visual" aria-label="Configured execution window">
+      <div class="schedule-window-visual" :aria-label="t('scheduleTab.windowAria')">
         <span>{{ schedule.startTime }}</span>
         <span class="schedule-window-visual__line" aria-hidden="true" />
         <span>{{ schedule.endTime }}</span>
       </div>
       <dl class="definition-grid">
         <div>
-          <dt>Timezone</dt>
+          <dt>{{ t('scheduleTab.timezone') }}</dt>
           <dd>{{ schedule.timezone }}</dd>
         </div>
         <div>
-          <dt>Maximum attempts</dt>
+          <dt>{{ t('scheduleTab.maxAttempts') }}</dt>
           <dd>{{ schedule.maxAttempts }}</dd>
         </div>
         <div>
-          <dt>Retry interval</dt>
-          <dd>{{ schedule.retryIntervalSeconds }} seconds</dd>
+          <dt>{{ t('scheduleTab.retryInterval') }}</dt>
+          <dd>{{ t('scheduleTab.seconds', { n: schedule.retryIntervalSeconds }) }}</dd>
         </div>
         <div>
-          <dt>Schedule enabled</dt>
-          <dd>{{ schedule.enabled ? 'Yes' : 'No' }}</dd>
+          <dt>{{ t('scheduleTab.scheduleEnabled') }}</dt>
+          <dd>{{ schedule.enabled ? t('common.yes') : t('common.no') }}</dd>
         </div>
       </dl>
     </section>
 
     <Drawer
       :open="drawerOpen"
-      :title="schedule ? 'Edit schedule' : 'Configure schedule'"
+      :title="schedule ? t('scheduleTab.edit') : t('scheduleTab.configure')"
       @close="closeForm"
     >
-      <p class="drawer-intro">Saving configuration does not start the Scheduler or a run.</p>
+      <p class="drawer-intro">{{ t('scheduleTab.drawerIntro') }}</p>
       <section v-if="serverChanged" class="notification-server-change" role="status">
         <div>
-          <strong>Schedule settings changed on the server.</strong>
-          <span>Your unsaved values have not been replaced.</span>
+          <strong>{{ t('scheduleTab.serverChangedTitle') }}</strong>
+          <span>{{ t('scheduleTab.serverChangedBody') }}</span>
         </div>
         <button
           class="button button--secondary button--compact"
           type="button"
           @click="requestServerReload"
         >
-          Reload
+          {{ t('scheduleTab.reload') }}
         </button>
       </section>
       <ScheduleForm
@@ -237,10 +238,10 @@ async function saveSchedule(input: ConfigureScheduleInput): Promise<void> {
 
     <DangerConfirmation
       :open="reloadConfirmationOpen"
-      title="Reload schedule settings?"
-      description="Reloading will replace your unsaved values with the latest server configuration."
-      confirm-label="Discard and reload"
-      cancel-label="Keep editing"
+      :title="t('scheduleTab.reloadConfirmTitle')"
+      :description="t('scheduleTab.reloadConfirmDescription')"
+      :confirm-label="t('scheduleTab.reloadConfirmButton')"
+      :cancel-label="t('scheduleTab.keepEditing')"
       @close="reloadConfirmationOpen = false"
       @confirm="confirmServerReload"
     />

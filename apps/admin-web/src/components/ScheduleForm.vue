@@ -9,7 +9,10 @@ import {
 } from '@sparkkeeper/shared';
 
 import type { ConfigureScheduleInput, Schedule } from '../types/api';
+import { useTranslation } from '../i18n';
 import FormField from './FormField.vue';
+
+const { t } = useTranslation();
 
 const props = withDefaults(
   defineProps<{
@@ -57,11 +60,11 @@ watch(dirty, (value) => emit('dirtyChange', value), { immediate: true });
 
 function submit(): void {
   if (form.startTime >= form.endTime) {
-    validationError.value = 'Start time must be before end time.';
+    validationError.value = t('scheduleForm.startBeforeEnd');
     return;
   }
   if (form.timezone.trim().length === 0) {
-    validationError.value = 'Timezone is required.';
+    validationError.value = t('scheduleForm.timezoneRequired');
     return;
   }
   if (
@@ -69,7 +72,10 @@ function submit(): void {
     form.maxAttempts < MIN_MAX_ATTEMPTS ||
     form.maxAttempts > MAX_MAX_ATTEMPTS
   ) {
-    validationError.value = `Maximum attempts must be from ${MIN_MAX_ATTEMPTS} through ${MAX_MAX_ATTEMPTS}.`;
+    validationError.value = t('scheduleForm.maxAttemptsRange', {
+      min: MIN_MAX_ATTEMPTS,
+      max: MAX_MAX_ATTEMPTS,
+    });
     return;
   }
   if (
@@ -77,7 +83,10 @@ function submit(): void {
     form.retryIntervalSeconds < MIN_RETRY_INTERVAL_SECONDS ||
     form.retryIntervalSeconds > MAX_RETRY_INTERVAL_SECONDS
   ) {
-    validationError.value = `Retry interval must be from ${MIN_RETRY_INTERVAL_SECONDS} through ${MAX_RETRY_INTERVAL_SECONDS} seconds.`;
+    validationError.value = t('scheduleForm.retryIntervalRange', {
+      min: MIN_RETRY_INTERVAL_SECONDS,
+      max: MAX_RETRY_INTERVAL_SECONDS,
+    });
     return;
   }
   validationError.value = '';
@@ -87,7 +96,7 @@ function submit(): void {
 
 <template>
   <form class="config-form config-form--grid" novalidate @submit.prevent="submit">
-    <FormField label="Start" help-text="Start of the automatic execution window.">
+    <FormField :label="t('scheduleForm.startLabel')" :help-text="t('scheduleForm.startHelp')">
       <template #default="{ fieldId, describedBy }">
         <input
           :id="fieldId"
@@ -100,7 +109,7 @@ function submit(): void {
         />
       </template>
     </FormField>
-    <FormField label="End" help-text="End of the automatic execution window.">
+    <FormField :label="t('scheduleForm.endLabel')" :help-text="t('scheduleForm.endHelp')">
       <template #default="{ fieldId, describedBy }">
         <input
           :id="fieldId"
@@ -113,7 +122,7 @@ function submit(): void {
         />
       </template>
     </FormField>
-    <FormField label="Timezone" help-text="BusinessDate and schedule window timezone.">
+    <FormField :label="t('scheduleForm.timezoneLabel')" :help-text="t('scheduleForm.timezoneHelp')">
       <template #default="{ fieldId, describedBy }">
         <input
           :id="fieldId"
@@ -126,7 +135,10 @@ function submit(): void {
         />
       </template>
     </FormField>
-    <FormField label="Maximum attempts" :help-text="`${MIN_MAX_ATTEMPTS}–${MAX_MAX_ATTEMPTS}`">
+    <FormField
+      :label="t('scheduleForm.maxAttemptsLabel')"
+      :help-text="`${MIN_MAX_ATTEMPTS}–${MAX_MAX_ATTEMPTS}`"
+    >
       <template #default="{ fieldId, describedBy }">
         <input
           :id="fieldId"
@@ -142,7 +154,7 @@ function submit(): void {
       </template>
     </FormField>
     <FormField
-      label="Retry interval seconds"
+      :label="t('scheduleForm.retryIntervalLabel')"
       :help-text="`${MIN_RETRY_INTERVAL_SECONDS}–${MAX_RETRY_INTERVAL_SECONDS}`"
     >
       <template #default="{ fieldId, describedBy }">
@@ -161,15 +173,13 @@ function submit(): void {
     </FormField>
     <label class="checkbox-field">
       <input v-model="form.enabled" name="scheduleEnabled" type="checkbox" :disabled="submitting" />
-      Schedule enabled
+      {{ t('scheduleForm.scheduleEnabled') }}
     </label>
     <p class="form-note form-actions--full">
-      This window constrains the automatic Scheduler. Manual Run remains governed by server
-      preflight for the current BusinessDate and is not restricted to being in this window.
+      {{ t('scheduleForm.windowNote') }}
     </p>
     <p class="form-note form-actions--full">
-      Saving does not change the runtime Scheduler or Real Send Authorization and does not start a
-      run.
+      {{ t('scheduleForm.saveNote') }}
     </p>
     <p
       v-if="validationError || serverError"
@@ -181,7 +191,7 @@ function submit(): void {
     </p>
     <div class="form-actions form-actions--full">
       <button class="button button--primary" type="submit" :disabled="submitting">
-        {{ submitting ? 'Saving…' : 'Save schedule' }}
+        {{ submitting ? t('scheduleForm.saving') : t('scheduleForm.save') }}
       </button>
       <button
         class="button button--secondary"
@@ -189,7 +199,7 @@ function submit(): void {
         :disabled="submitting"
         @click="$emit('cancel')"
       >
-        Cancel
+        {{ t('common.cancel') }}
       </button>
     </div>
   </form>

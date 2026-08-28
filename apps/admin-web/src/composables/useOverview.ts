@@ -14,6 +14,7 @@ import {
 import { ApiError } from '../api/client';
 import { invalidatesOverviewAccounts, invalidatesOverviewRuns } from '../api/overviewInvalidation';
 import { useAdminApp } from '../appContext';
+import { useTranslation } from '../i18n';
 import {
   classifyOverviewState,
   type OverviewClassification,
@@ -43,11 +44,17 @@ export interface OverviewOptions {
 function safeError(error: unknown): ApiError {
   return error instanceof ApiError
     ? error
-    : new ApiError('UNEXPECTED_ERROR', 'Something went wrong. Please try again.', 0, 'MALFORMED');
+    : new ApiError(
+        'UNEXPECTED_ERROR',
+        useTranslation().t('common.unexpectedError'),
+        0,
+        'MALFORMED',
+      );
 }
 
 export function useOverview(options: OverviewOptions = {}): OverviewStateModel {
   const app = useAdminApp();
+  const { t } = useTranslation();
   const now = options.now ?? (() => new Date());
   const accounts = useRequest((signal) => app.api.listAccounts(signal));
   const runsData = shallowRef<readonly DailyRun[] | null>(null);
@@ -128,9 +135,7 @@ export function useOverview(options: OverviewOptions = {}): OverviewStateModel {
     });
   });
   const classificationWarning = computed(() =>
-    detailUnavailableRunIds.value.size > 0
-      ? 'Unable to determine detailed failure reason for one or more runs.'
-      : null,
+    detailUnavailableRunIds.value.size > 0 ? t('overview.attention.failedDetailUnavailable') : null,
   );
 
   watch(

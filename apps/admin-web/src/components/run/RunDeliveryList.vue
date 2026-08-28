@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTranslation } from '../../i18n';
 import type { SendRecord } from '../../types/api';
 import { formatTimestamp } from '../../utils/format';
 import InlineError from '../InlineError.vue';
@@ -15,34 +16,38 @@ defineProps<{
 }>();
 
 defineEmits<{ retry: [] }>();
+
+const { t } = useTranslation();
 </script>
 
 <template>
-  <SectionLoading v-if="loading && records === null" label="Loading delivery records…" />
+  <SectionLoading v-if="loading && records === null" :label="t('deliveryList.loading')" />
   <InlineError v-else-if="errorMessage && records === null" :message="errorMessage" />
   <template v-else>
-    <BackgroundRefreshIndicator v-if="loading" label="Refreshing delivery records…" />
+    <BackgroundRefreshIndicator v-if="loading" :label="t('deliveryList.refreshing')" />
     <StaleDataNotice v-if="errorMessage" :message="errorMessage" @retry="$emit('retry')" />
     <div v-if="records !== null && records.length === 0" class="run-section-empty">
-      <p>No delivery records were created.</p>
+      <p>{{ t('deliveryList.emptyTitle') }}</p>
       <p class="run-section-empty__hint">
-        The run may have stopped before any delivery was attempted.
+        {{ t('deliveryList.emptyHint') }}
       </p>
     </div>
     <div v-else-if="records !== null" class="table-wrap">
       <table>
         <caption class="visually-hidden">
-          Send records for this run
+          {{
+            t('deliveryList.caption')
+          }}
         </caption>
         <thead>
           <tr>
-            <th scope="col">Contact</th>
-            <th scope="col">Status</th>
-            <th scope="col">Attempts</th>
-            <th scope="col">Failure code</th>
-            <th scope="col">Started</th>
-            <th scope="col">Finished</th>
-            <th scope="col">Sent</th>
+            <th scope="col">{{ t('deliveryList.contact') }}</th>
+            <th scope="col">{{ t('common.status') }}</th>
+            <th scope="col">{{ t('deliveryList.attempts') }}</th>
+            <th scope="col">{{ t('deliveryList.failureCode') }}</th>
+            <th scope="col">{{ t('runs.started') }}</th>
+            <th scope="col">{{ t('runs.finished') }}</th>
+            <th scope="col">{{ t('deliveryList.sent') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -57,12 +62,10 @@ defineEmits<{ retry: [] }>();
             <td>
               <RunStatusBadge :status="record.status" />
               <p v-if="record.status === 'DELIVERY_UNKNOWN'" class="delivery-uncertain-note">
-                Do not retry automatically.
+                {{ t('runHero.uncertainNoRetry') }}
               </p>
               <p v-if="record.status === 'RETRY_WAIT'" class="delivery-retry-note">
-                Waiting to retry after {{ record.attempts }} attempt{{
-                  record.attempts === 1 ? '' : 's'
-                }}.
+                {{ t('deliveryList.retryWait', record.attempts) }}
               </p>
             </td>
             <td>{{ record.attempts }}</td>

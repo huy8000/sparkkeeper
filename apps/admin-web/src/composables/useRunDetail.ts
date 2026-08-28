@@ -13,6 +13,7 @@ import {
 import { ApiError } from '../api/client';
 import { invalidatesRunDetail } from '../api/realtimeInvalidation';
 import { useAdminApp } from '../appContext';
+import { useTranslation } from '../i18n';
 import { deriveRunDetailState, type RunDetailState } from '../runs/deriveRunDetailState';
 import type { Account, DailyRun, SendRecord, SystemEvent } from '../types/api';
 import { useRealtimeRefresh } from './useRealtimeRefresh';
@@ -41,7 +42,12 @@ export interface RunDetailModel {
 function safeError(error: unknown): ApiError {
   return error instanceof ApiError
     ? error
-    : new ApiError('UNEXPECTED_ERROR', 'Something went wrong. Please try again.', 0, 'MALFORMED');
+    : new ApiError(
+        'UNEXPECTED_ERROR',
+        useTranslation().t('common.unexpectedError'),
+        0,
+        'MALFORMED',
+      );
 }
 
 /**
@@ -57,6 +63,7 @@ function safeError(error: unknown): ApiError {
  */
 export function useRunDetail(runId: Readonly<Ref<string>>): RunDetailModel {
   const app = useAdminApp();
+  const { t } = useTranslation();
   const run = useRequest((signal) => app.api.getRun(runId.value, signal));
 
   const accountData = shallowRef<Account | null>(null);
@@ -202,7 +209,7 @@ export function useRunDetail(runId: Readonly<Ref<string>>): RunDetailModel {
       ? null
       : deriveRunDetailState(run.data.value, sendRecordsData.value ?? []),
   );
-  const accountName = computed(() => accountData.value?.name ?? 'Unknown account');
+  const accountName = computed(() => accountData.value?.name ?? t('common.unknownAccount'));
 
   return {
     run,
@@ -216,7 +223,7 @@ export function useRunDetail(runId: Readonly<Ref<string>>): RunDetailModel {
     orderedEvents,
     detailState,
     accountName,
-    friendName: (friendId) => friendNames.value.get(friendId) ?? 'Unknown friend',
+    friendName: (friendId) => friendNames.value.get(friendId) ?? t('common.unknownFriend'),
     connectionState: readonly(app.realtime.connectionState) as Readonly<Ref<string>>,
     liveUpdatesUnavailable: computed(
       () =>

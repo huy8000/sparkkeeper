@@ -55,17 +55,17 @@ export function keepStaticMessage(draft: TemplateDraft, index: number): Template
 }
 
 export function validateTemplateDraft(draft: TemplateDraft): TemplateDraftErrors {
-  const name = draft.name.trim().length === 0 ? 'Template name is required.' : '';
+  const name = draft.name.trim().length === 0 ? 'templateEditor.validation.nameRequired' : '';
   const messages = draft.messages.map((message) =>
-    message.trim().length === 0 ? 'Message text is required.' : '',
+    message.trim().length === 0 ? 'templateEditor.validation.messageRequired' : '',
   );
   let summary = '';
   if (draft.providerType === 'STATIC' && draft.messages.length !== 1) {
-    summary = 'Static templates require exactly one message.';
+    summary = 'templateEditor.validation.staticExactlyOne';
   } else if (draft.messages.length === 0) {
-    summary = 'At least one message is required.';
+    summary = 'templateEditor.validation.atLeastOne';
   } else if (messages.some((message) => message !== '')) {
-    summary = 'Every configured message must contain text.';
+    summary = 'templateEditor.validation.allMessagesRequired';
   }
   return { name, messages, summary };
 }

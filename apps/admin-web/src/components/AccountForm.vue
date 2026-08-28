@@ -2,7 +2,10 @@
 import { computed, reactive, ref, watch } from 'vue';
 
 import type { Account, CreateAccountInput } from '../types/api';
+import { useTranslation } from '../i18n';
 import FormField from './FormField.vue';
+
+const { t } = useTranslation();
 
 const props = defineProps<{
   account?: Account;
@@ -34,7 +37,7 @@ watch(dirty, (value) => emit('dirtyChange', value), { immediate: true });
 function submit(): void {
   const name = form.name.trim();
   if (name.length === 0) {
-    validationError.value = 'Account name is required.';
+    validationError.value = t('accountForm.nameRequired');
     return;
   }
   validationError.value = '';
@@ -44,7 +47,7 @@ function submit(): void {
 
 <template>
   <form class="config-form" novalidate @submit.prevent="submit">
-    <FormField label="Account name">
+    <FormField :label="t('accountForm.accountName')">
       <template #default="{ fieldId, describedBy }">
         <input
           :id="fieldId"
@@ -59,7 +62,7 @@ function submit(): void {
     </FormField>
     <label class="checkbox-field">
       <input v-model="form.enabled" name="accountEnabled" type="checkbox" :disabled="submitting" />
-      Account enabled
+      {{ t('accountForm.accountEnabled') }}
     </label>
     <p
       v-if="validationError || serverError"
@@ -71,7 +74,7 @@ function submit(): void {
     </p>
     <div class="form-actions">
       <button class="button button--primary" type="submit" :disabled="submitting">
-        {{ submitting ? 'Saving…' : 'Save account' }}
+        {{ submitting ? t('accountForm.saving') : t('accountForm.save') }}
       </button>
       <button
         class="button button--secondary"
@@ -79,7 +82,7 @@ function submit(): void {
         :disabled="submitting"
         @click="$emit('cancel')"
       >
-        Cancel
+        {{ t('common.cancel') }}
       </button>
     </div>
   </form>

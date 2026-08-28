@@ -25,11 +25,15 @@ export function createAdminRouter(): Router {
         path: '/',
         component: AdminLayout,
         children: [
-          { path: '', component: OverviewPage, meta: { title: 'Overview', section: 'overview' } },
+          {
+            path: '',
+            component: OverviewPage,
+            meta: { title: 'nav.overview', section: 'overview' },
+          },
           {
             path: 'accounts',
             component: AccountsPage,
-            meta: { title: 'Accounts', section: 'accounts' },
+            meta: { title: 'nav.accounts', section: 'accounts' },
           },
           {
             path: 'accounts/:accountId',
@@ -43,27 +47,27 @@ export function createAdminRouter(): Router {
               {
                 path: 'overview',
                 component: AccountOverviewPage,
-                meta: { title: 'Account Overview', section: 'accounts' },
+                meta: { title: 'pages.accountOverview', section: 'accounts' },
               },
               {
                 path: 'friends',
                 component: AccountFriendsPage,
-                meta: { title: 'Account Friends', section: 'accounts' },
+                meta: { title: 'pages.accountFriends', section: 'accounts' },
               },
               {
                 path: 'schedule',
                 component: AccountSchedulePage,
-                meta: { title: 'Account Schedule', section: 'accounts' },
+                meta: { title: 'pages.accountSchedule', section: 'accounts' },
               },
               {
                 path: 'manual-run',
                 component: AccountManualRunPage,
-                meta: { title: 'Account Manual Run', section: 'accounts' },
+                meta: { title: 'pages.accountManualRun', section: 'accounts' },
               },
               {
                 path: 'history',
                 component: AccountHistoryPage,
-                meta: { title: 'Account History', section: 'accounts' },
+                meta: { title: 'pages.accountHistory', section: 'accounts' },
               },
             ],
           },
@@ -72,18 +76,18 @@ export function createAdminRouter(): Router {
             // reachable so existing links never 404.
             path: 'schedules',
             component: SchedulesPage,
-            meta: { title: 'Schedules', section: 'accounts' },
+            meta: { title: 'pages.schedules', section: 'accounts' },
           },
           {
             path: 'templates',
             component: TemplatesPage,
-            meta: { title: 'Templates', section: 'templates' },
+            meta: { title: 'nav.templates', section: 'templates' },
           },
-          { path: 'runs', component: RunsPage, meta: { title: 'Runs', section: 'runs' } },
+          { path: 'runs', component: RunsPage, meta: { title: 'nav.runs', section: 'runs' } },
           {
             path: 'runs/:runId',
             component: RunDetailPage,
-            meta: { title: 'Run detail', section: 'runs' },
+            meta: { title: 'pages.runDetail', section: 'runs' },
           },
           {
             // Compatibility redirect: notifications moved under /operations.
@@ -93,14 +97,14 @@ export function createAdminRouter(): Router {
           {
             path: 'operations/notifications',
             component: NotificationsPage,
-            meta: { title: 'Notifications', section: 'operations/notifications' },
+            meta: { title: 'nav.notifications', section: 'operations/notifications' },
           },
           {
             path: 'operations/system',
             component: SystemStatusPage,
-            meta: { title: 'System', section: 'operations/system' },
+            meta: { title: 'nav.system', section: 'operations/system' },
           },
-          { path: ':pathMatch(.*)*', component: NotFoundPage, meta: { title: 'Not found' } },
+          { path: ':pathMatch(.*)*', component: NotFoundPage, meta: { title: 'pages.notFound' } },
         ],
       },
     ],

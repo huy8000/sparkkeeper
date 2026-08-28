@@ -11,9 +11,11 @@ import ScheduleForm from '../components/ScheduleForm.vue';
 import { useRequest } from '../composables/useRequest';
 import { useMutation } from '../composables/useMutation';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
+import { useTranslation } from '../i18n';
 import type { ConfigureScheduleInput, Schedule } from '../types/api';
 
 const app = useAdminApp();
+const { t } = useTranslation();
 const result = useRequest(async (signal) => {
   const accounts = await app.api.listAccounts(signal);
   const groupedSchedules = await Promise.all(
@@ -55,7 +57,7 @@ async function saveSchedule(input: ConfigureScheduleInput): Promise<void> {
       editingSchedule.value = null;
       await result.load();
     },
-    'Schedule configuration saved.',
+    t('scheduleTab.savedToast'),
   );
 }
 
@@ -69,23 +71,25 @@ function closeForm(): void {
   <div class="page-stack">
     <header class="page-heading">
       <div>
-        <p class="eyebrow">Schedules</p>
-        <h2>Account schedule windows</h2>
-        <p>Schedule configuration is distinct from the runtime scheduler control.</p>
+        <p class="eyebrow">{{ t('pages.schedules') }}</p>
+        <h2>{{ t('schedulesPage.title') }}</h2>
+        <p>{{ t('schedulesPage.subtitle') }}</p>
       </div>
-      <button class="button button--secondary" type="button" @click="result.load">Refresh</button>
+      <button class="button button--secondary" type="button" @click="result.load">
+        {{ t('common.refresh') }}
+      </button>
     </header>
     <section class="notice-card">
-      <span>Runtime scheduler</span>
+      <span>{{ t('schedulesPage.runtimeScheduler') }}</span>
       <StatusBadge v-if="app.runtime.data.value" :status="runtimeSchedulerLabel" />
-      <span v-else>Unavailable</span>
-      <small>Each row below independently reports whether that schedule is enabled.</small>
+      <span v-else>{{ t('scheduleTab.unavailable') }}</span>
+      <small>{{ t('schedulesPage.rowNote') }}</small>
     </section>
     <p v-if="successMessage" class="success-message" role="status">{{ successMessage }}</p>
     <FormPanel
       v-if="editingSchedule"
-      title="Edit schedule"
-      description="Saving updates configuration only; it does not run the scheduler."
+      :title="t('scheduleTab.edit')"
+      :description="t('schedulesPage.editPanelDescription')"
       @cancel="closeForm"
     >
       <ScheduleForm
@@ -96,7 +100,10 @@ function closeForm(): void {
         @cancel="closeForm"
       />
     </FormPanel>
-    <LoadingState v-if="result.loading.value && !result.data.value" label="Loading schedules…" />
+    <LoadingState
+      v-if="result.loading.value && !result.data.value"
+      :label="t('schedulesPage.loading')"
+    />
     <ErrorState
       v-else-if="result.error.value"
       :message="result.error.value.message"
@@ -104,20 +111,20 @@ function closeForm(): void {
     />
     <EmptyState
       v-else-if="result.data.value?.length === 0"
-      title="No schedules"
-      description="No account schedules are available."
+      :title="t('schedulesPage.emptyTitle')"
+      :description="t('schedulesPage.emptyDescription')"
     />
     <div v-else-if="result.data.value" class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Account</th>
-            <th>Window</th>
-            <th>Timezone</th>
-            <th>Schedule enabled</th>
-            <th>Max attempts</th>
-            <th>Retry interval</th>
-            <th>Actions</th>
+            <th>{{ t('common.account') }}</th>
+            <th>{{ t('schedulesPage.columnWindow') }}</th>
+            <th>{{ t('scheduleTab.timezone') }}</th>
+            <th>{{ t('scheduleTab.scheduleEnabled') }}</th>
+            <th>{{ t('schedulesPage.columnMaxAttempts') }}</th>
+            <th>{{ t('scheduleTab.retryInterval') }}</th>
+            <th>{{ t('common.actions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -131,7 +138,9 @@ function closeForm(): void {
             <td>{{ item.schedule.timezone }}</td>
             <td><StatusBadge :status="item.schedule.enabled ? 'ENABLED' : 'DISABLED'" /></td>
             <td>{{ item.schedule.maxAttempts }}</td>
-            <td>{{ item.schedule.retryIntervalSeconds }} sec</td>
+            <td>
+              {{ t('schedulesPage.secondsShort', { n: item.schedule.retryIntervalSeconds }) }}
+            </td>
             <td>
               <button
                 class="button button--secondary button--compact"
@@ -141,7 +150,7 @@ function closeForm(): void {
                   formError = '';
                 "
               >
-                Edit
+                {{ t('common.edit') }}
               </button>
             </td>
           </tr>

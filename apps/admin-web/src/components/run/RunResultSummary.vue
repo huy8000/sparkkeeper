@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTranslation } from '../../i18n';
 import type { RunDetailState } from '../../runs/deriveRunDetailState';
 
 defineProps<{
@@ -9,6 +10,8 @@ defineProps<{
   failureCodes: readonly string[];
   failureSummary: string | null;
 }>();
+
+const { t } = useTranslation();
 </script>
 
 <template>
@@ -20,27 +23,22 @@ defineProps<{
   >
     <span class="run-hero__mark" aria-hidden="true">✓</span>
     <div class="run-hero__body">
-      <h3 id="run-hero-title">Verified Success</h3>
-      <p>This run has completed.</p>
+      <h3 id="run-hero-title">{{ t('runHero.successTitle') }}</h3>
+      <p>{{ t('runHero.successBody') }}</p>
       <p v-if="successfulDeliveryCount > 0">
-        Delivery results were verified by new outgoing message bubbles.
+        {{ t('runHero.successVerified') }}
       </p>
       <p class="run-hero__stats">
-        <span
-          >{{ successfulDeliveryCount }}
-          {{
-            successfulDeliveryCount === 1 ? 'successful delivery' : 'successful deliveries'
-          }}</span
-        >
+        <span>{{ t('runHero.successDeliveries', successfulDeliveryCount) }}</span>
         <span aria-hidden="true">·</span>
-        <span>{{ durationLabel }} duration</span>
+        <span>{{ t('runHero.successDuration', { duration: durationLabel }) }}</span>
       </p>
     </div>
-    <ol class="verification-chain" aria-label="How success is verified">
-      <li>Resolve contact</li>
-      <li>Send once</li>
-      <li>Observe new outgoing bubble</li>
-      <li>Persist SUCCESS</li>
+    <ol class="verification-chain" :aria-label="t('runHero.chainAria')">
+      <li>{{ t('runHero.chainResolve') }}</li>
+      <li>{{ t('runHero.chainSend') }}</li>
+      <li>{{ t('runHero.chainObserve') }}</li>
+      <li>{{ t('runHero.chainPersist') }}</li>
     </ol>
   </section>
 
@@ -52,10 +50,12 @@ defineProps<{
   >
     <span class="run-hero__mark" aria-hidden="true">?</span>
     <div class="run-hero__body">
-      <h3 id="run-hero-title">Delivery uncertain</h3>
-      <p>A send action occurred, but SparkKeeper could not verify a new outgoing message.</p>
-      <p><strong>The message may already have been delivered.</strong></p>
-      <p>Do not retry automatically.</p>
+      <h3 id="run-hero-title">{{ t('runHero.uncertainTitle') }}</h3>
+      <p>{{ t('runHero.uncertainBody') }}</p>
+      <p>
+        <strong>{{ t('runHero.uncertainMayDelivered') }}</strong>
+      </p>
+      <p>{{ t('runHero.uncertainNoRetry') }}</p>
     </div>
   </section>
 
@@ -66,12 +66,12 @@ defineProps<{
   >
     <span class="run-hero__mark" aria-hidden="true">!</span>
     <div class="run-hero__body">
-      <h3 id="run-hero-title">Login expired</h3>
-      <p>Authentication verification stopped the run.</p>
-      <p>This is the run status at the time it executed; the account may have recovered since.</p>
+      <h3 id="run-hero-title">{{ t('runHero.authExpiredTitle') }}</h3>
+      <p>{{ t('runHero.authExpiredBody') }}</p>
+      <p>{{ t('runHero.authExpiredNote') }}</p>
     </div>
     <RouterLink class="button button--secondary" :to="`/accounts/${accountId}/overview`">
-      View account
+      {{ t('runHero.viewAccount') }}
     </RouterLink>
   </section>
 
@@ -82,14 +82,14 @@ defineProps<{
   >
     <span class="run-hero__mark" aria-hidden="true">!</span>
     <div class="run-hero__body">
-      <h3 id="run-hero-title">Run failed</h3>
+      <h3 id="run-hero-title">{{ t('runHero.failedTitle') }}</h3>
       <p v-if="failureCodes.length > 0">
-        Failure codes:
+        {{ t('runHero.failedCodes') }}
         <code v-for="code in failureCodes" :key="code" class="run-hero__code">{{ code }}</code>
       </p>
       <p v-if="failureSummary">{{ failureSummary }}</p>
       <p v-if="failureCodes.length === 0 && failureSummary === null">
-        The run ended in a failure. Check the timeline for persisted details.
+        {{ t('runHero.failedFallback') }}
       </p>
     </div>
   </section>
@@ -101,16 +101,16 @@ defineProps<{
   >
     <span class="run-hero__pulse" aria-hidden="true" />
     <div class="run-hero__body">
-      <h3 id="run-hero-title">Running · Live</h3>
-      <p>The run is in progress. The timeline updates as events are persisted.</p>
+      <h3 id="run-hero-title">{{ t('runHero.runningTitle') }}</h3>
+      <p>{{ t('runHero.runningBody') }}</p>
     </div>
   </section>
 
   <section v-else class="run-hero" aria-labelledby="run-hero-title">
     <span class="run-hero__pulse" aria-hidden="true" />
     <div class="run-hero__body">
-      <h3 id="run-hero-title">Ready</h3>
-      <p>The run is ready and has not started yet.</p>
+      <h3 id="run-hero-title">{{ t('runHero.readyTitle') }}</h3>
+      <p>{{ t('runHero.readyBody') }}</p>
     </div>
   </section>
 </template>

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-withDefaults(defineProps<{ title?: string; message: string; retryLabel?: string }>(), {
-  title: 'Unable to load data',
-  retryLabel: 'Retry',
-});
+import { useTranslation } from '../i18n';
+
+defineProps<{ title?: string; message: string; retryLabel?: string }>();
 
 defineEmits<{ retry: [] }>();
+
+const { t } = useTranslation();
 </script>
 
 <template>
@@ -18,10 +19,10 @@ defineEmits<{ retry: [] }>();
         stroke-linecap="round"
       />
     </svg>
-    <h2 class="page-error__title">{{ title }}</h2>
+    <h2 class="page-error__title">{{ title ?? t('common.unableToLoadData') }}</h2>
     <p class="page-error__message">{{ message }}</p>
     <button class="button button--secondary" type="button" @click="$emit('retry')">
-      {{ retryLabel }}
+      {{ retryLabel ?? t('common.retry') }}
     </button>
   </section>
 </template>

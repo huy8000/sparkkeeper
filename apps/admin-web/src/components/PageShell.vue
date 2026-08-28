@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import { useTranslation } from '../i18n';
+
 defineProps<{ eyebrow?: string; title: string; description?: string }>();
+
+const { t } = useTranslation();
 </script>
 
 <template>
@@ -15,7 +19,7 @@ defineProps<{ eyebrow?: string; title: string; description?: string }>();
     <section class="page-shell">
       <slot>
         <p class="page-shell__note">
-          This area is part of the V3 foundation and will be completed in a follow-up task.
+          {{ t('pageShell.note') }}
         </p>
       </slot>
     </section>

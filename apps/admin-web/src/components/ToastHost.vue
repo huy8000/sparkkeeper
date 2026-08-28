@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useToasts } from '../composables/useToasts';
+import { useTranslation } from '../i18n';
 
 const { toasts, dismiss } = useToasts();
+const { t } = useTranslation();
 </script>
 
 <template>
@@ -11,7 +13,7 @@ const { toasts, dismiss } = useToasts();
       <button
         class="toast__dismiss"
         type="button"
-        :aria-label="`Dismiss ${toast.tone} notification`"
+        :aria-label="t('common.dismissNotification')"
         @click="dismiss(toast.id)"
       >
         ×

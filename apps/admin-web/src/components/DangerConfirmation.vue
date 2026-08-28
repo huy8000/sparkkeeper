@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTranslation } from '../i18n';
 import Modal from './Modal.vue';
 
 const props = defineProps<{
@@ -11,6 +12,8 @@ const props = defineProps<{
 }>();
 
 defineEmits<{ confirm: []; close: [] }>();
+
+const { t } = useTranslation();
 </script>
 
 <template>
@@ -26,7 +29,7 @@ defineEmits<{ confirm: []; close: [] }>();
       <slot />
       <div class="modal-actions">
         <button class="button button--secondary" type="button" @click="$emit('close')">
-          {{ props.cancelLabel ?? 'Cancel' }}
+          {{ props.cancelLabel ?? t('common.cancel') }}
         </button>
         <button
           class="button button--danger"
@@ -34,7 +37,7 @@ defineEmits<{ confirm: []; close: [] }>();
           :disabled="props.pending"
           @click="$emit('confirm')"
         >
-          {{ props.confirmLabel ?? 'Confirm' }}
+          {{ props.confirmLabel ?? t('common.confirm') }}
         </button>
       </div>
     </div>

@@ -75,7 +75,7 @@ describe('Runs list', () => {
       ),
     ).toBe(true);
 
-    const selects = wrapper.findAll('select');
+    const selects = wrapper.findAll('.filter-bar select');
     await selects[0]!.setValue('');
     await wrapper.find('input[type="date"]').setValue('');
     await selects[1]!.setValue('SUCCESS');
@@ -105,7 +105,7 @@ describe('Runs list', () => {
     expect(
       fetchMock.mock.calls.some(([input]) => String(input).endsWith('/api/runs?limit=50')),
     ).toBe(true);
-    const selects = wrapper.findAll('select');
+    const selects = wrapper.findAll('.filter-bar select');
     expect((selects[1]!.element as HTMLSelectElement).value).toBe('');
     wrapper.unmount();
   });
@@ -188,7 +188,7 @@ describe('Runs list', () => {
         : undefined,
     );
     const wrapper = await mountAdmin('/runs');
-    const selects = wrapper.findAll('select');
+    const selects = wrapper.findAll('.filter-bar select');
     await selects[1]!.setValue('FAILED');
     await wrapper.find('form').trigger('submit');
     await flushPromises();
@@ -249,7 +249,7 @@ describe('Runs list', () => {
       return success([runFixture]);
     });
     const wrapper = await mountAdmin('/runs');
-    const status = wrapper.findAll('select')[1]!;
+    const status = wrapper.findAll('.filter-bar select')[1]!;
     await status.setValue('FAILED');
     await wrapper.find('form').trigger('submit');
     await status.setValue('SUCCESS');
@@ -277,7 +277,7 @@ describe('Runs list', () => {
   it('only issues GET requests while browsing, filtering, and refreshing', async () => {
     const fetchMock = installApiFetch();
     const wrapper = await mountAdmin('/runs');
-    const selects = wrapper.findAll('select');
+    const selects = wrapper.findAll('.filter-bar select');
     await selects[1]!.setValue('FAILED');
     await wrapper.find('form').trigger('submit');
     await flushPromises();
@@ -297,7 +297,7 @@ describe('Runs list', () => {
     const fetchMock = installApiFetch();
     installEventSource();
     const wrapper = await mountAdmin('/runs');
-    const selects = wrapper.findAll('select');
+    const selects = wrapper.findAll('.filter-bar select');
     await selects[0]!.setValue(ACCOUNT_ID);
     await wrapper.find('input[type="date"]').setValue('2026-01-02');
     await selects[1]!.setValue('FAILED');

@@ -1,23 +1,21 @@
 <script setup lang="ts">
-withDefaults(
-  defineProps<{
-    message?: string;
-    retryLabel?: string;
-  }>(),
-  {
-    message: 'Unable to refresh latest data. Showing the last successful snapshot.',
-    retryLabel: 'Refresh again',
-  },
-);
+import { useTranslation } from '../i18n';
+
+defineProps<{
+  message?: string;
+  retryLabel?: string;
+}>();
 
 defineEmits<{ retry: [] }>();
+
+const { t } = useTranslation();
 </script>
 
 <template>
   <div class="stale-data-notice" role="alert">
-    <span>{{ message }}</span>
+    <span>{{ message ?? t('common.staleData') }}</span>
     <button class="button button--secondary button--compact" type="button" @click="$emit('retry')">
-      {{ retryLabel }}
+      {{ retryLabel ?? t('common.refreshAgain') }}
     </button>
   </div>
 </template>

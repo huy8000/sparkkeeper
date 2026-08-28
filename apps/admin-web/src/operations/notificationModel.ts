@@ -37,7 +37,7 @@ export function notificationInputFrom(draft: NotificationDraft): NotificationCon
 
 export function validateNotificationDraft(draft: NotificationDraft): string {
   if (draft.enabled && draft.webhookUrl.trim() === '') {
-    return 'Webhook URL is required while notifications are enabled.';
+    return 'notificationsPage.validation.webhookRequired';
   }
   return '';
 }

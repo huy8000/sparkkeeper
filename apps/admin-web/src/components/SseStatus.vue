@@ -1,24 +1,28 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-import { realtimeConnectionLabel } from '../api/realtimePolicy';
+import { realtimeConnectionKey } from '../api/realtimePolicy';
+import { useTranslation } from '../i18n';
 import type { RealtimeConnectionState } from '../types/api';
 
 const props = defineProps<{ state: RealtimeConnectionState }>();
+
+const { t } = useTranslation();
 
 /**
  * SSE presentation rule: CONNECTED → "Live"; any reconnecting phase →
  * "Reconnecting". A dropped realtime link never blocks REST pages.
  */
 const indicator = computed(() => {
+  const label = t(realtimeConnectionKey(props.state));
   if (props.state === 'CONNECTED') {
-    return { label: realtimeConnectionLabel(props.state), className: 'sse-status--live' };
+    return { label, className: 'sse-status--live' };
   }
   if (props.state === 'DISCONNECTED') {
-    return { label: realtimeConnectionLabel(props.state), className: 'sse-status--offline' };
+    return { label, className: 'sse-status--offline' };
   }
   return {
-    label: realtimeConnectionLabel(props.state),
+    label,
     className: 'sse-status--reconnecting',
   };
 });
