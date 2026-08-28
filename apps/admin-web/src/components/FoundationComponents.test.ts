@@ -4,6 +4,7 @@ import { h } from 'vue';
 
 import { useToasts } from '../composables/useToasts';
 import Drawer from './Drawer.vue';
+import BackgroundRefreshIndicator from './BackgroundRefreshIndicator.vue';
 import EmptyState from './EmptyState.vue';
 import FormField from './FormField.vue';
 import InlineError from './InlineError.vue';
@@ -12,6 +13,23 @@ import PageError from './PageError.vue';
 import PageLoading from './PageLoading.vue';
 import Skeleton from './Skeleton.vue';
 import ToastHost from './ToastHost.vue';
+import StaleDataNotice from './StaleDataNotice.vue';
+
+describe('background resource states', () => {
+  it('renders a quiet refresh status without replacing content', () => {
+    const wrapper = mount(BackgroundRefreshIndicator);
+    expect(wrapper.attributes('role')).toBe('status');
+    expect(wrapper.text()).toContain('Refreshing latest data');
+  });
+
+  it('renders stale snapshot guidance and emits an explicit refresh', async () => {
+    const wrapper = mount(StaleDataNotice);
+    expect(wrapper.attributes('role')).toBe('alert');
+    expect(wrapper.text()).toContain('last successful snapshot');
+    await wrapper.get('button').trigger('click');
+    expect(wrapper.emitted('retry')).toHaveLength(1);
+  });
+});
 
 describe('PageLoading', () => {
   it('renders skeleton placeholders instead of a full-screen spinner', () => {

@@ -4,10 +4,12 @@ import { watch } from 'vue';
 import { invalidatesWorkspaceRuns } from '../api/accountWorkspaceInvalidation';
 import { useAccountWorkspace } from '../accountWorkspaceContext';
 import { useAdminApp } from '../appContext';
+import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
 import EmptyState from '../components/EmptyState.vue';
 import InlineError from '../components/InlineError.vue';
 import RunStatusBadge from '../components/RunStatusBadge.vue';
 import SectionLoading from '../components/SectionLoading.vue';
+import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
 import { formatDuration, formatTimestamp } from '../utils/format';
@@ -37,12 +39,19 @@ useRealtimeRefresh(
       <button class="button button--secondary" type="button" @click="runs.load">Refresh</button>
     </header>
 
+    <BackgroundRefreshIndicator v-if="runs.refreshing.value" />
+    <StaleDataNotice
+      v-if="runs.refreshError.value"
+      :message="runs.refreshError.value.message"
+      @retry="runs.load"
+    />
+
     <SectionLoading
       v-if="runs.loading.value && runs.data.value === null"
       label="Loading account history…"
     />
-    <section v-else-if="runs.error.value" class="section-error-stack">
-      <InlineError :message="runs.error.value.message" />
+    <section v-else-if="runs.initialError.value" class="section-error-stack">
+      <InlineError :message="runs.initialError.value.message" />
       <button class="button button--secondary" type="button" @click="runs.load">Retry</button>
     </section>
     <EmptyState

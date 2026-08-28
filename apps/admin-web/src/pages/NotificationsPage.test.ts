@@ -370,6 +370,34 @@ describe('Notifications realtime and dirty state', () => {
     expect(wrapper.text()).toContain('Webhook configuration');
     wrapper.unmount();
   });
+
+  it('bounds a successful save plus CONFIG_CHANGED echo without duplicate success toasts', async () => {
+    const fetchMock = installApiFetch();
+    installEventSource();
+    const wrapper = await mountAdmin('/operations/notifications');
+    await wrapper.get('input[name="notifyTaskFailed"]').setValue(false);
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    vi.useFakeTimers();
+    FakeEventSource.instances[0]!.emit(
+      'config-changed',
+      configEvent('NOTIFICATION', 'notification-config', undefined, 'echo'),
+    );
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    vi.useRealTimers();
+
+    expect(
+      fetchMock.mock.calls.filter(
+        ([input, init]) =>
+          String(input).endsWith('/api/notification-config') && (init?.method ?? 'GET') === 'GET',
+      ),
+    ).toHaveLength(2);
+    expect(wrapper.findAll('.toast')).toHaveLength(1);
+    expect(wrapper.find('.toast').text()).toContain('Notification settings saved.');
+    wrapper.unmount();
+  });
 });
 
 describe('Test notification', () => {

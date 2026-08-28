@@ -55,9 +55,9 @@ function safeError(error: unknown): ApiError {
  * high-frequency phases (FRIEND_RESOLVING, MESSAGE_BUILDING, MESSAGE_SENDING,
  * VERIFYING) and useRealtimeRefresh coalesces bursts at 500ms.
  */
-export function useRunDetail(runId: string): RunDetailModel {
+export function useRunDetail(runId: Readonly<Ref<string>>): RunDetailModel {
   const app = useAdminApp();
-  const run = useRequest((signal) => app.api.getRun(runId, signal));
+  const run = useRequest((signal) => app.api.getRun(runId.value, signal));
 
   const accountData = shallowRef<Account | null>(null);
   const accountError = ref<ApiError | null>(null);
@@ -78,6 +78,23 @@ export function useRunDetail(runId: string): RunDetailModel {
   function cancelSecondaries(): void {
     secondaryController?.abort();
     secondaryController = undefined;
+  }
+
+  function resetSecondaries(): void {
+    cancelSecondaries();
+    secondaryRequest += 1;
+    accountData.value = null;
+    accountError.value = null;
+    accountLoading.value = false;
+    sendRecordsData.value = null;
+    sendRecordsError.value = null;
+    sendRecordsLoading.value = false;
+    eventsData.value = null;
+    eventsError.value = null;
+    eventsLoading.value = false;
+    friendNames.value = new Map();
+    resolvedAccountId = null;
+    friendsLoadedFor = null;
   }
 
   async function loadAccount(accountId: string, signal: AbortSignal): Promise<void> {
@@ -128,7 +145,7 @@ export function useRunDetail(runId: string): RunDetailModel {
 
     const accountTask = loadAccount(currentRun.accountId, signal);
     const recordsTask = app.api
-      .listSendRecords(runId, signal)
+      .listSendRecords(currentRun.id, signal)
       .then(async (records) => {
         if (signal.aborted) return;
         sendRecordsData.value = records;
@@ -142,7 +159,7 @@ export function useRunDetail(runId: string): RunDetailModel {
         if (!signal.aborted) sendRecordsLoading.value = false;
       });
     const eventsTask = app.api
-      .listSystemEvents(runId, signal)
+      .listSystemEvents(currentRun.id, signal)
       .then((events) => {
         if (!signal.aborted) eventsData.value = events;
       })
@@ -162,13 +179,18 @@ export function useRunDetail(runId: string): RunDetailModel {
     if (currentRun === null) return;
     void loadSecondaries(currentRun);
   });
+  watch(runId, () => {
+    resetSecondaries();
+    run.reset();
+    void run.load();
+  });
   watch(app.refreshVersion, () => void run.load());
   useRealtimeRefresh(
     app.realtime,
-    (event) => invalidatesRunDetail(event, runId),
+    (event) => invalidatesRunDetail(event, runId.value),
     () => void run.load(),
   );
-  onBeforeUnmount(cancelSecondaries);
+  onBeforeUnmount(resetSecondaries);
 
   const orderedEvents = computed(() =>
     [...(eventsData.value ?? [])].sort((left, right) =>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
 import type { Account, CreateAccountInput } from '../types/api';
 import FormField from './FormField.vue';
@@ -9,19 +9,27 @@ const props = defineProps<{
   submitting: boolean;
   serverError?: string;
 }>();
-const emit = defineEmits<{ submit: [value: CreateAccountInput]; cancel: [] }>();
+const emit = defineEmits<{
+  submit: [value: CreateAccountInput];
+  cancel: [];
+  dirtyChange: [dirty: boolean];
+}>();
 const form = reactive({ name: '', enabled: true });
 const validationError = ref('');
+const initialSnapshot = ref('');
+const dirty = computed(() => JSON.stringify(form) !== initialSnapshot.value);
 
 watch(
   () => props.account,
   (account) => {
     form.name = account?.name ?? '';
     form.enabled = account?.enabled ?? true;
+    initialSnapshot.value = JSON.stringify(form);
     validationError.value = '';
   },
   { immediate: true },
 );
+watch(dirty, (value) => emit('dirtyChange', value), { immediate: true });
 
 function submit(): void {
   const name = form.name.trim();

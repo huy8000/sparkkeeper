@@ -722,6 +722,39 @@ a {
   background: var(--sk-success-soft);
 }
 
+.background-refresh-indicator,
+.stale-data-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--sk-space-2);
+  margin: 0;
+  border-radius: var(--sk-radius-sm);
+  font-size: 0.8rem;
+}
+
+.background-refresh-indicator {
+  width: fit-content;
+  padding: 6px 10px;
+  color: var(--sk-text-secondary);
+  background: var(--sk-surface-secondary);
+}
+
+.background-refresh-indicator__pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sk-accent-cyan-strong);
+  box-shadow: 0 0 0 3px var(--sk-accent-cyan-soft);
+}
+
+.stale-data-notice {
+  justify-content: space-between;
+  padding: 9px var(--sk-space-2);
+  border: 1px solid color-mix(in srgb, var(--sk-warning) 35%, var(--sk-border));
+  color: var(--sk-text-secondary);
+  background: var(--sk-warning-soft);
+}
+
 .form-actions--full {
   grid-column: 1 / -1;
 }

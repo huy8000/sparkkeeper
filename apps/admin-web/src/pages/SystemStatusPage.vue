@@ -2,12 +2,14 @@
 import { computed, watch } from 'vue';
 
 import { useAdminApp } from '../appContext';
+import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
 import InlineError from '../components/InlineError.vue';
 import PageError from '../components/PageError.vue';
 import RuntimeStatus from '../components/RuntimeStatus.vue';
 import SectionLoading from '../components/SectionLoading.vue';
 import Skeleton from '../components/Skeleton.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useRequest } from '../composables/useRequest';
 import { classifyRuntimeReadiness, classifySystemSummary } from '../operations/runtimeReadiness';
 import { formatTimestamp } from '../utils/format';
@@ -98,7 +100,12 @@ function retryAll(): void {
             </button>
           </div>
           <template v-else-if="health.data.value">
-            <InlineError v-if="health.error.value" :message="health.error.value.message" />
+            <BackgroundRefreshIndicator v-if="health.refreshing.value" label="Refreshing Health…" />
+            <StaleDataNotice
+              v-if="health.refreshError.value"
+              :message="health.refreshError.value.message"
+              @retry="health.load"
+            />
             <dl class="system-definition-list">
               <div>
                 <dt>Server</dt>
@@ -159,9 +166,14 @@ function retryAll(): void {
             </button>
           </div>
           <template v-else-if="app.runtime.data.value">
-            <InlineError
-              v-if="app.runtime.error.value"
-              :message="app.runtime.error.value.message"
+            <BackgroundRefreshIndicator
+              v-if="app.runtime.refreshing.value"
+              label="Refreshing Runtime…"
+            />
+            <StaleDataNotice
+              v-if="app.runtime.refreshError.value"
+              :message="app.runtime.refreshError.value.message"
+              @retry="app.runtime.load"
             />
             <dl class="system-definition-list">
               <div>

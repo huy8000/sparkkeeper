@@ -4,11 +4,13 @@ import { ref, watch } from 'vue';
 import { useAdminApp } from '../appContext';
 import AccountForm from '../components/AccountForm.vue';
 import AuthStatusBadge from '../components/AuthStatusBadge.vue';
+import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
 import EmptyState from '../components/EmptyState.vue';
 import ErrorState from '../components/ErrorState.vue';
 import FormPanel from '../components/FormPanel.vue';
 import LoadingState from '../components/LoadingState.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useRequest } from '../composables/useRequest';
 import { useMutation } from '../composables/useMutation';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
@@ -66,6 +68,12 @@ function closeForm(): void {
         </button>
       </div>
     </header>
+    <BackgroundRefreshIndicator v-if="accounts.refreshing.value" />
+    <StaleDataNotice
+      v-if="accounts.refreshError.value"
+      :message="accounts.refreshError.value.message"
+      @retry="accounts.load"
+    />
     <p v-if="successMessage" class="success-message" role="status">{{ successMessage }}</p>
     <FormPanel
       v-if="creating"
@@ -80,10 +88,10 @@ function closeForm(): void {
         @cancel="closeForm"
       />
     </FormPanel>
-    <LoadingState v-if="accounts.loading.value && !accounts.data.value" label="Loading accounts…" />
+    <LoadingState v-if="accounts.initialLoading.value" label="Loading accounts…" />
     <ErrorState
-      v-else-if="accounts.error.value"
-      :message="accounts.error.value.message"
+      v-else-if="accounts.initialError.value"
+      :message="accounts.initialError.value.message"
       @retry="accounts.load"
     />
     <EmptyState

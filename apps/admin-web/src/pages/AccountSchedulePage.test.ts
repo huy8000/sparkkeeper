@@ -1,10 +1,11 @@
 import { flushPromises } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import ScheduleForm from '../components/ScheduleForm.vue';
 import { ACCOUNT_ID, scheduleFixture } from '../test/fixtures';
 import { failure, installApiFetch, success } from '../test/http';
 import { mountAdmin } from '../test/mountAdmin';
+import { FakeEventSource, configEvent, installEventSource } from '../test/realtime';
 
 describe('Account Schedule', () => {
   it('loads the existing 0..1 schedule and renders current configuration semantics', async () => {
@@ -145,6 +146,36 @@ describe('Account Schedule', () => {
     expect(wrapper.text()).toContain('Demo Account');
     expect(wrapper.find('.account-tabs').exists()).toBe(true);
     expect(wrapper.get('.section-loading[role="status"]').text()).toContain('Loading schedule');
+    wrapper.unmount();
+  });
+
+  it('does not overwrite a dirty Schedule form after CONFIG_CHANGED', async () => {
+    const fetchMock = installApiFetch();
+    installEventSource();
+    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}/schedule`);
+    await wrapper
+      .findAll('button')
+      .find((candidate) => candidate.text() === 'Edit schedule')!
+      .trigger('click');
+    const form = wrapper.getComponent(ScheduleForm);
+    await form.get('input[name="timezone"]').setValue('Asia/Tokyo');
+
+    vi.useFakeTimers();
+    FakeEventSource.instances[0]!.emit(
+      'config-changed',
+      configEvent('SCHEDULE', scheduleFixture.id, ACCOUNT_ID),
+    );
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    vi.useRealTimers();
+
+    expect(form.get('input[name="timezone"]').element).toHaveProperty('value', 'Asia/Tokyo');
+    expect(document.body.textContent).toContain('Schedule settings changed on the server.');
+    expect(
+      fetchMock.mock.calls.filter(([input]) =>
+        String(input).endsWith(`/api/accounts/${ACCOUNT_ID}/schedules`),
+      ),
+    ).toHaveLength(1);
     wrapper.unmount();
   });
 });

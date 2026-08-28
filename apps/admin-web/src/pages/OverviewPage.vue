@@ -2,6 +2,8 @@
 import { computed } from 'vue';
 
 import { useAdminApp } from '../appContext';
+import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
+import StaleDataNotice from '../components/StaleDataNotice.vue';
 import OverviewActivity from '../components/overview/OverviewActivity.vue';
 import OverviewAttention from '../components/overview/OverviewAttention.vue';
 import OverviewQuickActions from '../components/overview/OverviewQuickActions.vue';
@@ -13,12 +15,27 @@ const app = useAdminApp();
 const overview = useOverview();
 
 const todayError = computed(
-  () => overview.accounts.error.value?.message ?? overview.runs.error.value?.message ?? null,
+  () =>
+    (overview.accounts.data.value === null ? overview.accounts.error.value?.message : null) ??
+    (overview.runs.data.value === null ? overview.runs.error.value?.message : null) ??
+    null,
 );
 const todayLoading = computed(
   () =>
     (overview.accounts.loading.value && overview.accounts.data.value === null) ||
     (overview.runs.loading.value && overview.runs.data.value === null),
+);
+const isRefreshing = computed(
+  () =>
+    overview.accounts.refreshing.value ||
+    (overview.runs.loading.value && overview.runs.data.value !== null) ||
+    app.runtime.refreshing.value,
+);
+const hasRefreshError = computed(
+  () =>
+    overview.accounts.refreshError.value !== null ||
+    (overview.runs.data.value !== null && overview.runs.error.value !== null) ||
+    app.runtime.refreshError.value !== null,
 );
 const sortedRuns = computed(() =>
   overview.runs.data.value === null
@@ -74,6 +91,9 @@ function greetingForTimeZone(now: Date, timeZone: string | null): string {
       </div>
     </header>
 
+    <BackgroundRefreshIndicator v-if="isRefreshing" />
+    <StaleDataNotice v-if="hasRefreshError" @retry="overview.refresh" />
+
     <OverviewTodaySummary
       :classification="overview.classification.value"
       :loading="todayLoading"
@@ -92,7 +112,9 @@ function greetingForTimeZone(now: Date, timeZone: string | null): string {
       <OverviewRuntimeSummary
         :runtime="app.runtime.data.value"
         :loading="app.runtime.loading.value"
-        :error-message="app.runtime.error.value?.message ?? null"
+        :error-message="
+          app.runtime.data.value === null ? (app.runtime.error.value?.message ?? null) : null
+        "
         @retry="app.runtime.load"
       />
     </div>
@@ -101,7 +123,9 @@ function greetingForTimeZone(now: Date, timeZone: string | null): string {
       :runs="sortedRuns"
       :accounts="overview.accounts.data.value ?? []"
       :loading="overview.runs.loading.value"
-      :error-message="overview.runs.error.value?.message ?? null"
+      :error-message="
+        overview.runs.data.value === null ? (overview.runs.error.value?.message ?? null) : null
+      "
       @retry="overview.runs.load"
     />
 

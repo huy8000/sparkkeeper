@@ -49,6 +49,7 @@ describe('SseStatus', () => {
     expect(mount(SseStatus, { props: { state: 'CONNECTED' } }).text()).toBe('Live');
     expect(mount(SseStatus, { props: { state: 'CONNECTING' } }).text()).toBe('Reconnecting');
     expect(mount(SseStatus, { props: { state: 'RECONNECTING' } }).text()).toBe('Reconnecting');
+    expect(mount(SseStatus, { props: { state: 'DISCONNECTED' } }).text()).toBe('Offline');
   });
 
   it('exposes its state through role="status"', () => {

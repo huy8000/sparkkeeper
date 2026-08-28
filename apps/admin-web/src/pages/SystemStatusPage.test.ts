@@ -1,10 +1,10 @@
 import { flushPromises } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 
-import { healthFixture, runtimeFixture } from '../test/fixtures';
+import { RUN_ID, healthFixture, runtimeFixture } from '../test/fixtures';
 import { failure, installApiFetch, success } from '../test/http';
 import { mountAdmin } from '../test/mountAdmin';
-import { FakeEventSource, configEvent, installEventSource } from '../test/realtime';
+import { FakeEventSource, configEvent, installEventSource, runtimeEvent } from '../test/realtime';
 
 describe('System status', () => {
   it('loads Health and Runtime independently', async () => {
@@ -193,7 +193,7 @@ describe('System status', () => {
 });
 
 describe('System realtime behavior', () => {
-  it('coalesces relevant runtime/config bursts into one Runtime refresh', async () => {
+  it('ignores unrelated config changes and coalesces relevant runtime bursts', async () => {
     const fetchMock = installApiFetch();
     installEventSource();
     const wrapper = await mountAdmin('/operations/system');
@@ -206,6 +206,16 @@ describe('System realtime behavior', () => {
     );
     source.emit('config-changed', configEvent('ACCOUNT', 'synthetic-account', undefined, '2'));
     source.emit('config-changed', configEvent('TEMPLATE', 'synthetic-template', undefined, '3'));
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/runtime/status')),
+    ).toHaveLength(1);
+
+    source.emit('runtime', runtimeEvent(RUN_ID, 'RUN_STARTED', '4'));
+    source.emit('runtime', runtimeEvent(RUN_ID, 'TASK_FAILED', '5'));
+    source.emit('runtime', runtimeEvent(RUN_ID, 'MESSAGE_SENDING', '6'));
     await vi.advanceTimersByTimeAsync(500);
     await flushPromises();
 
@@ -233,6 +243,26 @@ describe('System realtime behavior', () => {
     expect(wrapper.text()).toContain(healthFixture.version);
     expect(wrapper.text()).toContain('Runtime dependencies');
     expect(wrapper.text()).not.toContain('System status unavailable');
+    wrapper.unmount();
+  });
+
+  it('retains the Runtime snapshot after a background refresh error', async () => {
+    let runtimeReads = 0;
+    installApiFetch((url) => {
+      if (url.pathname !== '/api/runtime/status') return undefined;
+      runtimeReads += 1;
+      return runtimeReads === 1
+        ? success(runtimeFixture)
+        : failure('RUNTIME_REFRESH_FAILED', 'Latest runtime could not be loaded.', 503);
+    });
+    const wrapper = await mountAdmin('/operations/system');
+    await wrapper.get('.topbar .button').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain(runtimeFixture.timezone);
+    expect(wrapper.text()).toContain('Latest runtime could not be loaded.');
+    expect(wrapper.find('.stale-data-notice').exists()).toBe(true);
+    expect(wrapper.find('.page-error').exists()).toBe(false);
     wrapper.unmount();
   });
 });

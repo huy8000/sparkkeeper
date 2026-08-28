@@ -201,6 +201,26 @@ describe('Overview', () => {
     wrapper.unmount();
   });
 
+  it('retains the successful overview snapshot after a background refresh error', async () => {
+    let runReads = 0;
+    installApiFetch((url) => {
+      if (url.pathname !== '/api/runs') return undefined;
+      runReads += 1;
+      return runReads === 1
+        ? success([runFixture])
+        : failure('OVERVIEW_REFRESH_FAILED', 'Latest overview runs could not be loaded.', 503);
+    });
+    const wrapper = await mountAdmin('/');
+    await wrapper.get('.topbar .button').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Everything is running normally');
+    expect(wrapper.text()).toContain('Unable to refresh latest data.');
+    expect(wrapper.find('.stale-data-notice').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("Today's summary is unavailable");
+    wrapper.unmount();
+  });
+
   it('keeps REST content visible while SSE reports Reconnecting', async () => {
     installApiFetch();
     installEventSource();

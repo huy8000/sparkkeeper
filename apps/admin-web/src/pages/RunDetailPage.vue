@@ -6,18 +6,22 @@ import RunDeliveryList from '../components/run/RunDeliveryList.vue';
 import RunResultSummary from '../components/run/RunResultSummary.vue';
 import RunTechnicalDetails from '../components/run/RunTechnicalDetails.vue';
 import RunTimeline from '../components/run/RunTimeline.vue';
+import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
 import PageError from '../components/PageError.vue';
 import RunStatusBadge from '../components/RunStatusBadge.vue';
 import Skeleton from '../components/Skeleton.vue';
+import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useRunDetail } from '../composables/useRunDetail';
 import { formatDuration, formatTimestamp } from '../utils/format';
 
 const route = useRoute();
-const runId = String(route.params.runId);
+const runId = computed(() => String(route.params.runId));
 const detail = useRunDetail(runId);
 
 const run = computed(() => detail.run.data.value);
-const is404 = computed(() => detail.run.error.value?.httpStatus === 404);
+const is404 = computed(
+  () => detail.run.data.value === null && detail.run.error.value?.httpStatus === 404,
+);
 
 const durationLabel = computed(() => {
   const current = run.value;
@@ -66,6 +70,13 @@ const failureSummary = computed(() => {
       </div>
     </div>
 
+    <BackgroundRefreshIndicator v-if="detail.run.refreshing.value" />
+    <StaleDataNotice
+      v-if="detail.run.refreshError.value"
+      :message="detail.run.refreshError.value.message"
+      @retry="detail.refresh"
+    />
+
     <section v-else-if="is404" class="state-panel state-panel--empty" role="alert">
       <div>
         <h2 class="state-panel__title">Run not found</h2>
@@ -75,9 +86,9 @@ const failureSummary = computed(() => {
     </section>
 
     <PageError
-      v-else-if="detail.run.error.value"
+      v-else-if="detail.run.initialError.value"
       title="Unable to load run"
-      :message="detail.run.error.value.message"
+      :message="detail.run.initialError.value.message"
       retry-label="Try loading again"
       @retry="detail.refresh"
     />
@@ -153,6 +164,7 @@ const failureSummary = computed(() => {
             :loading="detail.sendRecords.loading.value"
             :error-message="detail.sendRecords.error.value?.message ?? null"
             :friend-name="detail.friendName"
+            @retry="detail.refresh"
           />
         </section>
 
@@ -171,6 +183,7 @@ const failureSummary = computed(() => {
             :loading="detail.events.loading.value"
             :error-message="detail.events.error.value?.message ?? null"
             :friend-name="detail.friendName"
+            @retry="detail.refresh"
           />
         </section>
       </div>
