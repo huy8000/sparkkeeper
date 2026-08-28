@@ -29,7 +29,7 @@ const templates = useRequest((signal) => app.api.listTemplates(signal));
 const selectedTemplateId = ref('');
 const preflight = ref<ManualRunPreflightDto | null>(null);
 const preflightLoading = ref(false);
-const preflightError = ref('');
+const preflightError = ref<ApiError | string>('');
 const acknowledged = ref(false);
 const confirmationOpen = ref(false);
 const submitting = ref(false);
@@ -105,7 +105,7 @@ async function refreshPreflight(): Promise<void> {
       !(error instanceof ApiError && error.kind === 'ABORT')
     ) {
       preflightError.value =
-        error instanceof ApiError ? error.message : t('manualRunPage.preflightGenericError');
+        error instanceof ApiError ? error : t('manualRunPage.preflightGenericError');
     }
   } finally {
     if (currentRequest === requestNumber) preflightLoading.value = false;
@@ -146,7 +146,7 @@ async function startManualRun(): Promise<void> {
     confirmationOpen.value = false;
     acknowledged.value = false;
     if (error instanceof ApiError && error.kind === 'API') {
-      preflightError.value = error.message;
+      preflightError.value = error;
       preflight.value = null;
     } else {
       requestUncertain.value = true;
@@ -183,7 +183,7 @@ onBeforeUnmount(cancelPreflight);
     <BackgroundRefreshIndicator v-if="templates.refreshing.value" />
     <StaleDataNotice
       v-if="templates.refreshError.value"
-      :message="templates.refreshError.value.message"
+      :error="templates.refreshError.value"
       @retry="templates.load"
     />
 
@@ -192,7 +192,7 @@ onBeforeUnmount(cancelPreflight);
       :label="t('manualRunPage.templatesLoading')"
     />
     <section v-else-if="templates.initialError.value" class="section-error-stack">
-      <InlineError :message="templates.initialError.value.message" />
+      <InlineError :error="templates.initialError.value" />
       <button class="button button--secondary" type="button" @click="templates.load">
         {{ t('common.retry') }}
       </button>
@@ -235,7 +235,7 @@ onBeforeUnmount(cancelPreflight);
       </FormField>
 
       <SectionLoading v-if="preflightLoading" :label="t('manualRunPage.preflightChecking')" />
-      <InlineError v-if="preflightError" :message="preflightError" />
+      <InlineError v-if="preflightError" :error="preflightError" />
 
       <section v-if="requestUncertain" class="manual-result manual-result--uncertain" role="alert">
         <p class="eyebrow">{{ t('manualRunPage.uncertainEyebrow') }}</p>

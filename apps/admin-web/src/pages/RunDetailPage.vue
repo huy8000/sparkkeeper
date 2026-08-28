@@ -11,12 +11,14 @@ import PageError from '../components/PageError.vue';
 import RunStatusBadge from '../components/RunStatusBadge.vue';
 import Skeleton from '../components/Skeleton.vue';
 import StaleDataNotice from '../components/StaleDataNotice.vue';
+import { useApiErrorText } from '../composables/useApiErrorText';
 import { useRunDetail } from '../composables/useRunDetail';
 import { useTranslation } from '../i18n';
 import { formatDuration, formatTimestamp } from '../utils/format';
 
 const route = useRoute();
 const { t } = useTranslation();
+const { apiErrorText } = useApiErrorText();
 const runId = computed(() => String(route.params.runId));
 const detail = useRunDetail(runId);
 
@@ -75,7 +77,7 @@ const failureSummary = computed(() => {
     <BackgroundRefreshIndicator v-if="detail.run.refreshing.value" />
     <StaleDataNotice
       v-if="detail.run.refreshError.value"
-      :message="detail.run.refreshError.value.message"
+      :error="detail.run.refreshError.value"
       @retry="detail.refresh"
     />
 
@@ -92,7 +94,7 @@ const failureSummary = computed(() => {
     <PageError
       v-else-if="detail.run.initialError.value"
       :title="t('runDetail.errorTitle')"
-      :message="detail.run.initialError.value.message"
+      :error="detail.run.initialError.value"
       :retry-label="t('runs.tryAgain')"
       @retry="detail.refresh"
     />
@@ -166,7 +168,7 @@ const failureSummary = computed(() => {
           <RunDeliveryList
             :records="detail.sendRecords.data.value"
             :loading="detail.sendRecords.loading.value"
-            :error-message="detail.sendRecords.error.value?.message ?? null"
+            :error-message="apiErrorText(detail.sendRecords.error.value) || null"
             :friend-name="detail.friendName"
             @retry="detail.refresh"
           />
@@ -185,7 +187,7 @@ const failureSummary = computed(() => {
           <RunTimeline
             :events="detail.orderedEvents.value"
             :loading="detail.events.loading.value"
-            :error-message="detail.events.error.value?.message ?? null"
+            :error-message="apiErrorText(detail.events.error.value) || null"
             :friend-name="detail.friendName"
             @retry="detail.refresh"
           />

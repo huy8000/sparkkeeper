@@ -2,6 +2,7 @@ import { flushPromises, type VueWrapper } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 
 import ManualRunPreflight from '../components/account/ManualRunPreflight.vue';
+import { setLocale } from '../i18n';
 import {
   ACCOUNT_ID,
   TEMPLATE_ID,
@@ -204,8 +205,35 @@ describe('Account Manual Run', () => {
     await acknowledgeAndReview(wrapper);
     confirmationButton().click();
     await flushPromises();
-    expect(wrapper.get('[role="alert"]').text()).toContain('A run is already in progress.');
+    expect(wrapper.get('[role="alert"]').text()).toContain('A run is already in progress today.');
     expect(wrapper.findComponent(ManualRunPreflight).exists()).toBe(false);
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url, init]) => String(url).endsWith('/manual-runs') && init?.method === 'POST',
+      ),
+    ).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it('localizes authoritative POST rejections in zh-CN without leaking raw copy', async () => {
+    const fetchMock = installApiFetch((url, init) =>
+      url.pathname.endsWith('/manual-runs') && init?.method === 'POST'
+        ? failure('RUN_ALREADY_COMPLETE', 'The daily run already finished.', 409)
+        : undefined,
+    );
+    setLocale('zh-CN');
+    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}/manual-run`);
+    await selectTemplate(wrapper);
+    await acknowledgeAndReview(wrapper);
+    const button = [...document.body.querySelectorAll('button')].find(
+      (candidate) => candidate.textContent?.trim() === '启动手动执行',
+    );
+    expect(button).toBeDefined();
+    (button as HTMLButtonElement).click();
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain('今天的执行已经完成。');
+    expect(wrapper.text()).not.toContain('The daily run already finished.');
+    // Security rejections stay authoritative: exactly one POST, no retry.
     expect(
       fetchMock.mock.calls.filter(
         ([url, init]) => String(url).endsWith('/manual-runs') && init?.method === 'POST',

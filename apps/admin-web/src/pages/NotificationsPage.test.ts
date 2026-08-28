@@ -181,7 +181,9 @@ describe('Notifications configuration', () => {
     await wrapper.get('form').trigger('submit');
     await flushPromises();
 
-    expect(wrapper.get('[role="alert"]').text()).toContain('Webhook destination is not permitted.');
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      'The webhook destination is blocked by the security policy.',
+    );
     expect(wrapper.get('input[name="webhookUrl"]').element).toHaveProperty('value', typedUrl);
     expect(wrapper.get('input[name="notifyTaskFailed"]').element).toHaveProperty('checked', false);
     expect(wrapper.find('.toast').text()).not.toContain(typedUrl);

@@ -15,6 +15,7 @@ import Skeleton from '../components/Skeleton.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import StaleDataNotice from '../components/StaleDataNotice.vue';
 import TemplateEditor from '../components/template/TemplateEditor.vue';
+import { useApiErrorText } from '../composables/useApiErrorText';
 import { useDebouncedAction } from '../composables/useDebouncedAction';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
@@ -29,15 +30,16 @@ type ConfirmationAction = 'close' | 'reload';
 const app = useAdminApp();
 const toasts = useToasts();
 const { t } = useTranslation();
+const { apiErrorText } = useApiErrorText();
 const templates = useRequest((signal) => app.api.listTemplates(signal));
 const drawerOpen = ref(false);
 const editorMode = ref<EditorMode>('create');
 const editingTemplateId = ref('');
 const detail = ref<MessageTemplateDetail | null>(null);
 const detailLoading = ref(false);
-const detailError = ref('');
+const detailError = ref<ApiError | string>('');
 const submitting = ref(false);
-const mutationError = ref('');
+const mutationError = ref<ApiError | string>('');
 const editorDirty = ref(false);
 const serverChanged = ref(false);
 const confirmationAction = ref<ConfirmationAction | null>(null);
@@ -125,8 +127,7 @@ async function loadDetail(): Promise<void> {
       requestNumber === detailRequestNumber &&
       !(error instanceof ApiError && error.kind === 'ABORT')
     ) {
-      detailError.value =
-        error instanceof ApiError ? error.message : t('templatesPage.loadEditorError');
+      detailError.value = error instanceof ApiError ? error : t('templatesPage.loadEditorError');
     }
   } finally {
     if (requestNumber === detailRequestNumber) detailLoading.value = false;
@@ -179,8 +180,7 @@ async function saveTemplate(input: MessageTemplateInput): Promise<void> {
     await templates.load();
     toasts.notify('success', t('templatesPage.savedToast'));
   } catch (error) {
-    mutationError.value =
-      error instanceof ApiError ? error.message : t('templatesPage.saveErrorToast');
+    mutationError.value = error instanceof ApiError ? error : t('templatesPage.saveErrorToast');
     toasts.notify('error', t('templatesPage.saveErrorToast'));
   } finally {
     submitting.value = false;
@@ -216,7 +216,7 @@ onBeforeUnmount(() => {
     <BackgroundRefreshIndicator v-if="templates.refreshing.value" />
     <StaleDataNotice
       v-if="templates.refreshError.value"
-      :message="templates.refreshError.value.message"
+      :error="templates.refreshError.value"
       @retry="templates.load"
     />
 
@@ -236,7 +236,7 @@ onBeforeUnmount(() => {
     <PageError
       v-else-if="templates.initialError.value"
       :title="t('templatesPage.errorTitle')"
-      :message="templates.initialError.value.message"
+      :error="templates.initialError.value"
       @retry="templates.load"
     />
 
@@ -326,7 +326,7 @@ onBeforeUnmount(() => {
         v-else-if="editorMode === 'edit' && detailError && detail === null"
         class="section-error-stack"
       >
-        <InlineError :message="detailError" />
+        <InlineError :error="detailError" />
         <div class="form-actions">
           <button class="button button--secondary" type="button" @click="loadDetail">
             {{ t('common.retry') }}
@@ -343,13 +343,13 @@ onBeforeUnmount(() => {
         />
         <StaleDataNotice
           v-if="detailError && detail !== null"
-          :message="detailError"
+          :error="detailError"
           @retry="loadDetail"
         />
         <TemplateEditor
           :template="editorMode === 'edit' ? (detail ?? undefined) : undefined"
           :submitting="submitting"
-          :server-error="mutationError"
+          :server-error="apiErrorText(mutationError)"
           :server-changed="serverChanged"
           @submit="saveTemplate"
           @cancel="requestClose"

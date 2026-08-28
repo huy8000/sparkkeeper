@@ -47,11 +47,13 @@ const form = reactive<NotificationDraft>({
   notifyDeliveryUnknown: true,
 });
 const saving = ref(false);
-const saveError = ref('');
+// Client validation keys/strings pass through untouched; ApiError snapshots
+// localize at render time. The WEBHOOK_REQUIRED_KEY sentinel stays a string.
+const saveError = ref<ApiError | string>('');
 const serverChanged = ref(false);
 const reloadConfirmationOpen = ref(false);
 const testing = ref(false);
-const testError = ref('');
+const testError = ref<ApiError | string>('');
 const testResult = ref<NotificationDeliveryResult | null>(null);
 const testUncertain = ref(false);
 let applyNextResponse = false;
@@ -123,8 +125,7 @@ async function saveConfiguration(): Promise<void> {
     testError.value = '';
     toasts.notify('success', t('notificationsPage.savedToast'));
   } catch (error) {
-    saveError.value =
-      error instanceof ApiError ? error.message : t('notificationsPage.saveErrorToast');
+    saveError.value = error instanceof ApiError ? error : t('notificationsPage.saveErrorToast');
     toasts.notify('error', t('notificationsPage.saveErrorToast'));
   } finally {
     saving.value = false;
@@ -168,8 +169,7 @@ async function sendTestNotification(): Promise<void> {
       testUncertain.value = true;
       toasts.notify('warning', t('notificationsPage.testUncertainToast'));
     } else {
-      testError.value =
-        error instanceof ApiError ? error.message : t('notificationsPage.testSendError');
+      testError.value = error instanceof ApiError ? error : t('notificationsPage.testSendError');
       toasts.notify('error', t('notificationsPage.testSendError'));
     }
   } finally {
@@ -229,7 +229,7 @@ onBeforeUnmount(() => {
     <BackgroundRefreshIndicator v-if="configurationRequest.refreshing.value" />
     <StaleDataNotice
       v-if="configurationRequest.refreshError.value"
-      :message="configurationRequest.refreshError.value.message"
+      :error="configurationRequest.refreshError.value"
       @retry="configurationRequest.load"
     />
 
@@ -257,7 +257,7 @@ onBeforeUnmount(() => {
     <PageError
       v-else-if="configurationRequest.error.value && configuration === null"
       :title="t('notificationsPage.errorTitle')"
-      :message="configurationRequest.error.value.message"
+      :error="configurationRequest.error.value"
       @retry="configurationRequest.load"
     />
 
@@ -405,10 +405,7 @@ onBeforeUnmount(() => {
             </label>
           </fieldset>
 
-          <InlineError
-            v-if="saveError && saveError !== WEBHOOK_REQUIRED_KEY"
-            :message="saveError"
-          />
+          <InlineError v-if="saveError && saveError !== WEBHOOK_REQUIRED_KEY" :error="saveError" />
           <div class="form-actions">
             <button class="button button--primary" type="submit" :disabled="saving || !dirty">
               {{ saving ? t('notificationsPage.saving') : t('notificationsPage.save') }}
@@ -447,7 +444,7 @@ onBeforeUnmount(() => {
         <p v-if="!configured" class="notification-test-hint">
           {{ t('notificationsPage.testHint') }}
         </p>
-        <InlineError v-if="testError" :message="testError" />
+        <InlineError v-if="testError" :error="testError" />
         <NotificationTestResult :result="testResult" :uncertain="testUncertain" />
       </section>
     </template>

@@ -220,7 +220,9 @@ describe('V3 Templates', () => {
       'value',
       'Retained Template',
     );
-    expect(editor.get('[role="alert"]').text()).toContain('Template configuration is invalid.');
+    expect(editor.get('[role="alert"]').text()).toContain(
+      'The submitted input is invalid. Please review it and try again.',
+    );
     expect(wrapper.text()).toContain('Template configuration could not be saved.');
     wrapper.unmount();
   });
@@ -333,7 +335,9 @@ describe('V3 Templates', () => {
     expect((editor.get('input[name="templateEnabled"]').element as HTMLInputElement).checked).toBe(
       false,
     );
-    expect(editor.get('[role="alert"]').text()).toContain('Template changed before save.');
+    expect(editor.get('[role="alert"]').text()).toContain(
+      'The current state conflicts with this operation. Please refresh and try again.',
+    );
     wrapper.unmount();
   });
 

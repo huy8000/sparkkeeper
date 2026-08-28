@@ -13,6 +13,7 @@ import InlineError from '../components/InlineError.vue';
 import RunStatusBadge from '../components/RunStatusBadge.vue';
 import SectionLoading from '../components/SectionLoading.vue';
 import StaleDataNotice from '../components/StaleDataNotice.vue';
+import { useApiErrorText } from '../composables/useApiErrorText';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
 import { useToasts } from '../composables/useToasts';
@@ -24,11 +25,12 @@ const app = useAdminApp();
 const workspace = useAccountWorkspace();
 const toasts = useToasts();
 const { t } = useTranslation();
+const { apiErrorText } = useApiErrorText();
 const friends = useRequest((signal) => app.api.listFriends(workspace.accountId.value, signal));
 const drawerOpen = ref(false);
 const editingFriend = ref<Friend | null>(null);
 const submitting = ref(false);
-const formError = ref('');
+const formError = ref<ApiError | string>('');
 
 watch(app.refreshVersion, () => void friends.load());
 useRealtimeRefresh(
@@ -71,7 +73,7 @@ async function saveFriend(input: FriendConfigurationInput): Promise<void> {
     editingFriend.value = null;
     toasts.notify('success', t('friendsPage.savedToast'));
   } catch (error) {
-    formError.value = error instanceof ApiError ? error.message : t('friendsPage.saveErrorToast');
+    formError.value = error instanceof ApiError ? error : t('friendsPage.saveErrorToast');
     toasts.notify('error', t('friendsPage.saveErrorToast'));
   } finally {
     submitting.value = false;
@@ -111,7 +113,7 @@ function identityConfigured(friend: Friend): boolean {
     <BackgroundRefreshIndicator v-if="friends.refreshing.value" />
     <StaleDataNotice
       v-if="friends.refreshError.value"
-      :message="friends.refreshError.value.message"
+      :error="friends.refreshError.value"
       @retry="friends.load"
     />
 
@@ -120,7 +122,7 @@ function identityConfigured(friend: Friend): boolean {
       :label="t('friendsPage.loading')"
     />
     <section v-else-if="friends.initialError.value" class="section-error-stack">
-      <InlineError :message="friends.initialError.value.message" />
+      <InlineError :error="friends.initialError.value" />
       <button class="button button--secondary" type="button" @click="friends.load">
         {{ t('common.retry') }}
       </button>
@@ -195,7 +197,7 @@ function identityConfigured(friend: Friend): boolean {
       <FriendForm
         :friend="editingFriend ?? undefined"
         :submitting="submitting"
-        :server-error="formError"
+        :server-error="apiErrorText(formError)"
         @submit="saveFriend"
         @cancel="closeDrawer"
       />

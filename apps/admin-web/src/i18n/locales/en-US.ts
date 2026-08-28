@@ -39,6 +39,7 @@ export const enUS = {
     copyIdentifier: 'Copy identifier {value}',
     loadingContent: 'Loading content…',
     unexpectedError: 'Something went wrong. Please try again.',
+    saveFailed: 'The configuration could not be saved. Please try again.',
   },
   status: {
     success: 'Success',
@@ -835,6 +836,34 @@ export const enUS = {
     title: 'Not Found',
     description: 'The requested admin page does not exist.',
     back: 'Return to Overview',
+  },
+  errors: {
+    api: {
+      accountNotFound: 'Account not found.',
+      friendNotFound: 'Friend not found.',
+      scheduleNotFound: 'Schedule not found.',
+      templateNotFound: 'Message template not found.',
+      runNotFound: 'Run not found.',
+      validationError: 'The submitted input is invalid. Please review it and try again.',
+      conflict: 'The current state conflicts with this operation. Please refresh and try again.',
+      runAlreadyInProgress: 'A run is already in progress today.',
+      runAlreadyComplete: "Today's run is already complete.",
+      runTerminal: "Today's run has reached a terminal state.",
+      manualRunForbidden: 'Manual Run is disabled by server policy.',
+      manualRunBlocked:
+        'Manual Run is blocked by the current server state. Please refresh and try again.',
+      manualRunUnavailable: 'Manual Run is temporarily unavailable. Please try again later.',
+      realSendAcknowledgementRequired:
+        'Confirm the risk of real message sending before starting a run.',
+      adminRequestRequired: 'This admin request is missing a required security marker.',
+      adminRequestRejected: 'This admin request was rejected by the security policy.',
+      eventStreamRejected: 'The realtime event stream was rejected by the security policy.',
+      unsupportedMediaType: 'The request format is not supported.',
+      webhookDestinationBlocked: 'The webhook destination is blocked by the security policy.',
+      routeNotFound: 'The requested API route does not exist.',
+      internalError: 'The service hit an internal error. Please reload and try again.',
+      unknown: 'An unexpected error occurred.',
+    },
   },
 };
 

@@ -83,7 +83,9 @@ describe('Schedules', () => {
       .trigger('click');
     await wrapper.get('form').trigger('submit');
     await flushPromises();
-    expect(wrapper.get('[role="alert"]').text()).toContain('Schedule configuration is invalid.');
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      'The submitted input is invalid. Please review it and try again.',
+    );
     expect(wrapper.html()).not.toMatch(
       /private_stack_sentinel|database path|browser profile|fixture-only-token/iu,
     );

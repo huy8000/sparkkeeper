@@ -9,18 +9,31 @@ import OverviewAttention from '../components/overview/OverviewAttention.vue';
 import OverviewQuickActions from '../components/overview/OverviewQuickActions.vue';
 import OverviewRuntimeSummary from '../components/overview/OverviewRuntimeSummary.vue';
 import OverviewTodaySummary from '../components/overview/OverviewTodaySummary.vue';
+import { useApiErrorText } from '../composables/useApiErrorText';
 import { useOverview } from '../composables/useOverview';
 import { currentLocale, useTranslation } from '../i18n';
 
 const app = useAdminApp();
 const overview = useOverview();
 const { t } = useTranslation();
+const { apiErrorText } = useApiErrorText();
 
+// Keep the ApiError snapshot; the display copy resolves at render time so a
+// language switch re-renders the error text without refetching anything.
 const todayError = computed(
   () =>
-    (overview.accounts.data.value === null ? overview.accounts.error.value?.message : null) ??
-    (overview.runs.data.value === null ? overview.runs.error.value?.message : null) ??
+    (overview.accounts.data.value === null ? overview.accounts.error.value : null) ??
+    (overview.runs.data.value === null ? overview.runs.error.value : null) ??
     null,
+);
+const todayErrorText = computed(() =>
+  todayError.value === null ? null : apiErrorText(todayError.value),
+);
+const runtimeErrorText = computed(() =>
+  app.runtime.data.value === null ? apiErrorText(app.runtime.error.value) || null : null,
+);
+const activityErrorText = computed(() =>
+  overview.runs.data.value === null ? apiErrorText(overview.runs.error.value) || null : null,
 );
 const todayLoading = computed(
   () =>
@@ -100,7 +113,7 @@ function greetingForTimeZone(now: Date, timeZone: string | null): string {
     <OverviewTodaySummary
       :classification="overview.classification.value"
       :loading="todayLoading"
-      :error-message="todayError"
+      :error-message="todayErrorText"
       @retry="overview.refresh"
     />
 
@@ -110,14 +123,12 @@ function greetingForTimeZone(now: Date, timeZone: string | null): string {
         :accounts="overview.accounts.data.value ?? []"
         :warning="overview.classificationWarning.value"
         :loading="todayLoading"
-        :error-message="todayError"
+        :error-message="todayErrorText"
       />
       <OverviewRuntimeSummary
         :runtime="app.runtime.data.value"
         :loading="app.runtime.loading.value"
-        :error-message="
-          app.runtime.data.value === null ? (app.runtime.error.value?.message ?? null) : null
-        "
+        :error-message="runtimeErrorText"
         @retry="app.runtime.load"
       />
     </div>
@@ -126,9 +137,7 @@ function greetingForTimeZone(now: Date, timeZone: string | null): string {
       :runs="sortedRuns"
       :accounts="overview.accounts.data.value ?? []"
       :loading="overview.runs.loading.value"
-      :error-message="
-        overview.runs.data.value === null ? (overview.runs.error.value?.message ?? null) : null
-      "
+      :error-message="activityErrorText"
       @retry="overview.runs.load"
     />
 

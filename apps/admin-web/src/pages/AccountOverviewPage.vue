@@ -139,10 +139,7 @@ const hasRefreshError = computed(
           v-if="friends.loading.value && friends.data.value === null"
           :label="t('accountOverviewTab.friends.loading')"
         />
-        <InlineError
-          v-else-if="friends.initialError.value"
-          :message="friends.initialError.value.message"
-        />
+        <InlineError v-else-if="friends.initialError.value" :error="friends.initialError.value" />
         <template v-else>
           <strong class="account-summary-card__value">{{ enabledFriendCount ?? 0 }}</strong>
           <span>{{
@@ -166,7 +163,7 @@ const hasRefreshError = computed(
         />
         <InlineError
           v-else-if="schedules.initialError.value"
-          :message="schedules.initialError.value.message"
+          :error="schedules.initialError.value"
         />
         <template v-else-if="schedule">
           <StatusBadge :status="schedule.enabled ? 'ENABLED' : 'DISABLED'" />
@@ -192,10 +189,7 @@ const hasRefreshError = computed(
           v-if="runs.loading.value && runs.data.value === null"
           :label="t('accountOverviewTab.latestRun.loading')"
         />
-        <InlineError
-          v-else-if="runs.initialError.value"
-          :message="runs.initialError.value.message"
-        />
+        <InlineError v-else-if="runs.initialError.value" :error="runs.initialError.value" />
         <template v-else-if="latestRun">
           <RunStatusBadge :status="latestRun.status" />
           <strong>{{ latestRun.businessDate }}</strong>
@@ -222,7 +216,7 @@ const hasRefreshError = computed(
         />
         <InlineError
           v-else-if="app.runtime.initialError.value"
-          :message="app.runtime.initialError.value.message"
+          :error="app.runtime.initialError.value"
         />
         <template v-else-if="app.runtime.data.value">
           <StatusBadge
