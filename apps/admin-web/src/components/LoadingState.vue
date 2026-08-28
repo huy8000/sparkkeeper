@@ -1,10 +1,14 @@
 <script setup lang="ts">
-withDefaults(defineProps<{ label?: string }>(), { label: 'Loading data…' });
+import { useTranslation } from '../i18n';
+
+defineProps<{ label?: string }>();
+
+const { t } = useTranslation();
 </script>
 
 <template>
   <div class="state-panel" role="status" aria-live="polite">
     <span class="spinner" aria-hidden="true" />
-    <span>{{ label }}</span>
+    <span>{{ label ?? t('common.loadingData') }}</span>
   </div>
 </template>

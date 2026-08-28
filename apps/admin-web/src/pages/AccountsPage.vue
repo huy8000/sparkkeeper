@@ -3,19 +3,25 @@ import { ref, watch } from 'vue';
 
 import { useAdminApp } from '../appContext';
 import AccountForm from '../components/AccountForm.vue';
+import AuthStatusBadge from '../components/AuthStatusBadge.vue';
+import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
 import EmptyState from '../components/EmptyState.vue';
 import ErrorState from '../components/ErrorState.vue';
 import FormPanel from '../components/FormPanel.vue';
-import IdentifierValue from '../components/IdentifierValue.vue';
 import LoadingState from '../components/LoadingState.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useRequest } from '../composables/useRequest';
+import { useApiErrorText } from '../composables/useApiErrorText';
 import { useMutation } from '../composables/useMutation';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
+import { useTranslation } from '../i18n';
 import { formatTimestamp } from '../utils/format';
 import type { CreateAccountInput } from '../types/api';
 
 const app = useAdminApp();
+const { t } = useTranslation();
+const { apiErrorText } = useApiErrorText();
 const accounts = useRequest((signal) => app.api.listAccounts(signal));
 const creating = ref(false);
 const {
@@ -39,7 +45,7 @@ async function createAccount(input: CreateAccountInput): Promise<void> {
       creating.value = false;
       await accounts.load();
     },
-    'Account configuration saved.',
+    t('accountsPage.savedToast'),
   );
 }
 
@@ -53,65 +59,69 @@ function closeForm(): void {
   <div class="page-stack">
     <header class="page-heading">
       <div>
-        <p class="eyebrow">Accounts</p>
-        <h2>Configured accounts</h2>
-        <p>View account metadata and login state.</p>
+        <p class="eyebrow">{{ t('nav.accounts') }}</p>
+        <h2>{{ t('accountsPage.title') }}</h2>
+        <p>{{ t('accountsPage.subtitle') }}</p>
       </div>
       <div class="page-actions">
         <button class="button button--primary" type="button" @click="creating = true">
-          Create account
+          {{ t('accountsPage.create') }}
         </button>
         <button class="button button--secondary" type="button" @click="accounts.load">
-          Refresh
+          {{ t('common.refresh') }}
         </button>
       </div>
     </header>
+    <BackgroundRefreshIndicator v-if="accounts.refreshing.value" />
+    <StaleDataNotice
+      v-if="accounts.refreshError.value"
+      :error="accounts.refreshError.value"
+      @retry="accounts.load"
+    />
     <p v-if="successMessage" class="success-message" role="status">{{ successMessage }}</p>
     <FormPanel
       v-if="creating"
-      title="Create account"
-      description="Configure a local account record."
+      :title="t('accountsPage.createPanelTitle')"
+      :description="t('accountsPage.createPanelDescription')"
       @cancel="closeForm"
     >
       <AccountForm
         :submitting="submitting"
-        :server-error="formError"
+        :server-error="apiErrorText(formError)"
         @submit="createAccount"
         @cancel="closeForm"
       />
     </FormPanel>
-    <LoadingState v-if="accounts.loading.value && !accounts.data.value" label="Loading accounts…" />
+    <LoadingState v-if="accounts.initialLoading.value" :label="t('accountsPage.loading')" />
     <ErrorState
-      v-else-if="accounts.error.value"
-      :message="accounts.error.value.message"
+      v-else-if="accounts.initialError.value"
+      :error="accounts.initialError.value"
       @retry="accounts.load"
     />
     <EmptyState
       v-else-if="accounts.data.value?.length === 0"
-      title="No accounts"
-      description="No accounts are available in the current database."
+      :title="t('accountsPage.emptyTitle')"
+      :description="t('accountsPage.emptyDescription')"
     />
     <div v-else-if="accounts.data.value" class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Enabled</th>
-            <th>Login status</th>
-            <th>Identifier</th>
-            <th>Updated</th>
+            <th>{{ t('accountsPage.columnName') }}</th>
+            <th>{{ t('accountsPage.columnEnabled') }}</th>
+            <th>{{ t('accountsPage.columnLoginStatus') }}</th>
+            <th>{{ t('accountsPage.columnUpdated') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="account in accounts.data.value" :key="account.id">
             <td>
-              <RouterLink class="table-link" :to="`/accounts/${account.id}`">{{
+              <RouterLink class="table-link" :to="`/accounts/${account.id}/overview`">{{
                 account.name
               }}</RouterLink>
             </td>
             <td><StatusBadge :status="account.enabled ? 'ENABLED' : 'DISABLED'" /></td>
-            <td><StatusBadge :status="account.loginStatus" /></td>
-            <td><IdentifierValue :value="account.id" compact /></td>
+            <td><AuthStatusBadge :status="account.loginStatus" /></td>
             <td>{{ formatTimestamp(account.updatedAt) }}</td>
           </tr>
         </tbody>

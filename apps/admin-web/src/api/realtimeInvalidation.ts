@@ -26,11 +26,7 @@ const RUN_DETAIL_EVENTS = new Set<RuntimeEventType>([
 ]);
 
 export function invalidatesRuntimeStatus(event: RealtimeEvent): boolean {
-  return (
-    event.type === 'READY' ||
-    event.type === 'CONFIG_CHANGED' ||
-    (event.type === 'RUNTIME_EVENT' && RUNTIME_STATUS_EVENTS.has(event.data.eventType))
-  );
+  return event.type === 'RUNTIME_EVENT' && RUNTIME_STATUS_EVENTS.has(event.data.eventType);
 }
 
 export function invalidatesRunList(event: RealtimeEvent): boolean {
