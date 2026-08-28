@@ -17,9 +17,9 @@ describe('admin routing', () => {
     [`/accounts/${ACCOUNT_ID}/history`, 'Demo Account run history'],
     ['/schedules', 'Account schedule windows'],
     ['/templates', 'Message templates'],
-    ['/notifications', 'Webhook notifications'],
-    ['/operations/notifications', 'Webhook notifications'],
-    ['/operations/system', 'System status'],
+    ['/notifications', 'Configure webhook notifications'],
+    ['/operations/notifications', 'Configure webhook notifications'],
+    ['/operations/system', 'Runtime health and safety status'],
     ['/runs', 'Daily run history'],
     [`/runs/${RUN_ID}`, 'Run detail'],
   ])('renders %s', async (path, expected) => {

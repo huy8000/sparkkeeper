@@ -8,6 +8,7 @@ import RuntimeStatus from '../components/RuntimeStatus.vue';
 import SseStatus from '../components/SseStatus.vue';
 import ToastHost from '../components/ToastHost.vue';
 import { useTheme } from '../composables/useTheme';
+import { classifyRuntimeReadiness } from '../operations/runtimeReadiness';
 
 const route = useRoute();
 const app = useAdminApp();
@@ -20,7 +21,7 @@ const activeSection = computed(() => String(route.meta.section ?? ''));
 const runtimeIndicator = computed(() => {
   if (app.runtime.error.value) return 'UNAVAILABLE';
   if (!app.runtime.data.value) return 'LOADING';
-  return app.runtime.data.value.serverStatus === 'READY' ? 'READY' : 'DEGRADED';
+  return classifyRuntimeReadiness(app.runtime.data.value);
 });
 
 const safetyWarnings = computed(() => {

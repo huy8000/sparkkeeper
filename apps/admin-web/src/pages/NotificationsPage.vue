@@ -1,242 +1,425 @@
 <script setup lang="ts">
-import { reactive, watch } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 
 import { ApiError } from '../api/client';
 import { useAdminApp } from '../appContext';
-import ErrorState from '../components/ErrorState.vue';
-import LoadingState from '../components/LoadingState.vue';
-import { useMutation } from '../composables/useMutation';
-import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
+import DangerConfirmation from '../components/DangerConfirmation.vue';
+import FormField from '../components/FormField.vue';
+import InlineError from '../components/InlineError.vue';
+import NotificationTestResult from '../components/notification/NotificationTestResult.vue';
+import PageError from '../components/PageError.vue';
+import Skeleton from '../components/Skeleton.vue';
+import StatusBadge from '../components/StatusBadge.vue';
+import { useDebouncedAction } from '../composables/useDebouncedAction';
 import { useRequest } from '../composables/useRequest';
-import type { NotificationConfiguration, NotificationConfigurationInput } from '../types/api';
+import { useToasts } from '../composables/useToasts';
+import {
+  isNotificationConfigured,
+  notificationDraftFrom,
+  notificationDraftMatches,
+  notificationInputFrom,
+  validateNotificationDraft,
+  type NotificationDraft,
+} from '../operations/notificationModel';
+import type {
+  NotificationConfiguration,
+  NotificationDeliveryResult,
+  RealtimeEvent,
+} from '../types/api';
 
 const app = useAdminApp();
-const configuration = useRequest((signal) => app.api.getNotificationConfiguration(signal));
-const saveMutation = useMutation();
-const testMutation = useMutation();
-const form = reactive<NotificationConfigurationInput>({
+const toasts = useToasts();
+const configurationRequest = useRequest((signal) => app.api.getNotificationConfiguration(signal));
+const configuration = ref<NotificationConfiguration | null>(null);
+const form = reactive<NotificationDraft>({
   enabled: false,
   provider: 'WEBHOOK',
-  webhookUrl: null,
+  webhookUrl: '',
   notifyAuthExpired: true,
   notifyTaskFailed: true,
   notifyConsecutiveFailure: true,
   notifyDeliveryUnknown: true,
 });
+const saving = ref(false);
+const saveError = ref('');
+const serverChanged = ref(false);
+const reloadConfirmationOpen = ref(false);
+const testing = ref(false);
+const testError = ref('');
+const testResult = ref<NotificationDeliveryResult | null>(null);
+const testUncertain = ref(false);
+let applyNextResponse = false;
 
-watch(configuration.data, (value) => {
-  if (value !== null) applyConfiguration(value);
-});
-watch(app.refreshVersion, () => void configuration.load());
-useRealtimeRefresh(
-  app.realtime,
-  (event) => event.type === 'CONFIG_CHANGED' && event.data.entityType === 'NOTIFICATION',
-  () => void configuration.load(),
+const dirty = computed(
+  () => configuration.value !== null && !notificationDraftMatches(form, configuration.value),
 );
+const configured = computed(
+  () => configuration.value !== null && isNotificationConfigured(configuration.value),
+);
+const canTest = computed(() => configured.value && !testing.value && !saving.value);
+
+watch(configurationRequest.data, (next) => {
+  if (next === null) return;
+  const preserveDraft = dirty.value && !applyNextResponse;
+  configuration.value = next;
+  if (preserveDraft) {
+    serverChanged.value = true;
+  } else {
+    applyConfiguration(next);
+    serverChanged.value = false;
+  }
+  applyNextResponse = false;
+});
+
+watch(app.refreshVersion, () => void configurationRequest.load());
+
+const realtimeRefresh = useDebouncedAction(() => {
+  if (dirty.value) {
+    serverChanged.value = true;
+    return;
+  }
+  void configurationRequest.load();
+});
+const unsubscribeRealtime = app.realtime.subscribe((event) => {
+  if (isNotificationConfigurationEvent(event)) realtimeRefresh.trigger();
+});
+
+function isNotificationConfigurationEvent(
+  event: RealtimeEvent,
+): event is Extract<RealtimeEvent, { type: 'CONFIG_CHANGED' }> {
+  return event.type === 'CONFIG_CHANGED' && event.data.entityType === 'NOTIFICATION';
+}
 
 function applyConfiguration(value: NotificationConfiguration): void {
-  Object.assign(form, {
-    enabled: value.enabled,
-    provider: value.provider,
-    webhookUrl: value.webhookUrl,
-    notifyAuthExpired: value.notifyAuthExpired,
-    notifyTaskFailed: value.notifyTaskFailed,
-    notifyConsecutiveFailure: value.notifyConsecutiveFailure,
-    notifyDeliveryUnknown: value.notifyDeliveryUnknown,
-  });
+  Object.assign(form, notificationDraftFrom(value));
+  saveError.value = '';
 }
 
 async function saveConfiguration(): Promise<void> {
-  const webhookUrl = form.webhookUrl?.trim() ?? '';
-  if (form.enabled && webhookUrl.length === 0) {
-    saveMutation.error.value = 'Webhook URL is required while notifications are enabled.';
+  if (saving.value) return;
+  const validationError = validateNotificationDraft(form);
+  if (validationError !== '') {
+    saveError.value = validationError;
     return;
   }
-  await saveMutation.execute(
-    () =>
-      app.api.updateNotificationConfiguration({
-        ...form,
-        webhookUrl: webhookUrl.length === 0 ? null : webhookUrl,
-      }),
-    (saved) => {
-      applyConfiguration(saved);
-    },
-    'Notification configuration saved.',
-  );
-}
-
-async function sendTestNotification(): Promise<void> {
-  await testMutation.execute(
-    () => app.api.sendTestNotification(),
-    (result) => {
-      if (result.status === 'SENT') return;
-      const message =
-        result.status === 'BLOCKED'
-          ? 'Test notification was blocked by the destination safety policy or configuration.'
-          : 'Test notification delivery failed after bounded attempts.';
-      throw new ApiError('NOTIFICATION_DELIVERY_FAILED', message, 0, 'API');
-    },
-    'Test notification delivered to the configured Webhook.',
-  );
+  saving.value = true;
+  saveError.value = '';
+  try {
+    const saved = await app.api.updateNotificationConfiguration(notificationInputFrom(form));
+    configuration.value = saved;
+    applyConfiguration(saved);
+    serverChanged.value = false;
+    testResult.value = null;
+    testUncertain.value = false;
+    testError.value = '';
+    toasts.notify('success', 'Notification settings saved.');
+  } catch (error) {
+    saveError.value =
+      error instanceof ApiError ? error.message : 'Notification settings could not be saved.';
+    toasts.notify('error', 'Notification settings could not be saved.');
+  } finally {
+    saving.value = false;
+  }
 }
 
 function resetForm(): void {
-  if (configuration.data.value !== null) applyConfiguration(configuration.data.value);
-  saveMutation.clearError();
+  if (configuration.value === null || saving.value) return;
+  applyConfiguration(configuration.value);
+  serverChanged.value = false;
 }
+
+function requestServerReload(): void {
+  if (saving.value) return;
+  if (dirty.value) reloadConfirmationOpen.value = true;
+  else void configurationRequest.load();
+}
+
+async function confirmServerReload(): Promise<void> {
+  reloadConfirmationOpen.value = false;
+  applyNextResponse = true;
+  await configurationRequest.load();
+  if (configurationRequest.error.value !== null) applyNextResponse = false;
+}
+
+async function sendTestNotification(): Promise<void> {
+  if (!canTest.value) return;
+  testing.value = true;
+  testError.value = '';
+  testResult.value = null;
+  testUncertain.value = false;
+  try {
+    const result = await app.api.sendTestNotification();
+    testResult.value = result;
+    if (result.status === 'SENT') toasts.notify('success', 'Test notification sent.');
+    else if (result.status === 'FAILED') toasts.notify('error', 'Test notification failed.');
+    else toasts.notify('warning', 'Test notification blocked.');
+  } catch (error) {
+    if (error instanceof ApiError && error.kind === 'NETWORK') {
+      testUncertain.value = true;
+      toasts.notify('warning', 'Test request result is uncertain.');
+    } else {
+      testError.value =
+        error instanceof ApiError ? error.message : 'The test notification could not be sent.';
+      toasts.notify('error', 'The test notification could not be sent.');
+    }
+  } finally {
+    testing.value = false;
+  }
+}
+
+onBeforeUnmount(() => {
+  unsubscribeRealtime();
+  realtimeRefresh.cancel();
+});
 </script>
 
 <template>
-  <div class="page-stack">
+  <div class="page-stack notifications-page">
     <header class="page-heading">
       <div>
-        <p class="eyebrow">Notifications</p>
-        <h2>Webhook notifications</h2>
-        <p>Send selected high-value runtime summaries to one validated Webhook destination.</p>
+        <p class="eyebrow">Operations</p>
+        <h2>Notifications</h2>
+        <p>Configure webhook notifications for important SparkKeeper events.</p>
       </div>
-      <button class="button button--secondary" type="button" @click="configuration.load">
+      <button
+        class="button button--secondary"
+        type="button"
+        :disabled="configurationRequest.loading.value"
+        @click="configurationRequest.load"
+      >
         Refresh
       </button>
     </header>
 
-    <p class="notice-card template-privacy-note">
-      Webhook delivery sends only a safe runtime summary. It never includes contact names, message
-      content, credentials, evidence paths, raw errors, or database details. Treat a URL containing
-      a query secret as sensitive configuration.
-    </p>
-
-    <LoadingState
-      v-if="configuration.loading.value && configuration.data.value === null"
-      label="Loading notification configuration…"
-    />
-    <ErrorState
-      v-else-if="configuration.error.value"
-      :message="configuration.error.value.message"
-      @retry="configuration.load"
-    />
-    <section v-else-if="configuration.data.value" class="card" aria-labelledby="webhook-settings">
-      <div class="card__header">
-        <div>
-          <p class="eyebrow">Provider</p>
-          <h3 id="webhook-settings">WEBHOOK</h3>
-          <p>Notification failures remain non-critical and never change task results.</p>
-        </div>
+    <section class="notification-summary" aria-label="Notification configuration summary">
+      <div>
+        <span>Notifications</span>
+        <StatusBadge v-if="configuration === null" status="UNKNOWN" label="Checking…" />
+        <StatusBadge v-else :status="configuration.enabled ? 'ENABLED' : 'DISABLED'" />
       </div>
+      <div>
+        <span>Provider</span>
+        <strong>Webhook</strong>
+      </div>
+      <div>
+        <span>Destination</span>
+        <StatusBadge
+          :status="configured ? 'READY' : 'NOT_READY'"
+          :label="configured ? 'Configured' : 'Not configured'"
+        />
+      </div>
+    </section>
 
-      <form class="config-form notification-form" novalidate @submit.prevent="saveConfiguration">
-        <label class="checkbox-field">
-          <input
-            v-model="form.enabled"
-            name="notificationEnabled"
-            type="checkbox"
-            :disabled="saveMutation.submitting.value"
+    <section class="template-privacy-note notification-privacy-note" aria-label="Webhook privacy">
+      <span aria-hidden="true">◇</span>
+      <p>
+        Webhook URLs may contain sensitive tokens. They are shown only in this local editor and are
+        never copied into status summaries, test results, routes, or notifications.
+      </p>
+    </section>
+
+    <section
+      v-if="configurationRequest.loading.value && configuration === null"
+      class="notification-skeleton"
+      aria-label="Loading notification configuration"
+      aria-busy="true"
+    >
+      <Skeleton width="34%" height="20px" label="Loading notification heading…" />
+      <Skeleton height="52px" label="Loading notification destination…" />
+      <Skeleton height="180px" label="Loading notification events…" />
+    </section>
+
+    <PageError
+      v-else-if="configurationRequest.error.value && configuration === null"
+      title="Unable to load notification settings"
+      :message="configurationRequest.error.value.message"
+      @retry="configurationRequest.load"
+    />
+
+    <template v-else-if="configuration">
+      <InlineError
+        v-if="configurationRequest.error.value"
+        :message="configurationRequest.error.value.message"
+      />
+      <section v-if="serverChanged" class="notification-server-change" role="status">
+        <div>
+          <strong>Notification settings changed on the server.</strong>
+          <span>Your unsaved values have not been replaced.</span>
+        </div>
+        <button
+          class="button button--secondary button--compact"
+          type="button"
+          @click="requestServerReload"
+        >
+          Reload
+        </button>
+      </section>
+
+      <section class="card notification-config-card" aria-labelledby="notification-settings-title">
+        <header class="card__header">
+          <div>
+            <p class="eyebrow">{{ configured ? 'Configured' : 'Setup required' }}</p>
+            <h3 id="notification-settings-title">Webhook configuration</h3>
+            <p>
+              {{
+                configured
+                  ? 'Save explicitly after making changes.'
+                  : 'Add a destination before sending a test notification.'
+              }}
+            </p>
+          </div>
+          <span v-if="dirty" class="unsaved-indicator" role="status">Unsaved changes</span>
+        </header>
+
+        <form class="notification-form" novalidate @submit.prevent="saveConfiguration">
+          <label class="notification-enable-card">
+            <span>
+              <strong>Notifications enabled</strong>
+              <small>Allow selected runtime events to use the configured webhook.</small>
+            </span>
+            <input
+              v-model="form.enabled"
+              name="notificationEnabled"
+              type="checkbox"
+              :disabled="saving"
+            />
+          </label>
+
+          <div class="notification-destination-grid">
+            <FormField label="Provider" help-text="The current backend supports Webhook only.">
+              <template #default="{ fieldId, describedBy }">
+                <select
+                  :id="fieldId"
+                  v-model="form.provider"
+                  name="provider"
+                  :aria-describedby="describedBy"
+                  disabled
+                >
+                  <option value="WEBHOOK">Webhook</option>
+                </select>
+              </template>
+            </FormField>
+            <FormField
+              label="Webhook URL"
+              help-text="HTTP(S) only. Private and unsafe destinations are rejected by the server."
+              :error="saveError.includes('Webhook URL is required') ? saveError : ''"
+            >
+              <template #default="{ fieldId, describedBy }">
+                <input
+                  :id="fieldId"
+                  v-model="form.webhookUrl"
+                  name="webhookUrl"
+                  type="text"
+                  inputmode="url"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="https://example.invalid/webhook"
+                  :aria-describedby="describedBy"
+                  :disabled="saving"
+                />
+              </template>
+            </FormField>
+          </div>
+
+          <fieldset class="notification-events">
+            <legend>Events</legend>
+            <label>
+              <input
+                v-model="form.notifyAuthExpired"
+                name="notifyAuthExpired"
+                type="checkbox"
+                :disabled="saving"
+              />
+              <span><strong>Login expired</strong><small>AUTH_EXPIRED</small></span>
+            </label>
+            <label>
+              <input
+                v-model="form.notifyTaskFailed"
+                name="notifyTaskFailed"
+                type="checkbox"
+                :disabled="saving"
+              />
+              <span><strong>Run task failed</strong><small>TASK_FAILED</small></span>
+            </label>
+            <label>
+              <input
+                v-model="form.notifyConsecutiveFailure"
+                name="notifyConsecutiveFailure"
+                type="checkbox"
+                :disabled="saving"
+              />
+              <span
+                ><strong>Consecutive run failures</strong
+                ><small>CONSECUTIVE_RUN_FAILURE</small></span
+              >
+            </label>
+            <label>
+              <input
+                v-model="form.notifyDeliveryUnknown"
+                name="notifyDeliveryUnknown"
+                type="checkbox"
+                :disabled="saving"
+              />
+              <span><strong>Delivery uncertain</strong><small>DELIVERY_UNKNOWN</small></span>
+            </label>
+          </fieldset>
+
+          <InlineError
+            v-if="saveError && !saveError.includes('Webhook URL is required')"
+            :message="saveError"
           />
-          Notifications enabled
-        </label>
+          <div class="form-actions">
+            <button class="button button--primary" type="submit" :disabled="saving || !dirty">
+              {{ saving ? 'Saving…' : 'Save settings' }}
+            </button>
+            <button
+              class="button button--secondary"
+              type="button"
+              :disabled="saving || !dirty"
+              @click="resetForm"
+            >
+              Reset saved values
+            </button>
+          </div>
+        </form>
+      </section>
 
-        <label>
-          Webhook URL
-          <input
-            v-model="form.webhookUrl"
-            name="webhookUrl"
-            type="text"
-            inputmode="url"
-            autocomplete="off"
-            spellcheck="false"
-            placeholder="https://…"
-            :disabled="saveMutation.submitting.value"
-          />
-          <small
-            >HTTP(S) only. Local, private, link-local, and mixed DNS destinations are
-            blocked.</small
-          >
-        </label>
-
-        <fieldset class="message-fields">
-          <legend>Events</legend>
-          <label class="checkbox-field">
-            <input
-              v-model="form.notifyAuthExpired"
-              name="notifyAuthExpired"
-              type="checkbox"
-              :disabled="saveMutation.submitting.value"
-            />
-            AUTH_EXPIRED
-          </label>
-          <label class="checkbox-field">
-            <input
-              v-model="form.notifyTaskFailed"
-              name="notifyTaskFailed"
-              type="checkbox"
-              :disabled="saveMutation.submitting.value"
-            />
-            TASK_FAILED
-          </label>
-          <label class="checkbox-field">
-            <input
-              v-model="form.notifyConsecutiveFailure"
-              name="notifyConsecutiveFailure"
-              type="checkbox"
-              :disabled="saveMutation.submitting.value"
-            />
-            CONSECUTIVE_RUN_FAILURE
-          </label>
-          <label class="checkbox-field">
-            <input
-              v-model="form.notifyDeliveryUnknown"
-              name="notifyDeliveryUnknown"
-              type="checkbox"
-              :disabled="saveMutation.submitting.value"
-            />
-            DELIVERY_UNKNOWN
-          </label>
-        </fieldset>
-
-        <p v-if="saveMutation.error.value" class="form-error" role="alert">
-          {{ saveMutation.error.value }}
-        </p>
-        <p v-if="saveMutation.success.value" class="success-message" role="status">
-          {{ saveMutation.success.value }}
-        </p>
-        <p v-if="testMutation.error.value" class="form-error" role="alert">
-          {{ testMutation.error.value }}
-        </p>
-        <p v-if="testMutation.success.value" class="success-message" role="status">
-          {{ testMutation.success.value }}
-        </p>
-
-        <div class="form-actions">
-          <button
-            class="button button--primary"
-            type="submit"
-            :disabled="saveMutation.submitting.value"
-          >
-            {{ saveMutation.submitting.value ? 'Saving…' : 'Save notifications' }}
-          </button>
+      <section class="card notification-test-card" aria-labelledby="notification-test-title">
+        <header class="card__header">
+          <div>
+            <p class="eyebrow">Test notification</p>
+            <h3 id="notification-test-title">Verify the saved destination</h3>
+            <p>This sends a real webhook request when connected to a real runtime.</p>
+          </div>
           <button
             class="button button--secondary"
             type="button"
-            :disabled="saveMutation.submitting.value"
-            @click="resetForm"
-          >
-            Reset
-          </button>
-          <button
-            class="button button--secondary"
-            type="button"
-            :disabled="
-              testMutation.submitting.value || configuration.data.value.webhookUrl === null
-            "
+            :disabled="!canTest"
             @click="sendTestNotification"
           >
-            {{ testMutation.submitting.value ? 'Sending test…' : 'Send test notification' }}
+            {{ testing ? 'Sending test…' : 'Send test notification' }}
           </button>
-        </div>
+        </header>
         <p class="form-note">
-          Test Notification sends one fixed SparkKeeper test summary to the currently saved URL. It
-          cannot send user-supplied content and does not access Douyin.
+          The server sends one fixed SparkKeeper test summary to the currently saved URL. Unsaved
+          form values are never used.
         </p>
-      </form>
-    </section>
+        <p v-if="!configured" class="notification-test-hint">
+          Save a valid webhook URL before sending a test.
+        </p>
+        <InlineError v-if="testError" :message="testError" />
+        <NotificationTestResult :result="testResult" :uncertain="testUncertain" />
+      </section>
+    </template>
+
+    <DangerConfirmation
+      :open="reloadConfirmationOpen"
+      title="Reload notification settings?"
+      description="Reloading will replace your unsaved values with the latest server configuration."
+      confirm-label="Discard and reload"
+      cancel-label="Keep editing"
+      @close="reloadConfirmationOpen = false"
+      @confirm="confirmServerReload"
+    />
   </div>
 </template>
