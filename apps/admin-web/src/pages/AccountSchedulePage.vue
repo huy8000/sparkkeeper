@@ -14,6 +14,7 @@ import ScheduleForm from '../components/ScheduleForm.vue';
 import SectionLoading from '../components/SectionLoading.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import StaleDataNotice from '../components/StaleDataNotice.vue';
+import { useApiErrorText } from '../composables/useApiErrorText';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
 import { useToasts } from '../composables/useToasts';
@@ -24,10 +25,11 @@ const app = useAdminApp();
 const workspace = useAccountWorkspace();
 const toasts = useToasts();
 const { t } = useTranslation();
+const { apiErrorText } = useApiErrorText();
 const schedules = useRequest((signal) => app.api.listSchedules(workspace.accountId.value, signal));
 const drawerOpen = ref(false);
 const submitting = ref(false);
-const formError = ref('');
+const formError = ref<ApiError | string>('');
 const formDirty = ref(false);
 const serverChanged = ref(false);
 const reloadConfirmationOpen = ref(false);
@@ -92,7 +94,7 @@ async function saveSchedule(input: ConfigureScheduleInput): Promise<void> {
     drawerOpen.value = false;
     toasts.notify('success', t('scheduleTab.savedToast'));
   } catch (error) {
-    formError.value = error instanceof ApiError ? error.message : t('scheduleTab.saveErrorToast');
+    formError.value = error instanceof ApiError ? error : t('scheduleTab.saveErrorToast');
     toasts.notify('error', t('scheduleTab.saveErrorToast'));
   } finally {
     submitting.value = false;
@@ -148,7 +150,7 @@ async function saveSchedule(input: ConfigureScheduleInput): Promise<void> {
     <BackgroundRefreshIndicator v-if="schedules.refreshing.value" />
     <StaleDataNotice
       v-if="schedules.refreshError.value"
-      :message="schedules.refreshError.value.message"
+      :error="schedules.refreshError.value"
       @retry="refreshSchedules(true)"
     />
 
@@ -157,7 +159,7 @@ async function saveSchedule(input: ConfigureScheduleInput): Promise<void> {
       :label="t('scheduleTab.loading')"
     />
     <section v-else-if="schedules.initialError.value" class="section-error-stack">
-      <InlineError :message="schedules.initialError.value.message" />
+      <InlineError :error="schedules.initialError.value" />
       <button class="button button--secondary" type="button" @click="schedules.load">
         {{ t('common.retry') }}
       </button>
@@ -229,7 +231,7 @@ async function saveSchedule(input: ConfigureScheduleInput): Promise<void> {
         :schedule="schedule ?? undefined"
         :default-timezone="app.runtime.data.value?.timezone ?? 'UTC'"
         :submitting="submitting"
-        :server-error="formError"
+        :server-error="apiErrorText(formError)"
         @submit="saveSchedule"
         @cancel="closeForm"
         @dirty-change="formDirty = $event"

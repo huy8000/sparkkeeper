@@ -12,6 +12,7 @@ import LoadingState from '../components/LoadingState.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useRequest } from '../composables/useRequest';
+import { useApiErrorText } from '../composables/useApiErrorText';
 import { useMutation } from '../composables/useMutation';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useTranslation } from '../i18n';
@@ -20,6 +21,7 @@ import type { CreateAccountInput } from '../types/api';
 
 const app = useAdminApp();
 const { t } = useTranslation();
+const { apiErrorText } = useApiErrorText();
 const accounts = useRequest((signal) => app.api.listAccounts(signal));
 const creating = ref(false);
 const {
@@ -73,7 +75,7 @@ function closeForm(): void {
     <BackgroundRefreshIndicator v-if="accounts.refreshing.value" />
     <StaleDataNotice
       v-if="accounts.refreshError.value"
-      :message="accounts.refreshError.value.message"
+      :error="accounts.refreshError.value"
       @retry="accounts.load"
     />
     <p v-if="successMessage" class="success-message" role="status">{{ successMessage }}</p>
@@ -85,7 +87,7 @@ function closeForm(): void {
     >
       <AccountForm
         :submitting="submitting"
-        :server-error="formError"
+        :server-error="apiErrorText(formError)"
         @submit="createAccount"
         @cancel="closeForm"
       />
@@ -93,7 +95,7 @@ function closeForm(): void {
     <LoadingState v-if="accounts.initialLoading.value" :label="t('accountsPage.loading')" />
     <ErrorState
       v-else-if="accounts.initialError.value"
-      :message="accounts.initialError.value.message"
+      :error="accounts.initialError.value"
       @retry="accounts.load"
     />
     <EmptyState

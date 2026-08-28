@@ -1,10 +1,15 @@
 import { ref, type Ref } from 'vue';
 
 import { ApiError } from '../api/client';
+import { useTranslation } from '../i18n';
 
 export interface MutationState {
   readonly submitting: Ref<boolean>;
-  readonly error: Ref<string>;
+  /**
+   * ApiError snapshot (localized at render time) or a pre-translated generic
+   * fallback. Never stores a raw server message resolved ahead of time.
+   */
+  readonly error: Ref<ApiError | string>;
   readonly success: Ref<string>;
   readonly execute: <T>(
     action: () => Promise<T>,
@@ -15,8 +20,9 @@ export interface MutationState {
 }
 
 export function useMutation(): MutationState {
+  const { t } = useTranslation();
   const submitting = ref(false);
-  const error = ref('');
+  const error = ref<ApiError | string>('');
   const success = ref('');
 
   async function execute<T>(
@@ -33,10 +39,7 @@ export function useMutation(): MutationState {
       await onSuccess(result);
       success.value = successMessage;
     } catch (cause) {
-      error.value =
-        cause instanceof ApiError
-          ? cause.message
-          : 'The configuration could not be saved. Please try again.';
+      error.value = cause instanceof ApiError ? cause : t('common.saveFailed');
     } finally {
       submitting.value = false;
     }

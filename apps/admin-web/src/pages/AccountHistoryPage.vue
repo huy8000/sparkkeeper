@@ -52,7 +52,7 @@ useRealtimeRefresh(
     <BackgroundRefreshIndicator v-if="runs.refreshing.value" />
     <StaleDataNotice
       v-if="runs.refreshError.value"
-      :message="runs.refreshError.value.message"
+      :error="runs.refreshError.value"
       @retry="runs.load"
     />
 
@@ -61,7 +61,7 @@ useRealtimeRefresh(
       :label="t('historyTab.loading')"
     />
     <section v-else-if="runs.initialError.value" class="section-error-stack">
-      <InlineError :message="runs.initialError.value.message" />
+      <InlineError :error="runs.initialError.value" />
       <button class="button button--secondary" type="button" @click="runs.load">
         {{ t('common.retry') }}
       </button>

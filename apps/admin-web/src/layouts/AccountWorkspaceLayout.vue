@@ -15,6 +15,7 @@ import PageError from '../components/PageError.vue';
 import Skeleton from '../components/Skeleton.vue';
 import StaleDataNotice from '../components/StaleDataNotice.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import { useApiErrorText } from '../composables/useApiErrorText';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
 import { useToasts } from '../composables/useToasts';
@@ -25,11 +26,13 @@ const app = useAdminApp();
 const route = useRoute();
 const toasts = useToasts();
 const { t } = useTranslation();
+const { apiErrorText } = useApiErrorText();
 const accountId = computed(() => String(route.params.accountId));
 const account = useRequest((signal) => app.api.getAccount(accountId.value, signal));
 const settingsOpen = ref(false);
 const submitting = ref(false);
-const formError = ref('');
+// ApiError snapshot localized at render time; string keeps the generic copy.
+const formError = ref<ApiError | string>('');
 const formDirty = ref(false);
 const serverChanged = ref(false);
 const reloadConfirmationOpen = ref(false);
@@ -103,7 +106,7 @@ async function saveAccount(input: CreateAccountInput): Promise<void> {
     settingsOpen.value = false;
     toasts.notify('success', t('account.savedToast'));
   } catch (error) {
-    formError.value = error instanceof ApiError ? error.message : t('account.saveErrorToast');
+    formError.value = error instanceof ApiError ? error : t('account.saveErrorToast');
     toasts.notify('error', t('account.saveErrorToast'));
   } finally {
     submitting.value = false;
@@ -147,7 +150,7 @@ async function saveAccount(input: CreateAccountInput): Promise<void> {
     <BackgroundRefreshIndicator v-if="account.refreshing.value" />
     <StaleDataNotice
       v-if="account.refreshError.value"
-      :message="account.refreshError.value.message"
+      :error="account.refreshError.value"
       @retry="refreshAccount(true)"
     />
 
@@ -177,7 +180,7 @@ async function saveAccount(input: CreateAccountInput): Promise<void> {
       :message="
         account.initialError.value.httpStatus === 404
           ? t('account.notFoundMessage')
-          : account.initialError.value.message
+          : apiErrorText(account.initialError.value)
       "
       @retry="account.load"
     />
@@ -206,7 +209,7 @@ async function saveAccount(input: CreateAccountInput): Promise<void> {
         v-if="account.data.value"
         :account="account.data.value"
         :submitting="submitting"
-        :server-error="formError"
+        :server-error="apiErrorText(formError)"
         @submit="saveAccount"
         @cancel="closeSettings"
         @dirty-change="formDirty = $event"

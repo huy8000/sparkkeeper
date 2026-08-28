@@ -92,7 +92,7 @@ function retryAll(): void {
             v-else-if="health.error.value && health.data.value === null"
             class="section-error-stack"
           >
-            <InlineError :message="health.error.value.message" />
+            <InlineError :error="health.error.value" />
             <button
               class="button button--secondary button--compact"
               type="button"
@@ -108,7 +108,7 @@ function retryAll(): void {
             />
             <StaleDataNotice
               v-if="health.refreshError.value"
-              :message="health.refreshError.value.message"
+              :error="health.refreshError.value"
               @retry="health.load"
             />
             <dl class="system-definition-list">
@@ -161,7 +161,7 @@ function retryAll(): void {
             v-else-if="app.runtime.error.value && app.runtime.data.value === null"
             class="section-error-stack"
           >
-            <InlineError :message="app.runtime.error.value.message" />
+            <InlineError :error="app.runtime.error.value" />
             <button
               class="button button--secondary button--compact"
               type="button"
@@ -177,7 +177,7 @@ function retryAll(): void {
             />
             <StaleDataNotice
               v-if="app.runtime.refreshError.value"
-              :message="app.runtime.refreshError.value.message"
+              :error="app.runtime.refreshError.value"
               @retry="app.runtime.load"
             />
             <dl class="system-definition-list">
@@ -265,7 +265,7 @@ function retryAll(): void {
         />
         <InlineError
           v-else-if="app.runtime.error.value && app.runtime.data.value === null"
-          :message="app.runtime.error.value.message"
+          :error="app.runtime.error.value"
         />
         <dl v-else-if="app.runtime.data.value" class="system-gate-grid">
           <div>

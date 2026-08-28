@@ -157,14 +157,14 @@ async function resetFilters(): Promise<void> {
     <BackgroundRefreshIndicator v-if="runs.refreshing.value" />
     <StaleDataNotice
       v-if="runs.refreshError.value"
-      :message="runs.refreshError.value.message"
+      :error="runs.refreshError.value"
       @retry="runs.load"
     />
 
     <PageError
       v-if="runs.initialError.value"
       :title="t('runs.errorTitle')"
-      :message="runs.initialError.value.message"
+      :error="runs.initialError.value"
       :retry-label="t('runs.tryAgain')"
       @retry="runs.load"
     />

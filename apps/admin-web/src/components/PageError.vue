@@ -1,11 +1,19 @@
 <script setup lang="ts">
+import type { ApiErrorSource } from '../composables/useApiErrorText';
+import { useApiErrorText } from '../composables/useApiErrorText';
 import { useTranslation } from '../i18n';
 
-defineProps<{ title?: string; message: string; retryLabel?: string }>();
+defineProps<{
+  title?: string;
+  message?: string;
+  error?: ApiErrorSource;
+  retryLabel?: string;
+}>();
 
 defineEmits<{ retry: [] }>();
 
 const { t } = useTranslation();
+const { apiErrorText } = useApiErrorText();
 </script>
 
 <template>
@@ -20,7 +28,8 @@ const { t } = useTranslation();
       />
     </svg>
     <h2 class="page-error__title">{{ title ?? t('common.unableToLoadData') }}</h2>
-    <p class="page-error__message">{{ message }}</p>
+    <!-- Localized at render time so a language switch re-renders the copy. -->
+    <p class="page-error__message">{{ error !== undefined ? apiErrorText(error) : message }}</p>
     <button class="button button--secondary" type="button" @click="$emit('retry')">
       {{ retryLabel ?? t('common.retry') }}
     </button>

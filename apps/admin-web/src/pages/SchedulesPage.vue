@@ -8,6 +8,7 @@ import FormPanel from '../components/FormPanel.vue';
 import LoadingState from '../components/LoadingState.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import ScheduleForm from '../components/ScheduleForm.vue';
+import { useApiErrorText } from '../composables/useApiErrorText';
 import { useRequest } from '../composables/useRequest';
 import { useMutation } from '../composables/useMutation';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
@@ -16,6 +17,7 @@ import type { ConfigureScheduleInput, Schedule } from '../types/api';
 
 const app = useAdminApp();
 const { t } = useTranslation();
+const { apiErrorText } = useApiErrorText();
 const result = useRequest(async (signal) => {
   const accounts = await app.api.listAccounts(signal);
   const groupedSchedules = await Promise.all(
@@ -95,7 +97,7 @@ function closeForm(): void {
       <ScheduleForm
         :schedule="editingSchedule"
         :submitting="submitting"
-        :server-error="formError"
+        :server-error="apiErrorText(formError)"
         @submit="saveSchedule"
         @cancel="closeForm"
       />
@@ -104,11 +106,7 @@ function closeForm(): void {
       v-if="result.loading.value && !result.data.value"
       :label="t('schedulesPage.loading')"
     />
-    <ErrorState
-      v-else-if="result.error.value"
-      :message="result.error.value.message"
-      @retry="result.load"
-    />
+    <ErrorState v-else-if="result.error.value" :error="result.error.value" @retry="result.load" />
     <EmptyState
       v-else-if="result.data.value?.length === 0"
       :title="t('schedulesPage.emptyTitle')"
