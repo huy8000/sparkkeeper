@@ -253,6 +253,7 @@ function submit(): void {
     :open="staticSelectionOpen"
     title="Choose the Static message"
     labelled-by="static-message-selection-title"
+    compact
     @close="cancelStaticSelection"
   >
     <div class="template-static-selection">

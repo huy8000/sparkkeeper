@@ -18,6 +18,7 @@ defineEmits<{ confirm: []; close: [] }>();
     :open="props.open"
     :title="props.title"
     labelled-by="danger-confirmation-title"
+    compact
     @close="$emit('close')"
   >
     <div class="danger-confirmation">

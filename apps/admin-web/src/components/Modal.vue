@@ -3,7 +3,12 @@
 /* global document, HTMLElement, KeyboardEvent */
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
 
-const props = defineProps<{ open: boolean; title: string; labelledBy?: string }>();
+const props = defineProps<{
+  open: boolean;
+  title: string;
+  labelledBy?: string;
+  compact?: boolean;
+}>();
 const emit = defineEmits<{ close: [] }>();
 const dialog = ref<HTMLElement | null>(null);
 let previousFocus: HTMLElement | null = null;
@@ -44,6 +49,7 @@ onBeforeUnmount(() => {
       <div
         ref="dialog"
         class="modal-card"
+        :class="{ 'modal-card--compact': compact }"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="labelledBy ?? 'modal-title'"
