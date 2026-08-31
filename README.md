@@ -2,6 +2,8 @@
 
 SparkKeeper 是一套面向固定 Linux 服务器的自托管抖音火花维护自动化服务。项目将通过持久化浏览器环境保存用户本人有权控制的账号会话，并逐步提供任务执行、结果验证、失败恢复和可视化管理能力。
 
+> 当前正式生产版本为 `v3.0.0`。V4.0.0 的产品、架构、迁移、API、路线图和开发工作流已经进入文档冻结阶段，统一入口见 [SparkKeeper V4 Planning Index](./docs/v4/README.md)。V4 Release Gate 通过前不启用 Scheduler。
+
 ## 核心目标
 
 - 在固定服务器环境中长期保存登录会话。
@@ -12,7 +14,7 @@ SparkKeeper 是一套面向固定 Linux 服务器的自托管抖音火花维护�
 
 ## 当前开发阶段
 
-Project Foundation 以及 **MVP Task M1–M5** 均已完成，当前状态为 **MVP Core Flow Complete**。V1 的 **V1-1 Database Foundation**、**V1-2 Friend Identity**、**V1-3 Message Engine**、**V1-4 Daily Run & Idempotency**、**V1-5 Scheduler**、**V1-6 Retry & Failure State**、**V1-7 Observability** 和正式 Release Gate 均已完成；当前稳定版本为 **SparkKeeper v1.0.0**。
+Project Foundation、MVP、V1–V3 演进均已完成；当前稳定生产版本为 **SparkKeeper v3.0.0**。以下内容保留各阶段实现脉络；新的 V4 开发以 V4 Planning Index 中的冻结文档为准。
 
 `packages/automation` 现在提供基于 Playwright Chromium 的持久化浏览器会话基础：
 
