@@ -259,7 +259,7 @@ test('SystemEvent persists across close, reopen, and repeated migrate', (context
 
   const reopened = createDatabase({ databasePath: temporary.databasePath });
   context.after(() => reopened.close());
-  assert.equal(reopened.migrate().appliedMigrationCount, 8);
+  assert.equal(reopened.migrate().appliedMigrationCount, 9);
   assert.equal(
     new SystemEventRepository(reopened).findById(event.id)?.message,
     'Authentication expired',

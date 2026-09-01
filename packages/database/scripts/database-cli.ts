@@ -28,9 +28,25 @@ try {
       dailyRunsSchemaCompatible: inspection.dailyRunsSchemaCompatible,
       friendsSchemaCompatible: inspection.friendsSchemaCompatible,
       messageTemplatesSchemaCompatible: inspection.messageTemplatesSchemaCompatible,
+      notificationConfigsSchemaCompatible: inspection.notificationConfigsSchemaCompatible,
       sendRecordsSchemaCompatible: inspection.sendRecordsSchemaCompatible,
       schedulesSchemaCompatible: inspection.schedulesSchemaCompatible,
       systemEventsSchemaCompatible: inspection.systemEventsSchemaCompatible,
+      adminUsersSchemaCompatible: inspection.adminUsersSchemaCompatible,
+      adminSessionsSchemaCompatible: inspection.adminSessionsSchemaCompatible,
+      accountLoginSessionsSchemaCompatible: inspection.accountLoginSessionsSchemaCompatible,
+      avatarAssetsSchemaCompatible: inspection.avatarAssetsSchemaCompatible,
+      contactSyncRunsSchemaCompatible: inspection.contactSyncRunsSchemaCompatible,
+      contactsSchemaCompatible: inspection.contactsSchemaCompatible,
+      contactIdentitiesSchemaCompatible: inspection.contactIdentitiesSchemaCompatible,
+      sendTasksSchemaCompatible: inspection.sendTasksSchemaCompatible,
+      sendTaskTargetsSchemaCompatible: inspection.sendTaskTargetsSchemaCompatible,
+      executionRunsSchemaCompatible: inspection.executionRunsSchemaCompatible,
+      targetSendRecordsSchemaCompatible: inspection.targetSendRecordsSchemaCompatible,
+      deliveryResolutionsSchemaCompatible: inspection.deliveryResolutionsSchemaCompatible,
+      auditEventsSchemaCompatible: inspection.auditEventsSchemaCompatible,
+      legacyFriendBindingsSchemaCompatible: inspection.legacyFriendBindingsSchemaCompatible,
+      legacyScheduleImportsSchemaCompatible: inspection.legacyScheduleImportsSchemaCompatible,
     }),
   );
 
@@ -39,9 +55,25 @@ try {
     !inspection.dailyRunsSchemaCompatible ||
     !inspection.friendsSchemaCompatible ||
     !inspection.messageTemplatesSchemaCompatible ||
+    !inspection.notificationConfigsSchemaCompatible ||
     !inspection.sendRecordsSchemaCompatible ||
     !inspection.schedulesSchemaCompatible ||
-    !inspection.systemEventsSchemaCompatible
+    !inspection.systemEventsSchemaCompatible ||
+    !inspection.adminUsersSchemaCompatible ||
+    !inspection.adminSessionsSchemaCompatible ||
+    !inspection.accountLoginSessionsSchemaCompatible ||
+    !inspection.avatarAssetsSchemaCompatible ||
+    !inspection.contactSyncRunsSchemaCompatible ||
+    !inspection.contactsSchemaCompatible ||
+    !inspection.contactIdentitiesSchemaCompatible ||
+    !inspection.sendTasksSchemaCompatible ||
+    !inspection.sendTaskTargetsSchemaCompatible ||
+    !inspection.executionRunsSchemaCompatible ||
+    !inspection.targetSendRecordsSchemaCompatible ||
+    !inspection.deliveryResolutionsSchemaCompatible ||
+    !inspection.auditEventsSchemaCompatible ||
+    !inspection.legacyFriendBindingsSchemaCompatible ||
+    !inspection.legacyScheduleImportsSchemaCompatible
   ) {
     process.exitCode = 1;
   }

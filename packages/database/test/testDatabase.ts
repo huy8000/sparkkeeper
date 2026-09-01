@@ -2,6 +2,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { TestContext } from 'node:test';
+import { randomUUID } from 'node:crypto';
 
 import BetterSqlite3 from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -61,6 +62,30 @@ export function createV1SixDatabase(context: TestContext): TemporaryDatabase {
 
 export function createV1SevenDatabase(context: TestContext): TemporaryDatabase {
   return createHistoricalDatabase(context, 'v1-seven', 7);
+}
+
+export function createV1EightDatabase(context: TestContext): TemporaryDatabase {
+  return createHistoricalDatabase(context, 'v1-eight', 8);
+}
+
+export function insertLegacyAccount(
+  databasePath: string,
+  input: { id?: string; name: string; loginStatus?: string; nowMs?: number },
+): { id: string; name: string } {
+  const id = input.id ?? randomUUID();
+  const nowMs = input.nowMs ?? Date.now();
+  const sqlite = new BetterSqlite3(databasePath);
+  try {
+    sqlite
+      .prepare(
+        `insert into accounts (id, name, enabled, login_status, last_login_at, created_at, updated_at)
+         values (?, ?, 1, ?, null, ?, ?)`,
+      )
+      .run(id, input.name, input.loginStatus ?? 'UNKNOWN', nowMs, nowMs);
+    return { id, name: input.name };
+  } finally {
+    sqlite.close();
+  }
 }
 
 function createHistoricalDatabase(
