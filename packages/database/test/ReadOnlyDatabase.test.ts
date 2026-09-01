@@ -13,10 +13,16 @@ test('read-only database access inspects V1 state without changing business data
   const beforeHash = sha256(temporary.databasePath);
 
   const client = openDatabaseReadOnly({ databasePath: temporary.databasePath });
+  assert.equal(client.isOpen(), true);
+  assert.equal(client.ping(), true);
+
   const inspection = client.inspect();
   client.close();
+  assert.equal(client.isOpen(), false);
 
-  assert.equal(inspection.appliedMigrationCount, 8);
+  assert.throws(() => client.ping(), /closed/);
+
+  assert.equal(inspection.appliedMigrationCount, 9);
   assert.equal(inspection.pragmas.journalMode, 'wal');
   assert.equal(inspection.pragmas.foreignKeys, 1);
   assert.equal(inspection.pragmas.busyTimeoutMs, 5_000);

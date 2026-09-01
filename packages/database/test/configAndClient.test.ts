@@ -115,3 +115,110 @@ test('database close is idempotent and closed clients fail clearly', (context) =
   assert.equal(client.isOpen(), false);
   assert.throws(() => client.inspect(), DatabaseClientError);
 });
+
+test('withBusyTimeout: restores PRAGMA on sync success, sync throw, Promise rejection, and thenable rejection', (context) => {
+  const { client } = createTemporaryDatabase(context, { migrate: false });
+
+  // 1. Initial timeout
+  assert.equal(client.inspect().pragmas.busyTimeoutMs, DATABASE_BUSY_TIMEOUT_MS);
+
+  // 2. Sync success callback
+  const result = client.withBusyTimeout(123, () => {
+    assert.equal(client.inspect().pragmas.busyTimeoutMs, 123);
+    return 42;
+  });
+  assert.equal(result, 42);
+  assert.equal(client.inspect().pragmas.busyTimeoutMs, DATABASE_BUSY_TIMEOUT_MS);
+
+  // 3. Sync throw callback
+  assert.throws(
+    () => {
+      client.withBusyTimeout(234, () => {
+        assert.equal(client.inspect().pragmas.busyTimeoutMs, 234);
+        throw new Error('sync throw test');
+      });
+    },
+    (err: unknown) => err instanceof Error && err.message === 'sync throw test',
+  );
+  assert.equal(client.inspect().pragmas.busyTimeoutMs, DATABASE_BUSY_TIMEOUT_MS);
+
+  // 4. Promise-returning callback is synchronously rejected and restores timeout
+  assert.throws(
+    () => {
+      client.withBusyTimeout(345, (() => {
+        return Promise.resolve('async result');
+      }) as unknown as () => string);
+    },
+    (err: unknown) =>
+      err instanceof DatabaseClientError &&
+      /does not support asynchronous or Promise-returning callbacks/i.test(err.message),
+  );
+  assert.equal(client.inspect().pragmas.busyTimeoutMs, DATABASE_BUSY_TIMEOUT_MS);
+
+  // 5. Thenable object callback is synchronously rejected and restores timeout
+  assert.throws(
+    () => {
+      client.withBusyTimeout(456, (() => {
+        return { then: () => {} };
+      }) as unknown as () => unknown);
+    },
+    (err: unknown) =>
+      err instanceof DatabaseClientError &&
+      /does not support asynchronous or Promise-returning callbacks/i.test(err.message),
+  );
+  assert.equal(client.inspect().pragmas.busyTimeoutMs, DATABASE_BUSY_TIMEOUT_MS);
+});
+
+test('withBusyTimeout: compile-time rejection of async and Promise-returning callbacks', (context) => {
+  const { client } = createTemporaryDatabase(context, { migrate: false });
+
+  // Compile-time allowed: Synchronous number callback
+  const syncNum: number = client.withBusyTimeout(100, () => 123);
+  assert.equal(syncNum, 123);
+
+  // Compile-time allowed: Synchronous object callback
+  const syncObj: { ok: boolean } = client.withBusyTimeout(100, () => ({ ok: true }));
+  assert.deepEqual(syncObj, { ok: true });
+
+  // Compile-time allowed: Synchronous union callback (number | string)
+  const syncUnion: number | string = client.withBusyTimeout(100, () =>
+    Math.random() > 0.5 ? 123 : 'abc',
+  );
+  assert.ok(typeof syncUnion === 'number' || typeof syncUnion === 'string');
+
+  // Compile-time REJECTED: async callback
+  assert.throws(() => {
+    // @ts-expect-error async function returns Promise<number>, which must be rejected at compile time
+    client.withBusyTimeout(100, async () => 123);
+  }, DatabaseClientError);
+
+  // Compile-time REJECTED: explicit Promise return
+  assert.throws(() => {
+    // @ts-expect-error Promise-returning function must be rejected at compile time
+    client.withBusyTimeout(100, () => Promise.resolve(123));
+  }, DatabaseClientError);
+
+  // Compile-time REJECTED: explicit PromiseLike / thenable return
+  assert.throws(() => {
+    // @ts-expect-error Thenable-returning function must be rejected at compile time
+    client.withBusyTimeout(100, () => ({ then() {} }));
+  }, DatabaseClientError);
+
+  // Compile-time REJECTED: union of number | Promise<number>
+  assert.throws(() => {
+    // @ts-expect-error Union return type containing Promise must be rejected at compile time
+    client.withBusyTimeout(100, (): number | Promise<number> => Promise.resolve(456));
+  }, DatabaseClientError);
+
+  // Compile-time REJECTED: union of string | PromiseLike<string>
+  assert.throws(() => {
+    // @ts-expect-error Union return type containing PromiseLike must be rejected at compile time
+    client.withBusyTimeout(100, (): string | PromiseLike<string> => ({ then() {} }));
+  }, DatabaseClientError);
+
+  // Compile-time REJECTED: union of number | string | Promise<void>
+  assert.throws(() => {
+    // @ts-expect-error Union return type containing Promise must be rejected at compile time
+    client.withBusyTimeout(100, (): number | string | Promise<void> => Promise.resolve());
+  }, DatabaseClientError);
+});

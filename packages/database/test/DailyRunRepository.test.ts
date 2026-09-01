@@ -300,7 +300,7 @@ test('DailyRun persists after close, reopen, and repeated migrate', (context) =>
 
   const reopened = createDatabase({ databasePath: fixture.databasePath });
   context.after(() => reopened.close());
-  assert.equal(reopened.migrate().appliedMigrationCount, 8);
+  assert.equal(reopened.migrate().appliedMigrationCount, 9);
   assert.equal(
     new DailyRunRepository(reopened).findById(fixture.run.id)?.businessDate,
     BUSINESS_DATE,

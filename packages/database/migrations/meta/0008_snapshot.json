@@ -1,0 +1,3579 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "5644cd9e-900d-41c3-aa2c-42e7f87226e5",
+  "prevId": "cc99a100-b167-481e-b57b-5d36f1637fe7",
+  "tables": {
+    "account_login_sessions": {
+      "name": "account_login_sessions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "pending_account_id": {
+          "name": "pending_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_by_admin_user_id": {
+          "name": "created_by_admin_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'PENDING'"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ready_detected_at": {
+          "name": "ready_detected_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "failure_code": {
+          "name": "failure_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "account_login_sessions_active_relogin_idx": {
+          "name": "account_login_sessions_active_relogin_idx",
+          "columns": ["account_id"],
+          "isUnique": true,
+          "where": "\"account_login_sessions\".\"account_id\" is not null and \"account_login_sessions\".\"status\" in ('PENDING', 'STARTING', 'AWAITING_USER', 'READY_DETECTED', 'COMPLETING')"
+        }
+      },
+      "foreignKeys": {
+        "account_login_sessions_account_id_accounts_id_fk": {
+          "name": "account_login_sessions_account_id_accounts_id_fk",
+          "tableFrom": "account_login_sessions",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "account_login_sessions_created_by_admin_user_id_admin_users_id_fk": {
+          "name": "account_login_sessions_created_by_admin_user_id_admin_users_id_fk",
+          "tableFrom": "account_login_sessions",
+          "tableTo": "admin_users",
+          "columnsFrom": ["created_by_admin_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "account_login_sessions_purpose_check": {
+          "name": "account_login_sessions_purpose_check",
+          "value": "\"account_login_sessions\".\"purpose\" in ('ADD_ACCOUNT', 'RELOGIN')"
+        },
+        "account_login_sessions_status_check": {
+          "name": "account_login_sessions_status_check",
+          "value": "\"account_login_sessions\".\"status\" in ('PENDING', 'STARTING', 'AWAITING_USER', 'READY_DETECTED', 'COMPLETING', 'COMPLETED', 'EXPIRED', 'CANCELLED', 'FAILED')"
+        },
+        "account_login_sessions_failure_code_check": {
+          "name": "account_login_sessions_failure_code_check",
+          "value": "\"account_login_sessions\".\"failure_code\" is null or \"account_login_sessions\".\"failure_code\" in ('START_FAILED', 'PROFILE_LEASE_CONFLICT', 'PROFILE_PREPARE_FAILED', 'CONSOLE_START_FAILED', 'AUTH_NOT_READY', 'PROFILE_IDENTITY_UNAVAILABLE', 'PROFILE_IDENTITY_CONFLICT', 'READY_TIMEOUT', 'PROCESS_EXITED', 'FINALIZE_FAILED', 'INTEGRITY_ERROR')"
+        },
+        "account_login_sessions_purpose_target_check": {
+          "name": "account_login_sessions_purpose_target_check",
+          "value": "(\"account_login_sessions\".\"purpose\" = 'ADD_ACCOUNT' and \"account_login_sessions\".\"account_id\" is null and \"account_login_sessions\".\"pending_account_id\" is not null and length(trim(\"account_login_sessions\".\"pending_account_id\")) > 0) or (\"account_login_sessions\".\"purpose\" = 'RELOGIN' and \"account_login_sessions\".\"account_id\" is not null and \"account_login_sessions\".\"pending_account_id\" is null)"
+        },
+        "account_login_sessions_expires_at_check": {
+          "name": "account_login_sessions_expires_at_check",
+          "value": "\"account_login_sessions\".\"expires_at\" > \"account_login_sessions\".\"created_at\""
+        },
+        "account_login_sessions_completed_at_check": {
+          "name": "account_login_sessions_completed_at_check",
+          "value": "(\"account_login_sessions\".\"status\" = 'COMPLETED' and \"account_login_sessions\".\"completed_at\" is not null) or (\"account_login_sessions\".\"status\" != 'COMPLETED' and \"account_login_sessions\".\"completed_at\" is null)"
+        },
+        "account_login_sessions_cancelled_at_check": {
+          "name": "account_login_sessions_cancelled_at_check",
+          "value": "(\"account_login_sessions\".\"status\" = 'CANCELLED' and \"account_login_sessions\".\"cancelled_at\" is not null) or (\"account_login_sessions\".\"status\" != 'CANCELLED' and \"account_login_sessions\".\"cancelled_at\" is null)"
+        },
+        "account_login_sessions_failure_check": {
+          "name": "account_login_sessions_failure_check",
+          "value": "(\"account_login_sessions\".\"status\" = 'FAILED' and \"account_login_sessions\".\"failure_code\" is not null) or (\"account_login_sessions\".\"status\" != 'FAILED' and \"account_login_sessions\".\"failure_code\" is null)"
+        }
+      }
+    },
+    "accounts": {
+      "name": "accounts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "login_status": {
+          "name": "login_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'UNKNOWN'"
+        },
+        "last_login_at": {
+          "name": "last_login_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "avatar_remote_url": {
+          "name": "avatar_remote_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "avatar_cache_key": {
+          "name": "avatar_cache_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "douyin_unique_id": {
+          "name": "douyin_unique_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "douyin_short_id": {
+          "name": "douyin_short_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "douyin_sec_uid": {
+          "name": "douyin_sec_uid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "profile_state": {
+          "name": "profile_state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'MIGRATION_REQUIRED'"
+        },
+        "lifecycle_status": {
+          "name": "lifecycle_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'ACTIVE'"
+        },
+        "last_auth_check_at": {
+          "name": "last_auth_check_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_contact_sync_at": {
+          "name": "last_contact_sync_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "unbound_at": {
+          "name": "unbound_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "accounts_douyin_sec_uid_unique_idx": {
+          "name": "accounts_douyin_sec_uid_unique_idx",
+          "columns": ["douyin_sec_uid"],
+          "isUnique": true,
+          "where": "\"accounts\".\"douyin_sec_uid\" is not null"
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "accounts_login_status_check": {
+          "name": "accounts_login_status_check",
+          "value": "\"accounts\".\"login_status\" in ('READY', 'AUTH_EXPIRED', 'UNKNOWN')"
+        },
+        "accounts_name_not_empty_check": {
+          "name": "accounts_name_not_empty_check",
+          "value": "length(trim(\"accounts\".\"name\")) > 0"
+        },
+        "accounts_profile_state_check": {
+          "name": "accounts_profile_state_check",
+          "value": "\"accounts\".\"profile_state\" in ('PROVISIONING', 'READY', 'MIGRATION_REQUIRED', 'MISSING', 'QUARANTINED')"
+        },
+        "accounts_lifecycle_status_check": {
+          "name": "accounts_lifecycle_status_check",
+          "value": "\"accounts\".\"lifecycle_status\" in ('ACTIVE', 'UNBOUND')"
+        },
+        "accounts_avatar_remote_url_check": {
+          "name": "accounts_avatar_remote_url_check",
+          "value": "\"accounts\".\"avatar_remote_url\" is null or length(trim(\"accounts\".\"avatar_remote_url\", ' ' || char(9) || char(10) || char(13))) > 0"
+        },
+        "accounts_avatar_cache_key_check": {
+          "name": "accounts_avatar_cache_key_check",
+          "value": "\"accounts\".\"avatar_cache_key\" is null or length(trim(\"accounts\".\"avatar_cache_key\", ' ' || char(9) || char(10) || char(13))) > 0"
+        },
+        "accounts_douyin_unique_id_check": {
+          "name": "accounts_douyin_unique_id_check",
+          "value": "\"accounts\".\"douyin_unique_id\" is null or length(trim(\"accounts\".\"douyin_unique_id\", ' ' || char(9) || char(10) || char(13))) > 0"
+        },
+        "accounts_douyin_short_id_check": {
+          "name": "accounts_douyin_short_id_check",
+          "value": "\"accounts\".\"douyin_short_id\" is null or length(trim(\"accounts\".\"douyin_short_id\", ' ' || char(9) || char(10) || char(13))) > 0"
+        },
+        "accounts_douyin_sec_uid_check": {
+          "name": "accounts_douyin_sec_uid_check",
+          "value": "\"accounts\".\"douyin_sec_uid\" is null or length(trim(\"accounts\".\"douyin_sec_uid\", ' ' || char(9) || char(10) || char(13))) > 0"
+        }
+      }
+    },
+    "admin_sessions": {
+      "name": "admin_sessions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "admin_user_id": {
+          "name": "admin_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token_digest": {
+          "name": "token_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "csrf_token_digest": {
+          "name": "csrf_token_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "session_version": {
+          "name": "session_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reauthenticated_at": {
+          "name": "reauthenticated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "idle_expires_at": {
+          "name": "idle_expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "absolute_expires_at": {
+          "name": "absolute_expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revoke_reason": {
+          "name": "revoke_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "admin_sessions_token_digest_unique": {
+          "name": "admin_sessions_token_digest_unique",
+          "columns": ["token_digest"],
+          "isUnique": true
+        },
+        "admin_sessions_admin_user_revoked_idx": {
+          "name": "admin_sessions_admin_user_revoked_idx",
+          "columns": ["admin_user_id", "revoked_at"],
+          "isUnique": false
+        },
+        "admin_sessions_idle_expires_at_idx": {
+          "name": "admin_sessions_idle_expires_at_idx",
+          "columns": ["idle_expires_at"],
+          "isUnique": false
+        },
+        "admin_sessions_absolute_expires_at_idx": {
+          "name": "admin_sessions_absolute_expires_at_idx",
+          "columns": ["absolute_expires_at"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "admin_sessions_admin_user_id_admin_users_id_fk": {
+          "name": "admin_sessions_admin_user_id_admin_users_id_fk",
+          "tableFrom": "admin_sessions",
+          "tableTo": "admin_users",
+          "columnsFrom": ["admin_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "admin_sessions_token_digest_not_empty_check": {
+          "name": "admin_sessions_token_digest_not_empty_check",
+          "value": "length(trim(\"admin_sessions\".\"token_digest\")) > 0"
+        },
+        "admin_sessions_csrf_token_digest_not_empty_check": {
+          "name": "admin_sessions_csrf_token_digest_not_empty_check",
+          "value": "length(trim(\"admin_sessions\".\"csrf_token_digest\")) > 0"
+        },
+        "admin_sessions_session_version_check": {
+          "name": "admin_sessions_session_version_check",
+          "value": "\"admin_sessions\".\"session_version\" >= 1"
+        },
+        "admin_sessions_timeline_check": {
+          "name": "admin_sessions_timeline_check",
+          "value": "\"admin_sessions\".\"created_at\" <= \"admin_sessions\".\"last_seen_at\" and \"admin_sessions\".\"last_seen_at\" <= \"admin_sessions\".\"idle_expires_at\""
+        },
+        "admin_sessions_absolute_timeline_check": {
+          "name": "admin_sessions_absolute_timeline_check",
+          "value": "\"admin_sessions\".\"created_at\" < \"admin_sessions\".\"absolute_expires_at\" and \"admin_sessions\".\"idle_expires_at\" <= \"admin_sessions\".\"absolute_expires_at\""
+        },
+        "admin_sessions_reauthenticated_at_check": {
+          "name": "admin_sessions_reauthenticated_at_check",
+          "value": "\"admin_sessions\".\"reauthenticated_at\" is null or (\"admin_sessions\".\"reauthenticated_at\" >= \"admin_sessions\".\"created_at\" and \"admin_sessions\".\"reauthenticated_at\" <= \"admin_sessions\".\"absolute_expires_at\")"
+        },
+        "admin_sessions_revoke_reason_check": {
+          "name": "admin_sessions_revoke_reason_check",
+          "value": "(\"admin_sessions\".\"revoked_at\" is null and \"admin_sessions\".\"revoke_reason\" is null) or (\"admin_sessions\".\"revoked_at\" is not null and \"admin_sessions\".\"revoke_reason\" is not null and length(trim(\"admin_sessions\".\"revoke_reason\")) > 0)"
+        }
+      }
+    },
+    "admin_users": {
+      "name": "admin_users",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "username_normalized": {
+          "name": "username_normalized",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'ACTIVE'"
+        },
+        "session_version": {
+          "name": "session_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "failed_login_count": {
+          "name": "failed_login_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "locked_until": {
+          "name": "locked_until",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_failed_login_at": {
+          "name": "last_failed_login_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_login_at": {
+          "name": "last_login_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "password_changed_at": {
+          "name": "password_changed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "admin_users_username_normalized_unique": {
+          "name": "admin_users_username_normalized_unique",
+          "columns": ["username_normalized"],
+          "isUnique": true
+        },
+        "admin_users_active_singleton_idx": {
+          "name": "admin_users_active_singleton_idx",
+          "columns": ["status"],
+          "isUnique": true,
+          "where": "\"admin_users\".\"status\" = 'ACTIVE'"
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "admin_users_username_not_empty_check": {
+          "name": "admin_users_username_not_empty_check",
+          "value": "length(trim(\"admin_users\".\"username\")) > 0"
+        },
+        "admin_users_username_normalized_not_empty_check": {
+          "name": "admin_users_username_normalized_not_empty_check",
+          "value": "length(trim(\"admin_users\".\"username_normalized\")) > 0"
+        },
+        "admin_users_password_hash_not_empty_check": {
+          "name": "admin_users_password_hash_not_empty_check",
+          "value": "length(trim(\"admin_users\".\"password_hash\")) > 0"
+        },
+        "admin_users_status_check": {
+          "name": "admin_users_status_check",
+          "value": "\"admin_users\".\"status\" in ('ACTIVE', 'DISABLED')"
+        },
+        "admin_users_session_version_check": {
+          "name": "admin_users_session_version_check",
+          "value": "\"admin_users\".\"session_version\" >= 1"
+        },
+        "admin_users_failed_login_count_check": {
+          "name": "admin_users_failed_login_count_check",
+          "value": "\"admin_users\".\"failed_login_count\" >= 0"
+        }
+      }
+    },
+    "audit_events": {
+      "name": "audit_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actor_admin_user_id": {
+          "name": "actor_admin_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entity_type": {
+          "name": "entity_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reason_code": {
+          "name": "reason_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "correlation_digest": {
+          "name": "correlation_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "audit_events_created_at_idx": {
+          "name": "audit_events_created_at_idx",
+          "columns": ["created_at"],
+          "isUnique": false
+        },
+        "audit_events_actor_created_idx": {
+          "name": "audit_events_actor_created_idx",
+          "columns": ["actor_admin_user_id", "created_at"],
+          "isUnique": false
+        },
+        "audit_events_entity_created_idx": {
+          "name": "audit_events_entity_created_idx",
+          "columns": ["entity_type", "entity_id", "created_at"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "audit_events_actor_admin_user_id_admin_users_id_fk": {
+          "name": "audit_events_actor_admin_user_id_admin_users_id_fk",
+          "tableFrom": "audit_events",
+          "tableTo": "admin_users",
+          "columnsFrom": ["actor_admin_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "audit_events_outcome_check": {
+          "name": "audit_events_outcome_check",
+          "value": "\"audit_events\".\"outcome\" in ('SUCCESS', 'REJECTED', 'FAILED')"
+        },
+        "audit_events_action_check": {
+          "name": "audit_events_action_check",
+          "value": "\"audit_events\".\"action\" in ('ADMIN_INITIALIZED', 'LOGIN_SUCCEEDED', 'LOGIN_FAILED', 'LOGOUT', 'SESSION_REVOKED', 'PASSWORD_CHANGED', 'ACCOUNT_LOGIN_STARTED', 'ACCOUNT_LOGIN_CANCELLED', 'ACCOUNT_CREATED', 'ACCOUNT_RELOGIN_COMPLETED', 'ACCOUNT_UNBOUND', 'CONTACT_SYNC_STARTED', 'CONTACT_SYNC_FINISHED', 'PREFERRED_IDENTITY_CHANGED', 'LEGACY_FRIEND_BOUND', 'LEGACY_FRIEND_DISMISSED', 'TEMPLATE_CREATED', 'TEMPLATE_UPDATED', 'TASK_CREATED', 'TASK_UPDATED', 'TASK_ENABLED', 'TASK_DISABLED', 'TASK_ARCHIVED', 'TEST_SEND_CONFIRMED', 'DELIVERY_RESOLVED', 'NOTIFICATION_CONFIG_UPDATED', 'NOTIFICATION_TEST_CONFIRMED', 'SESSION_CLEANUP', 'PROFILE_QUARANTINED')"
+        },
+        "audit_events_entity_type_check": {
+          "name": "audit_events_entity_type_check",
+          "value": "\"audit_events\".\"entity_type\" in ('ADMIN_USER', 'ADMIN_SESSION', 'ACCOUNT_LOGIN_SESSION', 'DOUYIN_ACCOUNT', 'CONTACT_SYNC_RUN', 'CONTACT', 'CONTACT_IDENTITY', 'TEMPLATE', 'SEND_TASK', 'EXECUTION_RUN', 'TARGET_SEND_RECORD', 'DELIVERY_RESOLUTION', 'NOTIFICATION_CONFIG', 'LEGACY_FRIEND_BINDING', 'LEGACY_SCHEDULE_IMPORT', 'SYSTEM')"
+        },
+        "audit_events_entity_id_check": {
+          "name": "audit_events_entity_id_check",
+          "value": "\"audit_events\".\"entity_id\" is null or length(trim(\"audit_events\".\"entity_id\")) > 0"
+        },
+        "audit_events_reason_code_check": {
+          "name": "audit_events_reason_code_check",
+          "value": "\"audit_events\".\"reason_code\" is null or length(trim(\"audit_events\".\"reason_code\")) > 0"
+        },
+        "audit_events_correlation_digest_check": {
+          "name": "audit_events_correlation_digest_check",
+          "value": "\"audit_events\".\"correlation_digest\" is null or length(trim(\"audit_events\".\"correlation_digest\")) > 0"
+        }
+      }
+    },
+    "avatar_assets": {
+      "name": "avatar_assets",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "cache_key": {
+          "name": "cache_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "media_type": {
+          "name": "media_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "byte_size": {
+          "name": "byte_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content_digest": {
+          "name": "content_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fetched_at": {
+          "name": "fetched_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_referenced_at": {
+          "name": "last_referenced_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "avatar_assets_cache_key_unique": {
+          "name": "avatar_assets_cache_key_unique",
+          "columns": ["cache_key"],
+          "isUnique": true
+        },
+        "avatar_assets_account_id_idx": {
+          "name": "avatar_assets_account_id_idx",
+          "columns": ["account_id"],
+          "isUnique": false
+        },
+        "avatar_assets_expires_at_idx": {
+          "name": "avatar_assets_expires_at_idx",
+          "columns": ["expires_at"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "avatar_assets_account_id_accounts_id_fk": {
+          "name": "avatar_assets_account_id_accounts_id_fk",
+          "tableFrom": "avatar_assets",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "avatar_assets_cache_key_not_empty_check": {
+          "name": "avatar_assets_cache_key_not_empty_check",
+          "value": "length(trim(\"avatar_assets\".\"cache_key\")) > 0"
+        },
+        "avatar_assets_content_digest_not_empty_check": {
+          "name": "avatar_assets_content_digest_not_empty_check",
+          "value": "length(trim(\"avatar_assets\".\"content_digest\")) > 0"
+        },
+        "avatar_assets_media_type_check": {
+          "name": "avatar_assets_media_type_check",
+          "value": "\"avatar_assets\".\"media_type\" in ('image/jpeg', 'image/png', 'image/webp', 'image/gif')"
+        },
+        "avatar_assets_byte_size_check": {
+          "name": "avatar_assets_byte_size_check",
+          "value": "\"avatar_assets\".\"byte_size\" >= 1 and \"avatar_assets\".\"byte_size\" <= 5242880"
+        }
+      }
+    },
+    "contact_identities": {
+      "name": "contact_identities",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contact_id": {
+          "name": "contact_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "normalized_value": {
+          "name": "normalized_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'ACTIVE'"
+        },
+        "is_preferred": {
+          "name": "is_preferred",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "first_observed_at": {
+          "name": "first_observed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_observed_at": {
+          "name": "last_observed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "superseded_at": {
+          "name": "superseded_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "contact_identities_preferred_active_idx": {
+          "name": "contact_identities_preferred_active_idx",
+          "columns": ["contact_id"],
+          "isUnique": true,
+          "where": "\"contact_identities\".\"is_preferred\" = 1 and \"contact_identities\".\"state\" = 'ACTIVE'"
+        },
+        "contact_identities_stable_active_idx": {
+          "name": "contact_identities_stable_active_idx",
+          "columns": ["account_id", "kind", "normalized_value"],
+          "isUnique": true,
+          "where": "\"contact_identities\".\"state\" = 'ACTIVE' and \"contact_identities\".\"kind\" in ('SEC_UID', 'UNIQUE_ID', 'SHORT_ID', 'CONVERSATION_ID')"
+        },
+        "contact_identities_contact_state_idx": {
+          "name": "contact_identities_contact_state_idx",
+          "columns": ["contact_id", "state"],
+          "isUnique": false
+        },
+        "contact_identities_account_kind_normalized_idx": {
+          "name": "contact_identities_account_kind_normalized_idx",
+          "columns": ["account_id", "kind", "normalized_value"],
+          "isUnique": false
+        },
+        "contact_identities_contact_last_observed_idx": {
+          "name": "contact_identities_contact_last_observed_idx",
+          "columns": ["contact_id", "last_observed_at"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "contact_identities_account_id_accounts_id_fk": {
+          "name": "contact_identities_account_id_accounts_id_fk",
+          "tableFrom": "contact_identities",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "contact_identities_contact_id_contacts_id_fk": {
+          "name": "contact_identities_contact_id_contacts_id_fk",
+          "tableFrom": "contact_identities",
+          "tableTo": "contacts",
+          "columnsFrom": ["contact_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "contact_identities_kind_check": {
+          "name": "contact_identities_kind_check",
+          "value": "\"contact_identities\".\"kind\" in ('SEC_UID', 'UNIQUE_ID', 'SHORT_ID', 'REMARK_NAME', 'DISPLAY_NAME', 'CONVERSATION_ID')"
+        },
+        "contact_identities_source_check": {
+          "name": "contact_identities_source_check",
+          "value": "\"contact_identities\".\"source\" in ('DOM', 'PAGE_DATA', 'RESPONSE_PARSER', 'LEGACY_MANUAL', 'HUMAN_REBIND')"
+        },
+        "contact_identities_state_check": {
+          "name": "contact_identities_state_check",
+          "value": "\"contact_identities\".\"state\" in ('ACTIVE', 'SUPERSEDED')"
+        },
+        "contact_identities_value_not_empty_check": {
+          "name": "contact_identities_value_not_empty_check",
+          "value": "length(trim(\"contact_identities\".\"value\")) > 0"
+        },
+        "contact_identities_normalized_value_not_empty_check": {
+          "name": "contact_identities_normalized_value_not_empty_check",
+          "value": "length(trim(\"contact_identities\".\"normalized_value\")) > 0"
+        },
+        "contact_identities_observation_timeline_check": {
+          "name": "contact_identities_observation_timeline_check",
+          "value": "\"contact_identities\".\"first_observed_at\" <= \"contact_identities\".\"last_observed_at\""
+        },
+        "contact_identities_superseded_consistency_check": {
+          "name": "contact_identities_superseded_consistency_check",
+          "value": "(\"contact_identities\".\"state\" = 'ACTIVE' and \"contact_identities\".\"superseded_at\" is null) or (\"contact_identities\".\"state\" = 'SUPERSEDED' and \"contact_identities\".\"superseded_at\" is not null)"
+        },
+        "contact_identities_preferred_active_check": {
+          "name": "contact_identities_preferred_active_check",
+          "value": "\"contact_identities\".\"is_preferred\" = 0 or (\"contact_identities\".\"is_preferred\" = 1 and \"contact_identities\".\"state\" = 'ACTIVE')"
+        }
+      }
+    },
+    "contact_sync_runs": {
+      "name": "contact_sync_runs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "requested_by_admin_user_id": {
+          "name": "requested_by_admin_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'PENDING'"
+        },
+        "is_complete": {
+          "name": "is_complete",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "candidate_count": {
+          "name": "candidate_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "created_count": {
+          "name": "created_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "updated_count": {
+          "name": "updated_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "stale_count": {
+          "name": "stale_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "unavailable_count": {
+          "name": "unavailable_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "issue_count": {
+          "name": "issue_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "failure_code": {
+          "name": "failure_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "contact_sync_runs_account_created_idx": {
+          "name": "contact_sync_runs_account_created_idx",
+          "columns": ["account_id", "created_at"],
+          "isUnique": false
+        },
+        "contact_sync_runs_status_idx": {
+          "name": "contact_sync_runs_status_idx",
+          "columns": ["status"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "contact_sync_runs_account_id_accounts_id_fk": {
+          "name": "contact_sync_runs_account_id_accounts_id_fk",
+          "tableFrom": "contact_sync_runs",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "contact_sync_runs_requested_by_admin_user_id_admin_users_id_fk": {
+          "name": "contact_sync_runs_requested_by_admin_user_id_admin_users_id_fk",
+          "tableFrom": "contact_sync_runs",
+          "tableTo": "admin_users",
+          "columnsFrom": ["requested_by_admin_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "contact_sync_runs_status_check": {
+          "name": "contact_sync_runs_status_check",
+          "value": "\"contact_sync_runs\".\"status\" in ('PENDING', 'RUNNING', 'COMPLETE', 'PARTIAL', 'FAILED', 'AUTH_EXPIRED')"
+        },
+        "contact_sync_runs_failure_code_check": {
+          "name": "contact_sync_runs_failure_code_check",
+          "value": "\"contact_sync_runs\".\"failure_code\" is null or \"contact_sync_runs\".\"failure_code\" in ('PROFILE_UNAVAILABLE', 'PROFILE_BUSY', 'AUTH_EXPIRED', 'AUTH_UNKNOWN', 'CHAT_NOT_READY', 'DISCOVERY_TIMEOUT', 'CANDIDATE_LIMIT_REACHED', 'PARSER_CONTRACT_FAILURE', 'BROWSER_FAILURE', 'PERSISTENCE_FAILURE')"
+        },
+        "contact_sync_runs_candidate_count_check": {
+          "name": "contact_sync_runs_candidate_count_check",
+          "value": "\"contact_sync_runs\".\"candidate_count\" >= 0 and \"contact_sync_runs\".\"candidate_count\" <= 500"
+        },
+        "contact_sync_runs_created_count_check": {
+          "name": "contact_sync_runs_created_count_check",
+          "value": "\"contact_sync_runs\".\"created_count\" >= 0 and \"contact_sync_runs\".\"created_count\" <= 500"
+        },
+        "contact_sync_runs_updated_count_check": {
+          "name": "contact_sync_runs_updated_count_check",
+          "value": "\"contact_sync_runs\".\"updated_count\" >= 0 and \"contact_sync_runs\".\"updated_count\" <= 500"
+        },
+        "contact_sync_runs_stale_count_check": {
+          "name": "contact_sync_runs_stale_count_check",
+          "value": "\"contact_sync_runs\".\"stale_count\" >= 0 and \"contact_sync_runs\".\"stale_count\" <= 500"
+        },
+        "contact_sync_runs_unavailable_count_check": {
+          "name": "contact_sync_runs_unavailable_count_check",
+          "value": "\"contact_sync_runs\".\"unavailable_count\" >= 0 and \"contact_sync_runs\".\"unavailable_count\" <= 500"
+        },
+        "contact_sync_runs_issue_count_check": {
+          "name": "contact_sync_runs_issue_count_check",
+          "value": "\"contact_sync_runs\".\"issue_count\" >= 0 and \"contact_sync_runs\".\"issue_count\" <= 500"
+        },
+        "contact_sync_runs_completion_check": {
+          "name": "contact_sync_runs_completion_check",
+          "value": "(\"contact_sync_runs\".\"status\" = 'COMPLETE' and \"contact_sync_runs\".\"is_complete\" = 1 and \"contact_sync_runs\".\"failure_code\" is null) or (\"contact_sync_runs\".\"status\" in ('PARTIAL', 'FAILED', 'AUTH_EXPIRED') and \"contact_sync_runs\".\"is_complete\" = 0 and \"contact_sync_runs\".\"failure_code\" is not null) or (\"contact_sync_runs\".\"status\" in ('PENDING', 'RUNNING') and \"contact_sync_runs\".\"is_complete\" = 0 and \"contact_sync_runs\".\"failure_code\" is null)"
+        },
+        "contact_sync_runs_terminal_finished_check": {
+          "name": "contact_sync_runs_terminal_finished_check",
+          "value": "(\"contact_sync_runs\".\"status\" in ('COMPLETE', 'PARTIAL', 'FAILED', 'AUTH_EXPIRED') and \"contact_sync_runs\".\"finished_at\" is not null) or (\"contact_sync_runs\".\"status\" in ('PENDING', 'RUNNING') and \"contact_sync_runs\".\"finished_at\" is null)"
+        }
+      }
+    },
+    "contacts": {
+      "name": "contacts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "remark_name": {
+          "name": "remark_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "avatar_remote_url": {
+          "name": "avatar_remote_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "avatar_asset_id": {
+          "name": "avatar_asset_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "streak_days": {
+          "name": "streak_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "streak_updated_at": {
+          "name": "streak_updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "availability_status": {
+          "name": "availability_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'AVAILABLE'"
+        },
+        "identity_status": {
+          "name": "identity_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'UNAVAILABLE'"
+        },
+        "discovered_at": {
+          "name": "discovered_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_full_sync_id": {
+          "name": "last_full_sync_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "missed_full_sync_count": {
+          "name": "missed_full_sync_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "contacts_account_type_availability_idx": {
+          "name": "contacts_account_type_availability_idx",
+          "columns": ["account_id", "type", "availability_status"],
+          "isUnique": false
+        },
+        "contacts_account_display_name_idx": {
+          "name": "contacts_account_display_name_idx",
+          "columns": ["account_id", "display_name"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "contacts_account_id_accounts_id_fk": {
+          "name": "contacts_account_id_accounts_id_fk",
+          "tableFrom": "contacts",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "contacts_avatar_asset_id_avatar_assets_id_fk": {
+          "name": "contacts_avatar_asset_id_avatar_assets_id_fk",
+          "tableFrom": "contacts",
+          "tableTo": "avatar_assets",
+          "columnsFrom": ["avatar_asset_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "contacts_last_full_sync_id_contact_sync_runs_id_fk": {
+          "name": "contacts_last_full_sync_id_contact_sync_runs_id_fk",
+          "tableFrom": "contacts",
+          "tableTo": "contact_sync_runs",
+          "columnsFrom": ["last_full_sync_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "contacts_type_check": {
+          "name": "contacts_type_check",
+          "value": "\"contacts\".\"type\" in ('PERSON', 'GROUP', 'SYSTEM', 'UNKNOWN')"
+        },
+        "contacts_availability_status_check": {
+          "name": "contacts_availability_status_check",
+          "value": "\"contacts\".\"availability_status\" in ('AVAILABLE', 'STALE', 'UNAVAILABLE')"
+        },
+        "contacts_identity_status_check": {
+          "name": "contacts_identity_status_check",
+          "value": "\"contacts\".\"identity_status\" in ('READY', 'UNAVAILABLE', 'CHANGED', 'AMBIGUOUS', 'LEGACY_UNBOUND')"
+        },
+        "contacts_display_name_not_empty_check": {
+          "name": "contacts_display_name_not_empty_check",
+          "value": "length(trim(\"contacts\".\"display_name\")) > 0"
+        },
+        "contacts_remark_name_check": {
+          "name": "contacts_remark_name_check",
+          "value": "\"contacts\".\"remark_name\" is null or length(trim(\"contacts\".\"remark_name\")) > 0"
+        },
+        "contacts_avatar_remote_url_check": {
+          "name": "contacts_avatar_remote_url_check",
+          "value": "\"contacts\".\"avatar_remote_url\" is null or length(trim(\"contacts\".\"avatar_remote_url\")) > 0"
+        },
+        "contacts_streak_days_check": {
+          "name": "contacts_streak_days_check",
+          "value": "\"contacts\".\"streak_days\" is null or \"contacts\".\"streak_days\" >= 0"
+        },
+        "contacts_streak_consistency_check": {
+          "name": "contacts_streak_consistency_check",
+          "value": "(\"contacts\".\"streak_days\" is null and \"contacts\".\"streak_updated_at\" is null) or (\"contacts\".\"streak_days\" is not null and \"contacts\".\"streak_updated_at\" is not null)"
+        },
+        "contacts_missed_full_sync_count_check": {
+          "name": "contacts_missed_full_sync_count_check",
+          "value": "\"contacts\".\"missed_full_sync_count\" >= 0"
+        },
+        "contacts_timeline_check": {
+          "name": "contacts_timeline_check",
+          "value": "\"contacts\".\"last_seen_at\" >= \"contacts\".\"discovered_at\""
+        }
+      }
+    },
+    "daily_runs": {
+      "name": "daily_runs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "business_date": {
+          "name": "business_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'READY'"
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "daily_runs_account_business_date_unique": {
+          "name": "daily_runs_account_business_date_unique",
+          "columns": ["account_id", "business_date"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "daily_runs_account_id_accounts_id_fk": {
+          "name": "daily_runs_account_id_accounts_id_fk",
+          "tableFrom": "daily_runs",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "daily_runs_business_date_check": {
+          "name": "daily_runs_business_date_check",
+          "value": "strftime('%Y-%m-%d', \"daily_runs\".\"business_date\") = \"daily_runs\".\"business_date\""
+        },
+        "daily_runs_status_check": {
+          "name": "daily_runs_status_check",
+          "value": "\"daily_runs\".\"status\" in ('READY', 'RUNNING', 'SUCCESS', 'FAILED', 'AUTH_EXPIRED')"
+        }
+      }
+    },
+    "delivery_resolutions": {
+      "name": "delivery_resolutions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_send_record_id": {
+          "name": "target_send_record_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "legacy_send_record_id": {
+          "name": "legacy_send_record_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "original_machine_status": {
+          "name": "original_machine_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "resolution": {
+          "name": "resolution",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'HUMAN'"
+        },
+        "resolved_by_admin_user_id": {
+          "name": "resolved_by_admin_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "supersedes_resolution_id": {
+          "name": "supersedes_resolution_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "delivery_resolutions_supersedes_resolution_id_unique": {
+          "name": "delivery_resolutions_supersedes_resolution_id_unique",
+          "columns": ["supersedes_resolution_id"],
+          "isUnique": true
+        },
+        "delivery_resolutions_target_send_record_id_idx": {
+          "name": "delivery_resolutions_target_send_record_id_idx",
+          "columns": ["target_send_record_id"],
+          "isUnique": false
+        },
+        "delivery_resolutions_legacy_send_record_id_idx": {
+          "name": "delivery_resolutions_legacy_send_record_id_idx",
+          "columns": ["legacy_send_record_id"],
+          "isUnique": false
+        },
+        "delivery_resolutions_resolved_by_idx": {
+          "name": "delivery_resolutions_resolved_by_idx",
+          "columns": ["resolved_by_admin_user_id"],
+          "isUnique": false
+        },
+        "delivery_resolutions_resolved_at_idx": {
+          "name": "delivery_resolutions_resolved_at_idx",
+          "columns": ["resolved_at"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "delivery_resolutions_target_send_record_id_target_send_records_id_fk": {
+          "name": "delivery_resolutions_target_send_record_id_target_send_records_id_fk",
+          "tableFrom": "delivery_resolutions",
+          "tableTo": "target_send_records",
+          "columnsFrom": ["target_send_record_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "delivery_resolutions_legacy_send_record_id_send_records_id_fk": {
+          "name": "delivery_resolutions_legacy_send_record_id_send_records_id_fk",
+          "tableFrom": "delivery_resolutions",
+          "tableTo": "send_records",
+          "columnsFrom": ["legacy_send_record_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "delivery_resolutions_resolved_by_admin_user_id_admin_users_id_fk": {
+          "name": "delivery_resolutions_resolved_by_admin_user_id_admin_users_id_fk",
+          "tableFrom": "delivery_resolutions",
+          "tableTo": "admin_users",
+          "columnsFrom": ["resolved_by_admin_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "delivery_resolutions_supersedes_resolution_id_delivery_resolutions_id_fk": {
+          "name": "delivery_resolutions_supersedes_resolution_id_delivery_resolutions_id_fk",
+          "tableFrom": "delivery_resolutions",
+          "tableTo": "delivery_resolutions",
+          "columnsFrom": ["supersedes_resolution_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "delivery_resolutions_source_record_check": {
+          "name": "delivery_resolutions_source_record_check",
+          "value": "(\"delivery_resolutions\".\"target_send_record_id\" is not null and \"delivery_resolutions\".\"legacy_send_record_id\" is null) or (\"delivery_resolutions\".\"target_send_record_id\" is null and \"delivery_resolutions\".\"legacy_send_record_id\" is not null)"
+        },
+        "delivery_resolutions_original_status_check": {
+          "name": "delivery_resolutions_original_status_check",
+          "value": "\"delivery_resolutions\".\"original_machine_status\" = 'DELIVERY_UNKNOWN'"
+        },
+        "delivery_resolutions_resolution_check": {
+          "name": "delivery_resolutions_resolution_check",
+          "value": "\"delivery_resolutions\".\"resolution\" in ('CONFIRMED_DELIVERED', 'CONFIRMED_NOT_DELIVERED', 'INCONCLUSIVE')"
+        },
+        "delivery_resolutions_source_check": {
+          "name": "delivery_resolutions_source_check",
+          "value": "\"delivery_resolutions\".\"source\" in ('HUMAN')"
+        },
+        "delivery_resolutions_note_check": {
+          "name": "delivery_resolutions_note_check",
+          "value": "\"delivery_resolutions\".\"note\" is null or (length(trim(\"delivery_resolutions\".\"note\")) > 0 and length(\"delivery_resolutions\".\"note\") <= 500)"
+        }
+      }
+    },
+    "execution_runs": {
+      "name": "execution_runs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "task_id": {
+          "name": "task_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "template_id": {
+          "name": "template_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "requested_by_admin_user_id": {
+          "name": "requested_by_admin_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "business_date": {
+          "name": "business_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'PENDING'"
+        },
+        "confirmed_at": {
+          "name": "confirmed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "execution_runs_idempotency_key_unique": {
+          "name": "execution_runs_idempotency_key_unique",
+          "columns": ["idempotency_key"],
+          "isUnique": true
+        },
+        "execution_runs_account_created_idx": {
+          "name": "execution_runs_account_created_idx",
+          "columns": ["account_id", "created_at"],
+          "isUnique": false
+        },
+        "execution_runs_task_business_date_idx": {
+          "name": "execution_runs_task_business_date_idx",
+          "columns": ["task_id", "business_date"],
+          "isUnique": false
+        },
+        "execution_runs_status_created_idx": {
+          "name": "execution_runs_status_created_idx",
+          "columns": ["status", "created_at"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "execution_runs_account_id_accounts_id_fk": {
+          "name": "execution_runs_account_id_accounts_id_fk",
+          "tableFrom": "execution_runs",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "execution_runs_task_id_send_tasks_id_fk": {
+          "name": "execution_runs_task_id_send_tasks_id_fk",
+          "tableFrom": "execution_runs",
+          "tableTo": "send_tasks",
+          "columnsFrom": ["task_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "execution_runs_template_id_message_templates_id_fk": {
+          "name": "execution_runs_template_id_message_templates_id_fk",
+          "tableFrom": "execution_runs",
+          "tableTo": "message_templates",
+          "columnsFrom": ["template_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "execution_runs_requested_by_admin_user_id_admin_users_id_fk": {
+          "name": "execution_runs_requested_by_admin_user_id_admin_users_id_fk",
+          "tableFrom": "execution_runs",
+          "tableTo": "admin_users",
+          "columnsFrom": ["requested_by_admin_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "execution_runs_kind_check": {
+          "name": "execution_runs_kind_check",
+          "value": "\"execution_runs\".\"kind\" in ('TEST_SEND', 'SCHEDULED_TASK')"
+        },
+        "execution_runs_status_check": {
+          "name": "execution_runs_status_check",
+          "value": "\"execution_runs\".\"status\" in ('PENDING', 'RUNNING', 'SUCCESS', 'PARTIAL_FAILED', 'FAILED', 'DELIVERY_UNKNOWN', 'AUTH_EXPIRED', 'CANCELLED')"
+        },
+        "execution_runs_idempotency_key_not_empty_check": {
+          "name": "execution_runs_idempotency_key_not_empty_check",
+          "value": "length(trim(\"execution_runs\".\"idempotency_key\")) > 0"
+        },
+        "execution_runs_scheduled_check": {
+          "name": "execution_runs_scheduled_check",
+          "value": "(\"execution_runs\".\"kind\" = 'SCHEDULED_TASK' and \"execution_runs\".\"task_id\" is not null and \"execution_runs\".\"business_date\" is not null and \"execution_runs\".\"requested_by_admin_user_id\" is null and \"execution_runs\".\"confirmed_at\" is null) or (\"execution_runs\".\"kind\" = 'TEST_SEND' and \"execution_runs\".\"task_id\" is null and \"execution_runs\".\"business_date\" is null and \"execution_runs\".\"requested_by_admin_user_id\" is not null and \"execution_runs\".\"confirmed_at\" is not null)"
+        },
+        "execution_runs_business_date_format_check": {
+          "name": "execution_runs_business_date_format_check",
+          "value": "\"execution_runs\".\"business_date\" is null or length(\"execution_runs\".\"business_date\") = 10"
+        },
+        "execution_runs_terminal_finished_check": {
+          "name": "execution_runs_terminal_finished_check",
+          "value": "(\"execution_runs\".\"status\" in ('SUCCESS', 'PARTIAL_FAILED', 'FAILED', 'DELIVERY_UNKNOWN', 'AUTH_EXPIRED', 'CANCELLED') and \"execution_runs\".\"finished_at\" is not null) or (\"execution_runs\".\"status\" in ('PENDING', 'RUNNING') and \"execution_runs\".\"finished_at\" is null)"
+        }
+      }
+    },
+    "friends": {
+      "name": "friends",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "remark_name": {
+          "name": "remark_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "short_id": {
+          "name": "short_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "unique_id": {
+          "name": "unique_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sec_uid": {
+          "name": "sec_uid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "match_field": {
+          "name": "match_field",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "match_key": {
+          "name": "match_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "friends_account_id_idx": {
+          "name": "friends_account_id_idx",
+          "columns": ["account_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "friends_account_id_accounts_id_fk": {
+          "name": "friends_account_id_accounts_id_fk",
+          "tableFrom": "friends",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "friends_display_name_not_empty_check": {
+          "name": "friends_display_name_not_empty_check",
+          "value": "length(trim(\"friends\".\"display_name\")) > 0"
+        },
+        "friends_match_key_not_empty_check": {
+          "name": "friends_match_key_not_empty_check",
+          "value": "length(\"friends\".\"match_key\") > 0"
+        },
+        "friends_match_field_check": {
+          "name": "friends_match_field_check",
+          "value": "\"friends\".\"match_field\" in ('displayName', 'remarkName', 'shortId', 'uniqueId', 'secUid')"
+        },
+        "friends_match_consistency_check": {
+          "name": "friends_match_consistency_check",
+          "value": "case \"friends\".\"match_field\"\n        when 'displayName' then \"friends\".\"match_key\" = trim(\"friends\".\"display_name\")\n        when 'remarkName' then \"friends\".\"remark_name\" is not null and \"friends\".\"match_key\" = trim(\"friends\".\"remark_name\")\n        when 'shortId' then \"friends\".\"short_id\" is not null and \"friends\".\"match_key\" = trim(\"friends\".\"short_id\")\n        when 'uniqueId' then \"friends\".\"unique_id\" is not null and \"friends\".\"match_key\" = trim(\"friends\".\"unique_id\")\n        when 'secUid' then \"friends\".\"sec_uid\" is not null and \"friends\".\"match_key\" = trim(\"friends\".\"sec_uid\")\n        else 0\n      end"
+        }
+      }
+    },
+    "legacy_friend_bindings": {
+      "name": "legacy_friend_bindings",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "friend_id": {
+          "name": "friend_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contact_id": {
+          "name": "contact_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'PENDING'"
+        },
+        "bound_by_admin_user_id": {
+          "name": "bound_by_admin_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "bound_at": {
+          "name": "bound_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "dismissed_at": {
+          "name": "dismissed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "legacy_friend_bindings_friend_id_unique": {
+          "name": "legacy_friend_bindings_friend_id_unique",
+          "columns": ["friend_id"],
+          "isUnique": true
+        },
+        "legacy_friend_bindings_account_id_idx": {
+          "name": "legacy_friend_bindings_account_id_idx",
+          "columns": ["account_id"],
+          "isUnique": false
+        },
+        "legacy_friend_bindings_contact_id_idx": {
+          "name": "legacy_friend_bindings_contact_id_idx",
+          "columns": ["contact_id"],
+          "isUnique": false
+        },
+        "legacy_friend_bindings_status_idx": {
+          "name": "legacy_friend_bindings_status_idx",
+          "columns": ["status"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "legacy_friend_bindings_friend_id_friends_id_fk": {
+          "name": "legacy_friend_bindings_friend_id_friends_id_fk",
+          "tableFrom": "legacy_friend_bindings",
+          "tableTo": "friends",
+          "columnsFrom": ["friend_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "legacy_friend_bindings_account_id_accounts_id_fk": {
+          "name": "legacy_friend_bindings_account_id_accounts_id_fk",
+          "tableFrom": "legacy_friend_bindings",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "legacy_friend_bindings_contact_id_contacts_id_fk": {
+          "name": "legacy_friend_bindings_contact_id_contacts_id_fk",
+          "tableFrom": "legacy_friend_bindings",
+          "tableTo": "contacts",
+          "columnsFrom": ["contact_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "legacy_friend_bindings_bound_by_admin_user_id_admin_users_id_fk": {
+          "name": "legacy_friend_bindings_bound_by_admin_user_id_admin_users_id_fk",
+          "tableFrom": "legacy_friend_bindings",
+          "tableTo": "admin_users",
+          "columnsFrom": ["bound_by_admin_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "legacy_friend_bindings_status_check": {
+          "name": "legacy_friend_bindings_status_check",
+          "value": "\"legacy_friend_bindings\".\"status\" in ('PENDING', 'BOUND', 'DISMISSED')"
+        },
+        "legacy_friend_bindings_status_fields_check": {
+          "name": "legacy_friend_bindings_status_fields_check",
+          "value": "(\"legacy_friend_bindings\".\"status\" = 'PENDING' and \"legacy_friend_bindings\".\"contact_id\" is null and \"legacy_friend_bindings\".\"bound_by_admin_user_id\" is null and \"legacy_friend_bindings\".\"bound_at\" is null and \"legacy_friend_bindings\".\"dismissed_at\" is null) or (\"legacy_friend_bindings\".\"status\" = 'BOUND' and \"legacy_friend_bindings\".\"contact_id\" is not null and \"legacy_friend_bindings\".\"bound_by_admin_user_id\" is not null and \"legacy_friend_bindings\".\"bound_at\" is not null and \"legacy_friend_bindings\".\"dismissed_at\" is null) or (\"legacy_friend_bindings\".\"status\" = 'DISMISSED' and \"legacy_friend_bindings\".\"contact_id\" is null and \"legacy_friend_bindings\".\"bound_by_admin_user_id\" is null and \"legacy_friend_bindings\".\"bound_at\" is null and \"legacy_friend_bindings\".\"dismissed_at\" is not null)"
+        }
+      }
+    },
+    "legacy_schedule_imports": {
+      "name": "legacy_schedule_imports",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "schedule_id": {
+          "name": "schedule_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'PENDING'"
+        },
+        "start_time": {
+          "name": "start_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "end_time": {
+          "name": "end_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "max_attempts": {
+          "name": "max_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "retry_interval_seconds": {
+          "name": "retry_interval_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "legacy_enabled_snapshot": {
+          "name": "legacy_enabled_snapshot",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "converted_task_id": {
+          "name": "converted_task_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "converted_by_admin_user_id": {
+          "name": "converted_by_admin_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "converted_at": {
+          "name": "converted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "dismissed_at": {
+          "name": "dismissed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "legacy_schedule_imports_schedule_id_unique": {
+          "name": "legacy_schedule_imports_schedule_id_unique",
+          "columns": ["schedule_id"],
+          "isUnique": true
+        },
+        "legacy_schedule_imports_account_id_idx": {
+          "name": "legacy_schedule_imports_account_id_idx",
+          "columns": ["account_id"],
+          "isUnique": false
+        },
+        "legacy_schedule_imports_converted_task_id_idx": {
+          "name": "legacy_schedule_imports_converted_task_id_idx",
+          "columns": ["converted_task_id"],
+          "isUnique": false
+        },
+        "legacy_schedule_imports_status_idx": {
+          "name": "legacy_schedule_imports_status_idx",
+          "columns": ["status"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "legacy_schedule_imports_schedule_id_schedules_id_fk": {
+          "name": "legacy_schedule_imports_schedule_id_schedules_id_fk",
+          "tableFrom": "legacy_schedule_imports",
+          "tableTo": "schedules",
+          "columnsFrom": ["schedule_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "legacy_schedule_imports_account_id_accounts_id_fk": {
+          "name": "legacy_schedule_imports_account_id_accounts_id_fk",
+          "tableFrom": "legacy_schedule_imports",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "legacy_schedule_imports_converted_task_id_send_tasks_id_fk": {
+          "name": "legacy_schedule_imports_converted_task_id_send_tasks_id_fk",
+          "tableFrom": "legacy_schedule_imports",
+          "tableTo": "send_tasks",
+          "columnsFrom": ["converted_task_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "legacy_schedule_imports_converted_by_admin_user_id_admin_users_id_fk": {
+          "name": "legacy_schedule_imports_converted_by_admin_user_id_admin_users_id_fk",
+          "tableFrom": "legacy_schedule_imports",
+          "tableTo": "admin_users",
+          "columnsFrom": ["converted_by_admin_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "legacy_schedule_imports_status_check": {
+          "name": "legacy_schedule_imports_status_check",
+          "value": "\"legacy_schedule_imports\".\"status\" in ('PENDING', 'CONVERTED', 'DISMISSED')"
+        },
+        "legacy_schedule_imports_timezone_not_empty_check": {
+          "name": "legacy_schedule_imports_timezone_not_empty_check",
+          "value": "length(trim(\"legacy_schedule_imports\".\"timezone\")) > 0"
+        },
+        "legacy_schedule_imports_max_attempts_check": {
+          "name": "legacy_schedule_imports_max_attempts_check",
+          "value": "\"legacy_schedule_imports\".\"max_attempts\" >= 1 and \"legacy_schedule_imports\".\"max_attempts\" <= 5"
+        },
+        "legacy_schedule_imports_retry_interval_seconds_check": {
+          "name": "legacy_schedule_imports_retry_interval_seconds_check",
+          "value": "\"legacy_schedule_imports\".\"retry_interval_seconds\" >= 1 and \"legacy_schedule_imports\".\"retry_interval_seconds\" <= 86400"
+        },
+        "legacy_schedule_imports_status_fields_check": {
+          "name": "legacy_schedule_imports_status_fields_check",
+          "value": "(\"legacy_schedule_imports\".\"status\" = 'PENDING' and \"legacy_schedule_imports\".\"converted_task_id\" is null and \"legacy_schedule_imports\".\"converted_by_admin_user_id\" is null and \"legacy_schedule_imports\".\"converted_at\" is null and \"legacy_schedule_imports\".\"dismissed_at\" is null) or (\"legacy_schedule_imports\".\"status\" = 'CONVERTED' and \"legacy_schedule_imports\".\"converted_task_id\" is not null and \"legacy_schedule_imports\".\"converted_by_admin_user_id\" is not null and \"legacy_schedule_imports\".\"converted_at\" is not null and \"legacy_schedule_imports\".\"dismissed_at\" is null) or (\"legacy_schedule_imports\".\"status\" = 'DISMISSED' and \"legacy_schedule_imports\".\"converted_task_id\" is null and \"legacy_schedule_imports\".\"converted_by_admin_user_id\" is null and \"legacy_schedule_imports\".\"converted_at\" is null and \"legacy_schedule_imports\".\"dismissed_at\" is not null)"
+        }
+      }
+    },
+    "message_templates": {
+      "name": "message_templates",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider_type": {
+          "name": "provider_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "message_templates_name_not_empty_check": {
+          "name": "message_templates_name_not_empty_check",
+          "value": "length(trim(\"message_templates\".\"name\")) > 0"
+        },
+        "message_templates_provider_type_check": {
+          "name": "message_templates_provider_type_check",
+          "value": "\"message_templates\".\"provider_type\" in ('STATIC', 'RANDOM')"
+        }
+      }
+    },
+    "notification_configs": {
+      "name": "notification_configs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'WEBHOOK'"
+        },
+        "webhook_url": {
+          "name": "webhook_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "notify_auth_expired": {
+          "name": "notify_auth_expired",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "notify_task_failed": {
+          "name": "notify_task_failed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "notify_consecutive_failure": {
+          "name": "notify_consecutive_failure",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "notify_delivery_unknown": {
+          "name": "notify_delivery_unknown",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "notification_configs_singleton_check": {
+          "name": "notification_configs_singleton_check",
+          "value": "\"notification_configs\".\"id\" = 1"
+        },
+        "notification_configs_provider_check": {
+          "name": "notification_configs_provider_check",
+          "value": "\"notification_configs\".\"provider\" = 'WEBHOOK'"
+        },
+        "notification_configs_webhook_url_check": {
+          "name": "notification_configs_webhook_url_check",
+          "value": "\"notification_configs\".\"webhook_url\" is null or length(trim(\"notification_configs\".\"webhook_url\")) > 0"
+        }
+      }
+    },
+    "schedules": {
+      "name": "schedules",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "start_time": {
+          "name": "start_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "end_time": {
+          "name": "end_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "max_attempts": {
+          "name": "max_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 3
+        },
+        "retry_interval_seconds": {
+          "name": "retry_interval_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 60
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "schedules_account_id_unique": {
+          "name": "schedules_account_id_unique",
+          "columns": ["account_id"],
+          "isUnique": true
+        },
+        "schedules_enabled_idx": {
+          "name": "schedules_enabled_idx",
+          "columns": ["enabled"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "schedules_account_id_accounts_id_fk": {
+          "name": "schedules_account_id_accounts_id_fk",
+          "tableFrom": "schedules",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "schedules_start_time_check": {
+          "name": "schedules_start_time_check",
+          "value": "\"schedules\".\"start_time\" glob '[0-2][0-9]:[0-5][0-9]' and cast(substr(\"schedules\".\"start_time\", 1, 2) as integer) between 0 and 23"
+        },
+        "schedules_end_time_check": {
+          "name": "schedules_end_time_check",
+          "value": "\"schedules\".\"end_time\" glob '[0-2][0-9]:[0-5][0-9]' and cast(substr(\"schedules\".\"end_time\", 1, 2) as integer) between 0 and 23"
+        },
+        "schedules_window_check": {
+          "name": "schedules_window_check",
+          "value": "\"schedules\".\"start_time\" < \"schedules\".\"end_time\""
+        },
+        "schedules_timezone_not_empty_check": {
+          "name": "schedules_timezone_not_empty_check",
+          "value": "length(trim(\"schedules\".\"timezone\")) > 0"
+        },
+        "schedules_max_attempts_check": {
+          "name": "schedules_max_attempts_check",
+          "value": "\"schedules\".\"max_attempts\" between 1 and 5"
+        },
+        "schedules_retry_interval_seconds_check": {
+          "name": "schedules_retry_interval_seconds_check",
+          "value": "\"schedules\".\"retry_interval_seconds\" between 1 and 86400"
+        }
+      }
+    },
+    "send_records": {
+      "name": "send_records",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "daily_run_id": {
+          "name": "daily_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "friend_id": {
+          "name": "friend_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "business_date": {
+          "name": "business_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "message_template_id": {
+          "name": "message_template_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "message_text": {
+          "name": "message_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'READY'"
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "next_retry_at": {
+          "name": "next_retry_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_error_code": {
+          "name": "last_error_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "send_action_started_at": {
+          "name": "send_action_started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "send_records_friend_business_date_unique": {
+          "name": "send_records_friend_business_date_unique",
+          "columns": ["friend_id", "business_date"],
+          "isUnique": true
+        },
+        "send_records_daily_run_friend_unique": {
+          "name": "send_records_daily_run_friend_unique",
+          "columns": ["daily_run_id", "friend_id"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "send_records_daily_run_id_daily_runs_id_fk": {
+          "name": "send_records_daily_run_id_daily_runs_id_fk",
+          "tableFrom": "send_records",
+          "tableTo": "daily_runs",
+          "columnsFrom": ["daily_run_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "send_records_friend_id_friends_id_fk": {
+          "name": "send_records_friend_id_friends_id_fk",
+          "tableFrom": "send_records",
+          "tableTo": "friends",
+          "columnsFrom": ["friend_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "send_records_message_template_id_message_templates_id_fk": {
+          "name": "send_records_message_template_id_message_templates_id_fk",
+          "tableFrom": "send_records",
+          "tableTo": "message_templates",
+          "columnsFrom": ["message_template_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "send_records_business_date_check": {
+          "name": "send_records_business_date_check",
+          "value": "strftime('%Y-%m-%d', \"send_records\".\"business_date\") = \"send_records\".\"business_date\""
+        },
+        "send_records_message_text_not_empty_check": {
+          "name": "send_records_message_text_not_empty_check",
+          "value": "length(trim(\"send_records\".\"message_text\")) > 0"
+        },
+        "send_records_status_check": {
+          "name": "send_records_status_check",
+          "value": "\"send_records\".\"status\" in ('READY', 'RUNNING', 'RETRY_WAIT', 'SUCCESS', 'FAILED', 'DELIVERY_UNKNOWN')"
+        },
+        "send_records_attempt_count_check": {
+          "name": "send_records_attempt_count_check",
+          "value": "\"send_records\".\"attempt_count\" between 0 and 5"
+        },
+        "send_records_retry_wait_check": {
+          "name": "send_records_retry_wait_check",
+          "value": "(\"send_records\".\"status\" = 'RETRY_WAIT' and \"send_records\".\"next_retry_at\" is not null and \"send_records\".\"finished_at\" is null) or (\"send_records\".\"status\" <> 'RETRY_WAIT' and \"send_records\".\"next_retry_at\" is null)"
+        },
+        "send_records_last_error_code_check": {
+          "name": "send_records_last_error_code_check",
+          "value": "\"send_records\".\"last_error_code\" is null or \"send_records\".\"last_error_code\" in ('NETWORK_TRANSIENT', 'PAGE_LOAD_TIMEOUT', 'CONTACT_LIST_NOT_READY', 'BROWSER_TRANSIENT', 'CONTACT_NOT_FOUND', 'AMBIGUOUS_CONTACT', 'SELECTOR_FAILURE', 'CONVERSATION_VERIFICATION_FAILED', 'MESSAGE_INPUT_FAILED', 'SEND_ACTION_FAILED', 'VERIFY_FAILED', 'AUTH_EXPIRED', 'AUTH_UNKNOWN', 'TEMPLATE_INVALID', 'CONFIG_INVALID', 'PROCESS_INTERRUPTED_BEFORE_SEND', 'RETRY_WINDOW_EXPIRED', 'MAX_ATTEMPTS_EXHAUSTED', 'DELIVERY_UNKNOWN')"
+        }
+      }
+    },
+    "send_task_targets": {
+      "name": "send_task_targets",
+      "columns": {
+        "task_id": {
+          "name": "task_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contact_id": {
+          "name": "contact_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "send_task_targets_contact_id_idx": {
+          "name": "send_task_targets_contact_id_idx",
+          "columns": ["contact_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "send_task_targets_task_id_send_tasks_id_fk": {
+          "name": "send_task_targets_task_id_send_tasks_id_fk",
+          "tableFrom": "send_task_targets",
+          "tableTo": "send_tasks",
+          "columnsFrom": ["task_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "send_task_targets_contact_id_contacts_id_fk": {
+          "name": "send_task_targets_contact_id_contacts_id_fk",
+          "tableFrom": "send_task_targets",
+          "tableTo": "contacts",
+          "columnsFrom": ["contact_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "send_task_targets_task_id_contact_id_pk": {
+          "columns": ["task_id", "contact_id"],
+          "name": "send_task_targets_task_id_contact_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "send_tasks": {
+      "name": "send_tasks",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "template_id": {
+          "name": "template_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "schedule_type": {
+          "name": "schedule_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'DAILY_WINDOW'"
+        },
+        "start_time": {
+          "name": "start_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "end_time": {
+          "name": "end_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "max_attempts": {
+          "name": "max_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 3
+        },
+        "retry_interval_seconds": {
+          "name": "retry_interval_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 60
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "send_tasks_account_id_idx": {
+          "name": "send_tasks_account_id_idx",
+          "columns": ["account_id"],
+          "isUnique": false
+        },
+        "send_tasks_enabled_idx": {
+          "name": "send_tasks_enabled_idx",
+          "columns": ["enabled"],
+          "isUnique": false
+        },
+        "send_tasks_template_id_idx": {
+          "name": "send_tasks_template_id_idx",
+          "columns": ["template_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "send_tasks_account_id_accounts_id_fk": {
+          "name": "send_tasks_account_id_accounts_id_fk",
+          "tableFrom": "send_tasks",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "send_tasks_template_id_message_templates_id_fk": {
+          "name": "send_tasks_template_id_message_templates_id_fk",
+          "tableFrom": "send_tasks",
+          "tableTo": "message_templates",
+          "columnsFrom": ["template_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "send_tasks_name_not_empty_check": {
+          "name": "send_tasks_name_not_empty_check",
+          "value": "length(trim(\"send_tasks\".\"name\")) > 0"
+        },
+        "send_tasks_timezone_not_empty_check": {
+          "name": "send_tasks_timezone_not_empty_check",
+          "value": "length(trim(\"send_tasks\".\"timezone\")) > 0"
+        },
+        "send_tasks_schedule_type_check": {
+          "name": "send_tasks_schedule_type_check",
+          "value": "\"send_tasks\".\"schedule_type\" in ('DAILY_WINDOW')"
+        },
+        "send_tasks_max_attempts_check": {
+          "name": "send_tasks_max_attempts_check",
+          "value": "\"send_tasks\".\"max_attempts\" >= 1 and \"send_tasks\".\"max_attempts\" <= 5"
+        },
+        "send_tasks_retry_interval_seconds_check": {
+          "name": "send_tasks_retry_interval_seconds_check",
+          "value": "\"send_tasks\".\"retry_interval_seconds\" >= 1 and \"send_tasks\".\"retry_interval_seconds\" <= 86400"
+        },
+        "send_tasks_archived_enabled_check": {
+          "name": "send_tasks_archived_enabled_check",
+          "value": "\"send_tasks\".\"archived_at\" is null or \"send_tasks\".\"enabled\" = 0"
+        }
+      }
+    },
+    "system_events": {
+      "name": "system_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "level": {
+          "name": "level",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "friend_id": {
+          "name": "friend_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "attempt": {
+          "name": "attempt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "error_code": {
+          "name": "error_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "screenshot_path": {
+          "name": "screenshot_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "trace_path": {
+          "name": "trace_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "system_events_created_at_idx": {
+          "name": "system_events_created_at_idx",
+          "columns": ["created_at"],
+          "isUnique": false
+        },
+        "system_events_run_id_idx": {
+          "name": "system_events_run_id_idx",
+          "columns": ["run_id"],
+          "isUnique": false
+        },
+        "system_events_account_id_idx": {
+          "name": "system_events_account_id_idx",
+          "columns": ["account_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "system_events_run_id_daily_runs_id_fk": {
+          "name": "system_events_run_id_daily_runs_id_fk",
+          "tableFrom": "system_events",
+          "tableTo": "daily_runs",
+          "columnsFrom": ["run_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "system_events_account_id_accounts_id_fk": {
+          "name": "system_events_account_id_accounts_id_fk",
+          "tableFrom": "system_events",
+          "tableTo": "accounts",
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "system_events_friend_id_friends_id_fk": {
+          "name": "system_events_friend_id_friends_id_fk",
+          "tableFrom": "system_events",
+          "tableTo": "friends",
+          "columnsFrom": ["friend_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "system_events_level_check": {
+          "name": "system_events_level_check",
+          "value": "\"system_events\".\"level\" in ('INFO', 'WARN', 'ERROR')"
+        },
+        "system_events_event_type_check": {
+          "name": "system_events_event_type_check",
+          "value": "\"system_events\".\"event_type\" in ('RUN_STARTED', 'RUN_FINISHED', 'AUTH_CHECKING', 'AUTH_EXPIRED', 'AUTH_UNKNOWN', 'FRIEND_RESOLVING', 'CONTACT_NOT_FOUND', 'AMBIGUOUS_CONTACT', 'MESSAGE_BUILDING', 'MESSAGE_SENDING', 'VERIFYING', 'VERIFY_SUCCESS', 'RETRY_WAIT', 'TASK_FAILED', 'SELECTOR_FAILURE', 'BROWSER_ERROR', 'DELIVERY_UNKNOWN', 'CONVERSATION_VERIFICATION_FAILED', 'SKIPPED_IDEMPOTENT', 'CONSECUTIVE_RUN_FAILURE', 'OBSERVABILITY_ERROR')"
+        },
+        "system_events_attempt_check": {
+          "name": "system_events_attempt_check",
+          "value": "\"system_events\".\"attempt\" is null or \"system_events\".\"attempt\" > 0"
+        },
+        "system_events_message_not_empty_check": {
+          "name": "system_events_message_not_empty_check",
+          "value": "length(trim(\"system_events\".\"message\")) > 0"
+        }
+      }
+    },
+    "target_send_records": {
+      "name": "target_send_records",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "task_id": {
+          "name": "task_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "contact_id": {
+          "name": "contact_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "business_date": {
+          "name": "business_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "template_id": {
+          "name": "template_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "message_text": {
+          "name": "message_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "machine_status": {
+          "name": "machine_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'READY'"
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "next_retry_at": {
+          "name": "next_retry_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "failure_code": {
+          "name": "failure_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "target_identity_kind_snapshot": {
+          "name": "target_identity_kind_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_identity_value_digest": {
+          "name": "target_identity_value_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "send_action_started_at": {
+          "name": "send_action_started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "target_send_records_run_contact_unique_idx": {
+          "name": "target_send_records_run_contact_unique_idx",
+          "columns": ["run_id", "contact_id"],
+          "isUnique": true
+        },
+        "target_send_records_task_contact_date_unique_idx": {
+          "name": "target_send_records_task_contact_date_unique_idx",
+          "columns": ["task_id", "contact_id", "business_date"],
+          "isUnique": true,
+          "where": "\"target_send_records\".\"task_id\" is not null and \"target_send_records\".\"business_date\" is not null"
+        },
+        "target_send_records_contact_created_idx": {
+          "name": "target_send_records_contact_created_idx",
+          "columns": ["contact_id", "created_at"],
+          "isUnique": false
+        },
+        "target_send_records_status_idx": {
+          "name": "target_send_records_status_idx",
+          "columns": ["machine_status"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "target_send_records_run_id_execution_runs_id_fk": {
+          "name": "target_send_records_run_id_execution_runs_id_fk",
+          "tableFrom": "target_send_records",
+          "tableTo": "execution_runs",
+          "columnsFrom": ["run_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "target_send_records_task_id_send_tasks_id_fk": {
+          "name": "target_send_records_task_id_send_tasks_id_fk",
+          "tableFrom": "target_send_records",
+          "tableTo": "send_tasks",
+          "columnsFrom": ["task_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "target_send_records_contact_id_contacts_id_fk": {
+          "name": "target_send_records_contact_id_contacts_id_fk",
+          "tableFrom": "target_send_records",
+          "tableTo": "contacts",
+          "columnsFrom": ["contact_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "target_send_records_template_id_message_templates_id_fk": {
+          "name": "target_send_records_template_id_message_templates_id_fk",
+          "tableFrom": "target_send_records",
+          "tableTo": "message_templates",
+          "columnsFrom": ["template_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "target_send_records_message_text_not_empty_check": {
+          "name": "target_send_records_message_text_not_empty_check",
+          "value": "length(trim(\"target_send_records\".\"message_text\")) > 0"
+        },
+        "target_send_records_digest_not_empty_check": {
+          "name": "target_send_records_digest_not_empty_check",
+          "value": "length(trim(\"target_send_records\".\"target_identity_value_digest\")) > 0"
+        },
+        "target_send_records_identity_kind_check": {
+          "name": "target_send_records_identity_kind_check",
+          "value": "\"target_send_records\".\"target_identity_kind_snapshot\" in ('SEC_UID', 'UNIQUE_ID', 'SHORT_ID', 'REMARK_NAME', 'DISPLAY_NAME', 'CONVERSATION_ID')"
+        },
+        "target_send_records_machine_status_check": {
+          "name": "target_send_records_machine_status_check",
+          "value": "\"target_send_records\".\"machine_status\" in ('READY', 'RUNNING', 'RETRY_WAIT', 'SUCCESS', 'FAILED', 'DELIVERY_UNKNOWN', 'SKIPPED')"
+        },
+        "target_send_records_attempt_count_check": {
+          "name": "target_send_records_attempt_count_check",
+          "value": "\"target_send_records\".\"attempt_count\" >= 0 and \"target_send_records\".\"attempt_count\" <= 5"
+        },
+        "target_send_records_failure_code_check": {
+          "name": "target_send_records_failure_code_check",
+          "value": "\"target_send_records\".\"failure_code\" is null or \"target_send_records\".\"failure_code\" in ('NAVIGATION_FAILED', 'PAGE_LOAD_TIMEOUT', 'CONTACT_LIST_NOT_READY', 'TARGET_NOT_FOUND', 'TARGET_AMBIGUOUS', 'TARGET_IDENTITY_UNAVAILABLE', 'IDENTITY_CHANGED', 'CONVERSATION_VERIFICATION_FAILED', 'COMPOSER_NOT_READY', 'MESSAGE_INPUT_FAILED', 'SEND_ACTION_NOT_TRIGGERED', 'AUTH_EXPIRED', 'AUTH_UNKNOWN', 'CAPTCHA_OR_RISK_CONTROL', 'BROWSER_FAILURE', 'PROFILE_UNAVAILABLE', 'TEMPLATE_INVALID', 'CONFIG_INVALID', 'PROCESS_INTERRUPTED_BEFORE_SEND', 'RETRY_WINDOW_EXPIRED', 'MAX_ATTEMPTS_EXHAUSTED', 'BATCH_ABORTED', 'DELIVERY_VERIFICATION_TIMEOUT', 'DELIVERY_EVIDENCE_INSUFFICIENT', 'PAGE_CLOSED_AFTER_ACTION', 'NAVIGATION_AFTER_ACTION', 'AUTH_STATE_CHANGED_AFTER_ACTION', 'PROCESS_INTERRUPTED_AFTER_ACTION')"
+        },
+        "target_send_records_scheduled_tuple_check": {
+          "name": "target_send_records_scheduled_tuple_check",
+          "value": "(\"target_send_records\".\"task_id\" is null and \"target_send_records\".\"business_date\" is null) or (\"target_send_records\".\"task_id\" is not null and \"target_send_records\".\"business_date\" is not null)"
+        },
+        "target_send_records_retry_wait_check": {
+          "name": "target_send_records_retry_wait_check",
+          "value": "(\"target_send_records\".\"machine_status\" = 'RETRY_WAIT' and \"target_send_records\".\"next_retry_at\" is not null) or (\"target_send_records\".\"machine_status\" != 'RETRY_WAIT' and \"target_send_records\".\"next_retry_at\" is null)"
+        },
+        "target_send_records_failure_code_presence_check": {
+          "name": "target_send_records_failure_code_presence_check",
+          "value": "(\"target_send_records\".\"machine_status\" in ('READY', 'RUNNING', 'SUCCESS') and \"target_send_records\".\"failure_code\" is null) or (\"target_send_records\".\"machine_status\" in ('RETRY_WAIT', 'FAILED', 'DELIVERY_UNKNOWN', 'SKIPPED') and \"target_send_records\".\"failure_code\" is not null)"
+        },
+        "target_send_records_success_check": {
+          "name": "target_send_records_success_check",
+          "value": "\"target_send_records\".\"machine_status\" != 'SUCCESS' or (\"target_send_records\".\"send_action_started_at\" is not null and \"target_send_records\".\"sent_at\" is not null)"
+        },
+        "target_send_records_delivery_unknown_check": {
+          "name": "target_send_records_delivery_unknown_check",
+          "value": "\"target_send_records\".\"machine_status\" != 'DELIVERY_UNKNOWN' or (\"target_send_records\".\"send_action_started_at\" is not null and \"target_send_records\".\"failure_code\" in ('DELIVERY_VERIFICATION_TIMEOUT', 'DELIVERY_EVIDENCE_INSUFFICIENT', 'PAGE_CLOSED_AFTER_ACTION', 'NAVIGATION_AFTER_ACTION', 'AUTH_STATE_CHANGED_AFTER_ACTION', 'PROCESS_INTERRUPTED_AFTER_ACTION'))"
+        },
+        "target_send_records_failed_skipped_check": {
+          "name": "target_send_records_failed_skipped_check",
+          "value": "\"target_send_records\".\"machine_status\" not in ('FAILED', 'SKIPPED') or \"target_send_records\".\"sent_at\" is null"
+        },
+        "target_send_records_finished_check": {
+          "name": "target_send_records_finished_check",
+          "value": "(\"target_send_records\".\"machine_status\" in ('SUCCESS', 'FAILED', 'DELIVERY_UNKNOWN', 'SKIPPED') and \"target_send_records\".\"finished_at\" is not null) or (\"target_send_records\".\"machine_status\" in ('READY', 'RUNNING', 'RETRY_WAIT') and \"target_send_records\".\"finished_at\" is null)"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

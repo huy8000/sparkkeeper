@@ -33,9 +33,17 @@ try {
   const firstMigration = client.migrate();
   const firstInspection = client.inspect();
 
-  assert.equal(firstMigration.appliedMigrationCount, 8);
+  assert.equal(firstMigration.appliedMigrationCount, 9);
   assert.equal(firstInspection.pragmas.journalMode, 'wal');
   assert.equal(firstInspection.pragmas.foreignKeys, 1);
+  assert.equal(firstInspection.adminUsersSchemaCompatible, true);
+  assert.equal(firstInspection.contactsSchemaCompatible, true);
+  assert.equal(firstInspection.sendTasksSchemaCompatible, true);
+  assert.equal(firstInspection.executionRunsSchemaCompatible, true);
+  assert.equal(firstInspection.targetSendRecordsSchemaCompatible, true);
+  assert.equal(firstInspection.deliveryResolutionsSchemaCompatible, true);
+  assert.equal(firstInspection.legacyFriendBindingsSchemaCompatible, true);
+  assert.equal(firstInspection.legacyScheduleImportsSchemaCompatible, true);
 
   const accountsRepository = new AccountRepository(client);
   const account = accountsRepository.create({
@@ -126,7 +134,7 @@ try {
   const persistedStatic = reopenedTemplates.findById(staticTemplate.id);
   const persistedRandom = reopenedTemplates.findById(randomTemplate.id);
 
-  assert.equal(secondMigration.appliedMigrationCount, 8);
+  assert.equal(secondMigration.appliedMigrationCount, 9);
   assert.equal(reopenedAccount?.name, 'Test Account');
   assert.equal(reopenedAccount?.loginStatus, 'READY');
   assert.equal(new ScheduleRepository(client).findById(schedule.id)?.startTime, '09:00');
@@ -203,6 +211,7 @@ try {
     successTerminal: 'VERIFIED',
     nextBusinessDate: 'VERIFIED',
     schedulePersistence: 'VERIFIED',
+    v4Foundation: 'VERIFIED',
     networkAccess: 'NONE',
   };
 } finally {

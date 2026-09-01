@@ -359,7 +359,7 @@ test('template persists after close, reopen, and repeated migration', (context) 
   const migration = reopened.migrate();
   const persisted = new MessageTemplateRepository(reopened).findById(created.id);
 
-  assert.equal(migration.appliedMigrationCount, 8);
+  assert.equal(migration.appliedMigrationCount, 9);
   assert.equal(persisted?.name, 'Random Test Template');
   assert.equal(persisted?.providerType, 'RANDOM');
   assert.deepEqual(persisted?.messages, ['Message A', 'Message B']);

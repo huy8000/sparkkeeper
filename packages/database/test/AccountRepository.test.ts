@@ -126,6 +126,6 @@ test('account data persists after close, reopen, and a second migration', (conte
   assert.equal(persisted?.name, 'Test Account');
   assert.equal(persisted?.enabled, false);
   assert.equal(persisted?.loginStatus, 'READY');
-  assert.equal(reopened.inspect().appliedMigrationCount, 8);
+  assert.equal(reopened.inspect().appliedMigrationCount, 9);
   reopened.close();
 });
