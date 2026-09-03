@@ -18,17 +18,31 @@ export type ApiErrorCode =
   | 'WEBHOOK_DESTINATION_BLOCKED'
   | 'RUN_NOT_FOUND'
   | 'VALIDATION_ERROR'
+  | 'INVALID_CREDENTIALS'
+  | 'UNAUTHENTICATED'
+  | 'SESSION_EXPIRED'
+  | 'SESSION_REVOKED'
+  | 'ORIGIN_REJECTED'
+  | 'CSRF_REJECTED'
+  | 'REAUTH_REQUIRED'
+  | 'RATE_LIMITED'
+  | 'SERVICE_NOT_INITIALIZED'
+  | 'AUTH_SERVICE_UNAVAILABLE'
   | 'ROUTE_NOT_FOUND'
   | 'INTERNAL_ERROR';
 
 export class ApiError extends Error {
+  readonly retryAfter?: number | undefined;
+
   constructor(
     readonly statusCode: number,
     readonly code: ApiErrorCode,
     message: string,
+    options?: { readonly retryAfter?: number; readonly cause?: unknown },
   ) {
-    super(message);
+    super(message, options ? { cause: options.cause } : undefined);
     this.name = 'ApiError';
+    this.retryAfter = options?.retryAfter;
   }
 }
 

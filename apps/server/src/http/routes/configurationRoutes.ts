@@ -43,6 +43,7 @@ export function registerConfigurationRoutes(server: FastifyInstance, services: A
   server.post<{ Body: CreateAccountConfigInput }>(
     '/api/accounts',
     {
+      config: { auth: 'M' },
       schema: {
         body: createAccountBodySchema,
         response: {
@@ -58,6 +59,7 @@ export function registerConfigurationRoutes(server: FastifyInstance, services: A
   server.patch<{ Params: AccountParams; Body: UpdateAccountConfigInput }>(
     '/api/accounts/:accountId',
     {
+      config: { auth: 'M' },
       schema: {
         params: idParamsSchema('accountId'),
         body: updateAccountBodySchema,
@@ -74,6 +76,7 @@ export function registerConfigurationRoutes(server: FastifyInstance, services: A
   server.post<{ Params: AccountParams; Body: FriendConfigInput }>(
     '/api/accounts/:accountId/friends',
     {
+      config: { auth: 'M' },
       schema: {
         params: idParamsSchema('accountId'),
         body: createFriendBodySchema,
@@ -92,6 +95,7 @@ export function registerConfigurationRoutes(server: FastifyInstance, services: A
   server.patch<{ Params: FriendParams; Body: UpdateFriendConfigInput }>(
     '/api/friends/:friendId',
     {
+      config: { auth: 'M' },
       schema: {
         params: idParamsSchema('friendId'),
         body: updateFriendBodySchema,
@@ -108,6 +112,7 @@ export function registerConfigurationRoutes(server: FastifyInstance, services: A
   server.get(
     '/api/templates',
     {
+      config: { auth: 'S' },
       schema: {
         response: {
           200: successEnvelopeSchema({ type: 'array', items: templateSummarySchema }),
@@ -121,6 +126,7 @@ export function registerConfigurationRoutes(server: FastifyInstance, services: A
   server.get<{ Params: TemplateParams }>(
     '/api/templates/:templateId',
     {
+      config: { auth: 'S' },
       schema: {
         params: idParamsSchema('templateId'),
         response: {
@@ -135,6 +141,7 @@ export function registerConfigurationRoutes(server: FastifyInstance, services: A
   server.post<{ Body: TemplateConfigInput }>(
     '/api/templates',
     {
+      config: { auth: 'M' },
       schema: {
         body: createTemplateBodySchema,
         response: {
@@ -150,6 +157,7 @@ export function registerConfigurationRoutes(server: FastifyInstance, services: A
   server.patch<{ Params: TemplateParams; Body: UpdateTemplateConfigInput }>(
     '/api/templates/:templateId',
     {
+      config: { auth: 'M' },
       schema: {
         params: idParamsSchema('templateId'),
         body: updateTemplateBodySchema,
@@ -166,6 +174,7 @@ export function registerConfigurationRoutes(server: FastifyInstance, services: A
   server.put<{ Params: AccountParams; Body: ConfigureScheduleInput }>(
     '/api/accounts/:accountId/schedule',
     {
+      config: { auth: 'M' },
       schema: {
         params: idParamsSchema('accountId'),
         body: configureScheduleBodySchema,

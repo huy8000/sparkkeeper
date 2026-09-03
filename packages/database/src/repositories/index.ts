@@ -85,6 +85,21 @@ export {
   type CreateAdminSessionInput,
 } from './AdminSessionRepository.js';
 export {
+  AdminAuthRepository,
+  AdminAuthRepositoryError,
+  AUTH_DB_BUSY_TIMEOUT_MS,
+  authAdminUserSelection,
+  type AuthAdminUserRow,
+  type BootstrapInitialAdminInput,
+  type BootstrapInitialAdminResult,
+  type CompleteAuthenticatedLoginInput,
+  type CompleteAuthenticatedLoginResult,
+  type ValidateSessionInput,
+  type ValidateSessionResult,
+  type LogoutCurrentSessionInput,
+  type LogoutCurrentSessionResult,
+} from './AdminAuthRepository.js';
+export {
   ACTIVE_LOGIN_SESSION_STATUSES,
   ALLOWED_LOGIN_SESSION_TRANSITIONS,
   TERMINAL_LOGIN_SESSION_STATUSES,

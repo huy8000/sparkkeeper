@@ -13,6 +13,7 @@ export function registerStatusRoutes(server: FastifyInstance, services: ApiServi
   server.get(
     '/api/health',
     {
+      config: { auth: 'P' },
       schema: {
         response: {
           200: successEnvelopeSchema(healthSchema),
@@ -26,6 +27,7 @@ export function registerStatusRoutes(server: FastifyInstance, services: ApiServi
   server.get(
     '/api/runtime/status',
     {
+      config: { auth: 'S' },
       schema: {
         response: {
           200: successEnvelopeSchema(runtimeStatusSchema),

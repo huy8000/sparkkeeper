@@ -1,5 +1,6 @@
 import type {
   Account,
+  AuthSessionResponseData,
   DailyRun,
   Friend,
   Health,
@@ -21,15 +22,23 @@ export const SCHEDULE_ID = '00000000-0000-4000-8000-000000000003';
 export const RUN_ID = '00000000-0000-4000-8000-000000000004';
 export const RECORD_ID = '00000000-0000-4000-8000-000000000005';
 export const TEMPLATE_ID = '00000000-0000-4000-8000-000000000006';
+export const ADMIN_USER_ID = '00000000-0000-4000-8000-000000000099';
 const CREATED_AT = '2026-01-02T03:04:05.000Z';
+
+export const authSessionFixture: AuthSessionResponseData = {
+  admin: {
+    id: ADMIN_USER_ID,
+    username: 'admin_test',
+  },
+  csrfToken: 'a'.repeat(43),
+  idleExpiresAt: '2026-01-02T03:34:05.000Z',
+  absoluteExpiresAt: '2026-01-02T15:04:05.000Z',
+  recentlyReauthenticated: true,
+};
 
 export const healthFixture: Health = {
   serviceName: 'SparkKeeper',
-  version: '2.0.0-test',
   status: 'READY',
-  database: { status: 'READY' },
-  migration: { status: 'READY' },
-  timestamp: CREATED_AT,
 };
 
 export const runtimeFixture: RuntimeStatus = {

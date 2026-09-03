@@ -3,7 +3,7 @@
 > 状态：FROZEN
 > 适用版本：V4.0.0
 > 起始基线：`develop@37903c8`
-> 生产基线：`v3.0.0@69de7eb15c8cbeaa6edf888873a769be7a5ca5fa`
+> 历史 V3 开发代码基线：`v3.0.0@69de7eb15c8cbeaa6edf888873a769be7a5ca5fa`（未实际生产部署）
 > 本文定义 V4 从规划到发布的唯一默认工作流。
 
 ## 1. 权威顺序
@@ -206,6 +206,41 @@ Review 只能输出：
 
 不得仅依据 Agent report 判定 PASS。
 
+### 8.1 实现前必须建立 Invariant / Failure / Proof Matrix
+
+每个安全、数据完整性或不可逆边界都必须在实现前明确：
+
+- invariant；
+- failure mode；
+- production guard/behavior；
+- 能证明目标路径真正执行的 deterministic test/proof。
+
+测试 PASS 不等于 proof PASS。若测试可能绕过目标分支、竞态或失败点，必须增加状态、barrier、调用次数或真实路径证据。
+
+### 8.2 错误语义只能来自对应事实
+
+- business failure、security failure 与 infrastructure failure 必须分类；
+- 不得把任意 DB/network/driver/crypto 失败翻译成 `AUTH_FAILED`、`CONFLICT`、`FORBIDDEN` 或其他业务事实；
+- error-classification test 应尽可能通过真实 HTTP/service/repository/security path。
+
+### 8.3 时间预算覆盖完整 stack
+
+任何 timeout/rate/session 契约必须计入 application wait、database/driver busy wait、crypto cost 与可适用的 proxy/network wait。不得宣称一个会被隐藏下层等待超过的名义 timeout。
+
+### 8.4 Test seam 与 resource scope
+
+- test seam 不得执行任意 production-path callback，不得改变安全决策、error classification 或 timing semantics，也不得成为 public business API；
+- synchronous resource scope 必须在 TypeScript 类型层禁止 Promise/Thenable，并在 runtime 防御；
+- async lease/queue/stream 必须在所有 success/failure/abort 路径可证明地释放。
+
+### 8.5 Risk-tiered 与批量收敛 review
+
+- VERY HIGH：real sends、target identity、delivery verification、irreversible action boundary、Scheduler idempotency；
+- HIGH：authentication、sessions、CSRF、credential storage、authorization；
+- NORMAL：ordinary Admin CRUD、presentation/UI 与低风险 read path。
+
+若 review 发现 P0/P1，可停止已无意义的高成本 regression/Git delivery，但必须继续对本 Milestone 其余 scope 做合理可发现的 static inspection，一次批量返回 P0/P1。不得故意把可同轮发现的 A/B/C 拆成多轮 review。
+
 ## 9. Commit 前危险文件检查
 
 只有 `CODE_REVIEW_PASS` 后执行：
@@ -276,3 +311,12 @@ Review PASS 后：
 - Gate F 只有 A–E 全部通过后才能授权首次 Scheduler。
 
 任何 Gate 失败均回到修复与独立 review，不得降低标准或扩大真实测试范围。
+
+## 13. V4 生产基线与 V3 兼容政策
+
+V4 是 SparkKeeper 的第一个真实生产基线；V3 是未曾真实生产部署的开发原型。因此：
+
+- V3 compatibility 只是 `BEST_EFFORT_ONLY`；
+- 不为假设的 V3 migration 新增 compatibility bridge；
+- 不为保留未使用的 V3 behavior 破坏 V4 architecture/security；
+- 已接受的 legacy 结构可保留到对应 Milestone，但不扩展 Friend/Schedule compatibility，除非当前 Spec 明确要求。

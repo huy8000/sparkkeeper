@@ -1,5 +1,7 @@
 import type {
   Account,
+  AdminUserDto,
+  AuthSessionResponseData,
   DailyRun,
   Friend,
   Health,
@@ -113,29 +115,19 @@ function arrayOf<T>(value: unknown, parser: Parser<T>): T[] | undefined {
 
 export const parseHealth: Parser<Health> = (value) => {
   const data = record(value);
-  const database = record(data?.database);
-  const migration = record(data?.migration);
-  const version = string(data?.version);
-  const timestamp = string(data?.timestamp);
   const status = oneOf(data?.status, ['READY', 'DEGRADED'] as const);
-  const databaseStatus = oneOf(database?.status, ['READY', 'UNAVAILABLE'] as const);
-  const migrationStatus = oneOf(migration?.status, ['READY', 'NOT_READY'] as const);
+  if (data?.serviceName !== 'SparkKeeper' || status === undefined) return undefined;
   if (
-    data?.serviceName !== 'SparkKeeper' ||
-    version === undefined ||
-    timestamp === undefined ||
-    status === undefined ||
-    databaseStatus === undefined ||
-    migrationStatus === undefined
-  )
+    'version' in (data ?? {}) ||
+    'database' in (data ?? {}) ||
+    'migration' in (data ?? {}) ||
+    'timestamp' in (data ?? {})
+  ) {
     return undefined;
+  }
   return {
     serviceName: 'SparkKeeper',
-    version,
     status,
-    database: { status: databaseStatus },
-    migration: { status: migrationStatus },
-    timestamp,
   };
 };
 
@@ -579,3 +571,73 @@ export const parseMessageTemplateSummaries: Parser<MessageTemplateSummary[]> = (
 export const parseDailyRuns: Parser<DailyRun[]> = (value) => arrayOf(value, parseDailyRun);
 export const parseSendRecords: Parser<SendRecord[]> = (value) => arrayOf(value, parseSendRecord);
 export const parseSystemEvents: Parser<SystemEvent[]> = (value) => arrayOf(value, parseSystemEvent);
+
+const ISO_TIMESTAMP_REGEX =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+const CSRF_TOKEN_REGEX = /^[A-Za-z0-9_-]{43}$/;
+
+export const parseAdminUser: Parser<AdminUserDto> = (value) => {
+  const data = record(value);
+  if (!data) return undefined;
+  const keys = Object.keys(data);
+  if (keys.length !== 2 || !keys.includes('id') || !keys.includes('username')) return undefined;
+  const id = string(data.id);
+  const username = string(data.username);
+  if (!id || !username) return undefined;
+  return { id, username };
+};
+
+export const parseAuthSessionResponse: Parser<AuthSessionResponseData> = (value) => {
+  const data = record(value);
+  if (!data) return undefined;
+
+  const keys = Object.keys(data);
+  const expectedKeys = [
+    'admin',
+    'csrfToken',
+    'idleExpiresAt',
+    'absoluteExpiresAt',
+    'recentlyReauthenticated',
+  ];
+  if (keys.length !== expectedKeys.length) return undefined;
+  for (const expected of expectedKeys) {
+    if (!keys.includes(expected)) return undefined;
+  }
+
+  const admin = parseAdminUser(data.admin);
+  if (!admin) return undefined;
+
+  const csrfToken = string(data.csrfToken);
+  if (!csrfToken || !CSRF_TOKEN_REGEX.test(csrfToken)) return undefined;
+
+  const idleExpiresAt = string(data.idleExpiresAt);
+  if (
+    !idleExpiresAt ||
+    !ISO_TIMESTAMP_REGEX.test(idleExpiresAt) ||
+    Number.isNaN(Date.parse(idleExpiresAt))
+  ) {
+    return undefined;
+  }
+
+  const absoluteExpiresAt = string(data.absoluteExpiresAt);
+  if (
+    !absoluteExpiresAt ||
+    !ISO_TIMESTAMP_REGEX.test(absoluteExpiresAt) ||
+    Number.isNaN(Date.parse(absoluteExpiresAt))
+  ) {
+    return undefined;
+  }
+
+  const recentlyReauthenticated = boolean(data.recentlyReauthenticated);
+  if (recentlyReauthenticated === undefined) return undefined;
+
+  return {
+    admin,
+    csrfToken,
+    idleExpiresAt,
+    absoluteExpiresAt,
+    recentlyReauthenticated,
+  };
+};
+
+export const parseNoContent: Parser<void> = () => undefined;

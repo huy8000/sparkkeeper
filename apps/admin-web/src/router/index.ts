@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type Router } from 'vue-router';
 
+import type { AuthController } from '../auth/AuthController';
 import AccountWorkspaceLayout from '../layouts/AccountWorkspaceLayout.vue';
 import AdminLayout from '../layouts/AdminLayout.vue';
 import AccountFriendsPage from '../pages/AccountFriendsPage.vue';
@@ -8,6 +9,7 @@ import AccountManualRunPage from '../pages/AccountManualRunPage.vue';
 import AccountOverviewPage from '../pages/AccountOverviewPage.vue';
 import AccountSchedulePage from '../pages/AccountSchedulePage.vue';
 import AccountsPage from '../pages/AccountsPage.vue';
+import LoginPage from '../pages/LoginPage.vue';
 import OverviewPage from '../pages/OverviewPage.vue';
 import NotFoundPage from '../pages/NotFoundPage.vue';
 import NotificationsPage from '../pages/NotificationsPage.vue';
@@ -17,10 +19,63 @@ import SchedulesPage from '../pages/SchedulesPage.vue';
 import SystemStatusPage from '../pages/SystemStatusPage.vue';
 import TemplatesPage from '../pages/TemplatesPage.vue';
 
-export function createAdminRouter(): Router {
-  return createRouter({
+/** The single login-redirect target: keep the current path for post-login return. */
+function loginRedirectTarget(fullPath: string): { path: string; query: Record<string, string> } {
+  return { path: '/login', query: fullPath === '/' ? {} : { redirect: fullPath } };
+}
+
+/**
+ * The single canonical navigation policy. The router consumes the auth
+ * controller's state; no other module may register its own conflicting
+ * bootstrap/auth semantics.
+ */
+export function installAuthNavigationGuard(
+  router: Pick<Router, 'beforeEach'>,
+  authController: AuthController,
+): void {
+  router.beforeEach(async (to) => {
+    if (authController.state.value === 'BOOTSTRAPPING') {
+      await authController.bootstrap();
+    }
+    const isPublic = to.meta.public === true;
+    const isAuthenticated = authController.isAuthenticated();
+
+    if (!isPublic && !isAuthenticated) {
+      // ERROR state still renders the protected route shell so App.vue can
+      // show the retry barrier for that navigation.
+      if (authController.state.value === 'ERROR') {
+        return true;
+      }
+      return loginRedirectTarget(to.fullPath);
+    }
+
+    if (to.path === '/login' && isAuthenticated) {
+      return { path: '/' };
+    }
+
+    return true;
+  });
+}
+
+/**
+ * The canonical unauthenticated navigation decision, owned by the router
+ * module. App.vue invokes this on session loss so the redirect policy exists in
+ * exactly one place (the router), never duplicated in component code.
+ */
+export function redirectAfterSessionLoss(router: Router, currentFullPath: string): void {
+  if (router.currentRoute.value.meta.public === true) return;
+  void router.push(loginRedirectTarget(currentFullPath));
+}
+
+export function createAdminRouter(authController?: AuthController): Router {
+  const router = createRouter({
     history: createWebHistory(),
     routes: [
+      {
+        path: '/login',
+        component: LoginPage,
+        meta: { public: true, title: 'auth.title' },
+      },
       {
         path: '/',
         component: AdminLayout,
@@ -110,6 +165,12 @@ export function createAdminRouter(): Router {
     ],
     scrollBehavior: () => ({ top: 0 }),
   });
+
+  if (authController) {
+    installAuthNavigationGuard(router, authController);
+  }
+
+  return router;
 }
 
 export const router = createAdminRouter();

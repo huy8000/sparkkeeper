@@ -29,6 +29,7 @@ export function registerManualRunRoutes(server: FastifyInstance, services: ApiSe
   server.get<{ Params: AccountParams; Querystring: PreflightQuery }>(
     '/api/accounts/:accountId/manual-run/preflight',
     {
+      config: { auth: 'S' },
       schema: {
         params: idParamsSchema('accountId'),
         querystring: manualRunPreflightQuerySchema,
@@ -45,6 +46,7 @@ export function registerManualRunRoutes(server: FastifyInstance, services: ApiSe
   server.post<{ Params: AccountParams; Body: ManualRunRequest }>(
     '/api/accounts/:accountId/manual-runs',
     {
+      config: { auth: 'M' },
       schema: {
         params: idParamsSchema('accountId'),
         body: manualRunRequestBodySchema,

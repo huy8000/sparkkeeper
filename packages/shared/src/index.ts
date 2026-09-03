@@ -75,6 +75,7 @@ export {
 
 export {
   ADMIN_USER_STATUSES,
+  ADMIN_USERNAME_REGEX,
   AdminValidationError,
   isAdminUserStatus,
   normalizeAdminUsername,

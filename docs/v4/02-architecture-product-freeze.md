@@ -5,14 +5,14 @@
 > 数据库：SQLite + WAL + Drizzle + additive versioned migrations
 > 本文冻结 V4.0.0 的领域、生命周期、安全、运行与 UI 边界。
 
-## 1. V3 事实基线
+## 1. V3 历史/开发事实基线
 
 架构建立在实际仓库而不是绿地假设之上：
 
 - pnpm/TypeScript ESM monorepo；
 - Fastify API + Vue/Vite Admin + Nginx same-origin proxy；
 - SQLite/WAL/Drizzle，已执行 migration `0000`–`0007`；
-- V3 `accounts`、`friends`、`message_templates`、`schedules`、`daily_runs`、`send_records`、`system_events`、`notification_configs` 已有真实数据兼容义务；
+- V3 `accounts`、`friends`、`message_templates`、`schedules`、`daily_runs`、`send_records`、`system_events`、`notification_configs` 的既有 preservation/bridge 工作是已接受的开发与历史兼容基线，不代表当前存在真实生产数据兼容义务；
 - persistence 可保存 Friend 的 `secUid/uniqueId/shortId/remarkName/displayName`，但 `ProductionDailyTaskAutomation` 实际只传 `friend.displayName`；
 - ContactResolver 以虚拟列表 index 去重，遇到首个名称 match 就返回，不能证明后续没有同名项；
 - MessageSender 以当前挂载 outgoing node 的 count、同文本 count 与 DOM marker 判定新增 bubble，不能可靠处理 virtualization/unmount/remount；
@@ -389,10 +389,11 @@ V4.0 没有 hard-delete Account API。危险操作 `unbind` 需要近期密码 r
 
 ### 5.3 Login rate limit
 
-- Caddy per-IP 基础限流 + application per trusted-IP、per normalized username 双维度限流；
-- 默认 5 次失败/15 分钟后指数 lock，最长 1 小时；成功后清零用户失败计数；
-- rate-limit/lock audit 不记录明文 IP；只记录由独立 server secret HMAC 的短期 correlation digest；
-- 后端重启不得解除 AdminUser 的 persisted lock；未知用户名仍走相同耗时路径与 per-IP limiter。
+- Caddy per-IP 基础限流属于后续部署 gate；V4-2 application 使用 process-memory per trusted-IP、per normalized username 双维度限流；
+- 每个维度 15 分钟最多 admission 5 次，Argon2 另有 process-wide active/queue gate；并发 admission 必须原子预留；
+- known/unknown username 使用相同 memory limiter 与 restart reset 语义，未知用户名仍执行 dummy Argon2 verify；
+- V4-1 `failedLoginCount`、`lockedUntil`、`lastFailedLoginAt` 保留但 V4-2 runtime 不读写，不新增 persistent unknown-user store；
+- rate-limit operational log 不记录明文 IP/username；只使用由 ephemeral process secret HMAC 的 correlation digest。
 
 ### 5.4 Session 与 Cookie
 
@@ -407,7 +408,7 @@ V4.0 没有 hard-delete Account API。危险操作 `unbind` 需要近期密码 r
 ### 5.5 CSRF / Origin / CORS
 
 - `GET/HEAD` 不产生业务 mutation；
-- mutation 必须同时满足 authenticated session、exact canonical HTTPS Origin、`Sec-Fetch-Site` 非 cross-site、JSON content type、session-bound synchronizer token `X-SparkKeeper-CSRF`；
+- mutation 必须同时满足 authenticated session、exact configured canonical Origin（production HTTPS；显式 loopback development 可为 HTTP）、`Sec-Fetch-Site: same-origin`、JSON content type、session-bound synchronizer token `X-SparkKeeper-CSRF`；
 - token 由 `/api/auth/me` 返回，前端只存在内存；不在 cookie/URL/log；
 - Login endpoint 无 session token，但仍要求 exact Origin/Host、JSON 与 rate limit；
 - 不启用 wildcard CORS，不支持 cross-origin credentialed API；
@@ -706,6 +707,8 @@ AUTH_EXPIRED
 
 ## 14. V3 Migration Compatibility
 
+- V4 是第一个真实生产基线；V3 是未实际生产使用的开发原型。下列已完成的 preservation/bridge 设计作为历史兼容基线接受，但 compatibility 为 `BEST_EFFORT_ONLY`，不产生新的 V3 兼容负担；
+- V4 architecture/security correctness 优先。Friend/Schedule compatibility 不得扩展，除非未来明确 Spec 授权；已接受的 V4-1 legacy 结构本 Milestone 不删除；
 - 详细步骤见 [迁移计划](./04-data-migration-plan.md)；
 - `accounts` 原地扩展，旧行 `profileState=MIGRATION_REQUIRED`；
 - Friend/Schedule/DailyRun/SendRecord/SystemEvent 不删除、不重命名、不回写；

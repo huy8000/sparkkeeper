@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 
-import { ApiError } from '../api/client';
+import { ApiError, isApiError } from '../api/client';
 import { REALTIME_REFRESH_DELAY_MS } from '../api/realtimePolicy';
 import { useAdminApp } from '../appContext';
 import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
@@ -125,7 +125,7 @@ async function saveConfiguration(): Promise<void> {
     testError.value = '';
     toasts.notify('success', t('notificationsPage.savedToast'));
   } catch (error) {
-    saveError.value = error instanceof ApiError ? error : t('notificationsPage.saveErrorToast');
+    saveError.value = isApiError(error) ? error : t('notificationsPage.saveErrorToast');
     toasts.notify('error', t('notificationsPage.saveErrorToast'));
   } finally {
     saving.value = false;
@@ -165,11 +165,11 @@ async function sendTestNotification(): Promise<void> {
       toasts.notify('error', t('notificationsPage.testFailedToast'));
     else toasts.notify('warning', t('notificationsPage.testBlockedToast'));
   } catch (error) {
-    if (error instanceof ApiError && error.kind === 'NETWORK') {
+    if (isApiError(error) && error.kind === 'NETWORK') {
       testUncertain.value = true;
       toasts.notify('warning', t('notificationsPage.testUncertainToast'));
     } else {
-      testError.value = error instanceof ApiError ? error : t('notificationsPage.testSendError');
+      testError.value = isApiError(error) ? error : t('notificationsPage.testSendError');
       toasts.notify('error', t('notificationsPage.testSendError'));
     }
   } finally {

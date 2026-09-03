@@ -6,6 +6,7 @@ import {
   RUN_ID,
   TEMPLATE_ID,
   accountFixture,
+  authSessionFixture,
   friendFixture,
   healthFixture,
   runFixture,
@@ -47,6 +48,12 @@ export function installApiFetch(override?: TestHandler): ReturnType<typeof vi.fn
     if (overridden !== undefined) return overridden;
     const method = init?.method ?? 'GET';
     switch (`${method} ${url.pathname}`) {
+      case 'GET /api/auth/me':
+        return success(authSessionFixture);
+      case 'POST /api/auth/login':
+        return success(authSessionFixture);
+      case 'POST /api/auth/logout':
+        return new Response(null, { status: 204 });
       case 'GET /api/health':
         return success(healthFixture);
       case 'GET /api/runtime/status':

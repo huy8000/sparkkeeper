@@ -27,6 +27,7 @@ export function registerAccountRoutes(server: FastifyInstance, services: ApiServ
   server.get(
     '/api/accounts',
     {
+      config: { auth: 'S' },
       schema: {
         response: {
           200: successEnvelopeSchema({ type: 'array', items: accountSchema }),
@@ -40,6 +41,7 @@ export function registerAccountRoutes(server: FastifyInstance, services: ApiServ
   server.get<{ Params: AccountParams }>(
     '/api/accounts/:accountId',
     {
+      config: { auth: 'S' },
       schema: {
         params: idParamsSchema('accountId'),
         response: {
@@ -54,6 +56,7 @@ export function registerAccountRoutes(server: FastifyInstance, services: ApiServ
   server.get<{ Params: AccountParams }>(
     '/api/accounts/:accountId/friends',
     {
+      config: { auth: 'S' },
       schema: {
         params: idParamsSchema('accountId'),
         response: {
@@ -68,6 +71,7 @@ export function registerAccountRoutes(server: FastifyInstance, services: ApiServ
   server.get<{ Params: FriendParams }>(
     '/api/friends/:friendId',
     {
+      config: { auth: 'S' },
       schema: {
         params: idParamsSchema('friendId'),
         response: {
@@ -82,6 +86,7 @@ export function registerAccountRoutes(server: FastifyInstance, services: ApiServ
   server.get<{ Params: AccountParams }>(
     '/api/accounts/:accountId/schedules',
     {
+      config: { auth: 'S' },
       schema: {
         params: idParamsSchema('accountId'),
         response: {
@@ -96,6 +101,7 @@ export function registerAccountRoutes(server: FastifyInstance, services: ApiServ
   server.get<{ Params: ScheduleParams }>(
     '/api/schedules/:scheduleId',
     {
+      config: { auth: 'S' },
       schema: {
         params: idParamsSchema('scheduleId'),
         response: {

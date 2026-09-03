@@ -1,34 +1,44 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
-import { createServer } from '../src/http/createServer.js';
-import type { MutationGuardOptions } from '../src/http/plugins/MutationGuard.js';
-import type { ApiServices } from '../src/http/services/ApiServices.js';
+import { createApiApplication } from '../src/http/ApiApplication.js';
 import { RuntimeEventHub } from '../src/realtime/RuntimeEventHub.js';
+import { createAuthenticatedTestSession } from './authFixture.js';
 
-const ADMIN_ORIGIN = 'http://127.0.0.1:5173';
 const FIXED_NOW = new Date('2026-03-04T05:06:07.000Z');
 
 test('SSE route streams ready, runtime events, heartbeat, and cleans every connection', async (context) => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'sparkkeeper-realtime-test-'));
+  const dbPath = path.join(dir, 'fixture.db');
   const hub = new RuntimeEventHub(() => FIXED_NOW);
-  const allowedHosts = new Set<string>();
-  const access: MutationGuardOptions = {
-    allowedHosts,
-    allowedOrigins: new Set([ADMIN_ORIGIN]),
-  };
-  const server = createServer({
-    services: unusedServices(),
-    logger: false,
-    realtime: { events: hub, access, heartbeatMs: 20, retryMs: 3_000 },
-  });
-  context.after(() => server.close());
-  await server.listen({ host: '127.0.0.1', port: 0 });
-  const address = server.server.address();
-  assert.ok(address !== null && typeof address !== 'string');
-  allowedHosts.add(`127.0.0.1:${address.port}`);
-  const url = `http://127.0.0.1:${address.port}/api/events/stream`;
 
-  const first = await openStream(url);
+  const app = createApiApplication({
+    databasePath: dbPath,
+    environment: {
+      SPARKKEEPER_ADMIN_SECURITY_MODE: 'development',
+      SPARKKEEPER_ADMIN_CANONICAL_ORIGIN: 'http://127.0.0.1:8080',
+    },
+    logger: false,
+    clock: () => FIXED_NOW,
+    realtime: hub,
+    sseHeartbeatMs: 20,
+    sseRetryMs: 3_000,
+  });
+
+  context.after(async () => {
+    await app.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const session = await createAuthenticatedTestSession(app);
+
+  await app.server.listen({ host: '127.0.0.1', port: 8080 });
+  const url = `http://127.0.0.1:8080/api/events/stream`;
+
+  const first = await openStream(url, 8080, session.cookieHeader);
   assert.equal(first.response.status, 200);
   assert.match(first.response.headers.get('content-type') ?? '', /^text\/event-stream/u);
   assert.equal(first.response.headers.get('cache-control'), 'no-cache, no-transform');
@@ -44,7 +54,7 @@ test('SSE route streams ready, runtime events, heartbeat, and cleans every conne
     data: { serviceStatus: 'READY' },
   });
 
-  const second = await openStream(url);
+  const second = await openStream(url, 8080, session.cookieHeader);
   await readUntil(second.reader, 'event: ready');
   assert.equal(hub.subscriberCount, 2);
   hub.publish({
@@ -82,37 +92,37 @@ test('SSE route streams ready, runtime events, heartbeat, and cleans every conne
       runResult: 'SUCCESS',
     },
   });
-  await server.close();
+  await app.server.close();
   await waitFor(() => hub.subscriberCount === 0);
   await waitForStreamEnd(second.reader);
 });
 
-test('SSE local access guard rejects invalid Host and Origin without mutation headers', async (context) => {
+test('SSE route requires authenticated session and rejects unauthenticated requests', async (context) => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'sparkkeeper-realtime-test-'));
+  const dbPath = path.join(dir, 'fixture.db');
   const hub = new RuntimeEventHub(() => FIXED_NOW);
-  const server = createServer({
-    services: unusedServices(),
-    logger: false,
-    realtime: {
-      events: hub,
-      access: {
-        allowedHosts: new Set(['127.0.0.1:8080']),
-        allowedOrigins: new Set([ADMIN_ORIGIN]),
-      },
-      heartbeatMs: 20,
-    },
-  });
-  context.after(() => server.close());
 
-  for (const headers of [
-    { host: '127.0.0.1.evil.test:8080', origin: ADMIN_ORIGIN },
-    { host: '127.0.0.1:8080', origin: 'http://127.0.0.1.evil.test:5173' },
-    { host: 'localhost.evil:5173', origin: 'null' },
-  ]) {
-    const response = await server.inject({ method: 'GET', url: '/api/events/stream', headers });
-    assert.equal(response.statusCode, 403);
-    assert.equal(response.json().error.code, 'EVENT_STREAM_REJECTED');
-    assert.equal(response.headers['access-control-allow-origin'], undefined);
-  }
+  const app = createApiApplication({
+    databasePath: dbPath,
+    environment: {
+      SPARKKEEPER_ADMIN_SECURITY_MODE: 'development',
+      SPARKKEEPER_ADMIN_CANONICAL_ORIGIN: 'http://127.0.0.1:8080',
+    },
+    logger: false,
+    clock: () => FIXED_NOW,
+    realtime: hub,
+    sseHeartbeatMs: 20,
+    sseRetryMs: 3_000,
+  });
+
+  context.after(async () => {
+    await app.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  const unauthenticated = await app.server.inject({ method: 'GET', url: '/api/events/stream' });
+  assert.equal(unauthenticated.statusCode, 401);
+  assert.equal(unauthenticated.json().error.code, 'UNAUTHENTICATED');
   assert.equal(hub.subscriberCount, 0);
 });
 
@@ -122,10 +132,17 @@ interface OpenStream {
   readonly abort: AbortController;
 }
 
-async function openStream(url: string): Promise<OpenStream> {
+async function openStream(url: string, port: number, cookie: string): Promise<OpenStream> {
   const abort = new AbortController();
+  const origin = `http://127.0.0.1:${port}`;
   const response = await fetch(url, {
-    headers: { Accept: 'text/event-stream', Origin: ADMIN_ORIGIN },
+    headers: {
+      Accept: 'text/event-stream',
+      Origin: origin,
+      Host: `127.0.0.1:${port}`,
+      'Sec-Fetch-Site': 'same-origin',
+      Cookie: cookie,
+    },
     signal: abort.signal,
   });
   assert.ok(response.body !== null);
@@ -184,36 +201,4 @@ async function waitForStreamEnd(reader: ReadableStreamDefaultReader<Uint8Array>)
   }
   await reader.cancel().catch(() => undefined);
   assert.fail('SSE client stream did not close after draining buffered events.');
-}
-
-function unusedServices(): ApiServices {
-  const unavailable = (): never => {
-    throw new Error('Fixture service should not be called.');
-  };
-  return {
-    status: { health: unavailable, runtime: unavailable },
-    read: {
-      listAccounts: unavailable,
-      getAccount: unavailable,
-      listFriends: unavailable,
-      getFriend: unavailable,
-      listSchedules: unavailable,
-      getSchedule: unavailable,
-      listRuns: unavailable,
-      getRun: unavailable,
-      listSendRecords: unavailable,
-      listSystemEvents: unavailable,
-    },
-    configuration: {
-      createAccount: unavailable,
-      updateAccount: unavailable,
-      createFriend: unavailable,
-      updateFriend: unavailable,
-      listTemplates: unavailable,
-      getTemplate: unavailable,
-      createTemplate: unavailable,
-      updateTemplate: unavailable,
-      configureSchedule: unavailable,
-    },
-  };
 }

@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
+    "admin:bootstrap": "tsx src/admin-cli.ts bootstrap",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "pnpm --filter @sparkkeeper/shared build && pnpm --filter @sparkkeeper/message-engine build && pnpm --filter @sparkkeeper/database build && pnpm --filter @sparkkeeper/automation build && pnpm --filter @sparkkeeper/notifier build",
@@ -20,13 +21,15 @@
     "v1:gate:smoke": "pnpm pretest && tsx scripts/v1-gate-smoke.ts"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.1.2",
     "@sparkkeeper/automation": "workspace:*",
     "@sparkkeeper/database": "workspace:*",
     "@sparkkeeper/message-engine": "workspace:*",
     "@sparkkeeper/notifier": "workspace:*",
     "@sparkkeeper/shared": "workspace:*",
+    "argon2": "^0.45.1",
     "fastify": "^5.12.1",
-    "playwright": "^1.62.1",
-    "pino": "^10.3.1"
+    "pino": "^10.3.1",
+    "playwright": "^1.62.1"
   }
 }

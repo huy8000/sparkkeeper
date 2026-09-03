@@ -87,17 +87,44 @@ test('Admin domain enums, type guards, and validators', () => {
   assert.equal(isAdminUserStatus('UNKNOWN'), false);
   assert.equal(isAdminUserStatus(null), false);
 
-  assert.equal(validateAdminUsername('  admin_1  '), 'admin_1');
-  assert.equal(normalizeAdminUsername('  Admin_User_1  '), 'admin_user_1');
+  // Valid usernames (3-64 chars, first char alphanumeric, remaining alphanumeric or . _ -)
+  assert.equal(validateAdminUsername('adm'), 'adm');
+  assert.equal(validateAdminUsername('Admin_1'), 'Admin_1');
+  assert.equal(validateAdminUsername('admin.user-name_99'), 'admin.user-name_99');
+  assert.equal(validateAdminUsername('A'.repeat(64)), 'A'.repeat(64));
 
-  assert.throws(
-    () => validateAdminUsername('   '),
-    (error: unknown) => {
-      assert.ok(error instanceof AdminValidationError);
-      assert.equal(error.code, 'INVALID_USERNAME');
-      return true;
-    },
-  );
+  // Normalization: ASCII lowercase only, preserving input validation
+  assert.equal(normalizeAdminUsername('Admin_User_1'), 'admin_user_1');
+  assert.equal(normalizeAdminUsername('ADM'), 'adm');
+
+  // Invalid usernames: whitespace, length, forbidden chars, first char non-alphanumeric
+  const invalidUsernames = [
+    '',
+    '   ',
+    '  admin_1  ',
+    'admin 1',
+    'ad', // 2 chars (too short)
+    'A'.repeat(65), // 65 chars (too long)
+    '_admin', // first char not alphanumeric
+    '-admin',
+    '.admin',
+    'admin@domain',
+    'admin!',
+    '管理员', // Unicode forbidden
+    'admin#1',
+  ];
+
+  for (const invalid of invalidUsernames) {
+    assert.throws(
+      () => validateAdminUsername(invalid),
+      (error: unknown) => {
+        assert.ok(error instanceof AdminValidationError);
+        assert.equal(error.code, 'INVALID_USERNAME');
+        return true;
+      },
+      `Expected validation failure for '${invalid}'`,
+    );
+  }
 });
 
 test('Account domain enums, type guards, and validators', () => {

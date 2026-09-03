@@ -28,6 +28,16 @@ export const KNOWN_API_ERROR_CODES = [
   'WEBHOOK_DESTINATION_BLOCKED',
   'ROUTE_NOT_FOUND',
   'INTERNAL_ERROR',
+  'INVALID_CREDENTIALS',
+  'UNAUTHENTICATED',
+  'SESSION_EXPIRED',
+  'SESSION_REVOKED',
+  'ORIGIN_REJECTED',
+  'CSRF_REJECTED',
+  'REAUTH_REQUIRED',
+  'RATE_LIMITED',
+  'SERVICE_NOT_INITIALIZED',
+  'AUTH_SERVICE_UNAVAILABLE',
 ] as const;
 
 export type KnownApiErrorCode = (typeof KNOWN_API_ERROR_CODES)[number];
@@ -54,6 +64,16 @@ const API_ERROR_TRANSLATION_KEYS: Record<KnownApiErrorCode, string> = {
   WEBHOOK_DESTINATION_BLOCKED: 'errors.api.webhookDestinationBlocked',
   ROUTE_NOT_FOUND: 'errors.api.routeNotFound',
   INTERNAL_ERROR: 'errors.api.internalError',
+  INVALID_CREDENTIALS: 'errors.api.invalidCredentials',
+  UNAUTHENTICATED: 'errors.api.unauthenticated',
+  SESSION_EXPIRED: 'errors.api.sessionExpired',
+  SESSION_REVOKED: 'errors.api.sessionRevoked',
+  ORIGIN_REJECTED: 'errors.api.originRejected',
+  CSRF_REJECTED: 'errors.api.csrfRejected',
+  REAUTH_REQUIRED: 'errors.api.reauthRequired',
+  RATE_LIMITED: 'errors.api.rateLimited',
+  SERVICE_NOT_INITIALIZED: 'errors.api.serviceNotInitialized',
+  AUTH_SERVICE_UNAVAILABLE: 'errors.api.authServiceUnavailable',
 };
 
 /**

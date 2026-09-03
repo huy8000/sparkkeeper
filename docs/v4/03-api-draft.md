@@ -2,7 +2,7 @@
 
 > 状态：FROZEN DRAFT（endpoint/side-effect contract 冻结；实现可拆文件但不得改变语义）
 > Base path：`/api`
-> Transport：same-origin HTTPS JSON；SSE/console 例外在本文单列。
+> Transport：same-origin JSON；production 为 HTTPS，显式 loopback development 可为 HTTP；SSE/console 例外在本文单列。
 
 ## 1. 共同协议
 
@@ -23,9 +23,9 @@
 | Code | 要求                                                                                          |
 | ---- | --------------------------------------------------------------------------------------------- |
 | P    | Public；仅最小 health 或 login                                                                |
-| L    | Public login guard：canonical HTTPS Host/Origin、JSON、Fetch Metadata、per-IP/user rate limit |
+| L    | Public login guard：configured canonical Host/Origin（production HTTPS；loopback development HTTP）、JSON、`Sec-Fetch-Site: same-origin`、per-IP/user rate limit |
 | S    | 有效 AdminSession；读请求；server-side idle/absolute expiry                                   |
-| M    | S + exact Origin + `Sec-Fetch-Site` + JSON + session-bound `X-SparkKeeper-CSRF`               |
+| M    | S + exact Origin + `Sec-Fetch-Site: same-origin` + JSON + session-bound `X-SparkKeeper-CSRF`   |
 | R    | M + 5 分钟内 recent password re-auth                                                          |
 | D    | R + typed confirmation/expected version；危险 mutation                                        |
 | I    | M/D + required `Idempotency-Key`；重复 key 返回 canonical operation                           |
@@ -46,20 +46,20 @@
 | HTTP | Code 示例                                            | 含义                                    |
 | ---: | ---------------------------------------------------- | --------------------------------------- |
 |  400 | `VALIDATION_ERROR`                                   | schema/input invalid                    |
-|  401 | `AUTH_REQUIRED`, `SESSION_EXPIRED`                   | 未认证或 session 失效                   |
-|  403 | `CSRF_REJECTED`, `REAUTH_REQUIRED`                   | guard 不满足                            |
+|  401 | `UNAUTHENTICATED`, `SESSION_EXPIRED`, `SESSION_REVOKED` | 未认证或 session 失效                |
+|  403 | `ORIGIN_REJECTED`, `CSRF_REJECTED`, `REAUTH_REQUIRED`   | guard 不满足                         |
 |  404 | `*_NOT_FOUND`                                        | resource 不存在；不得用于 username 枚举 |
 |  409 | `STATE_CONFLICT`, `VERSION_CONFLICT`, `PROFILE_BUSY` | 状态/lease/idempotency 冲突             |
 |  410 | `INTENT_EXPIRED`, `LOGIN_SESSION_EXPIRED`            | 临时资源过期                            |
 |  422 | `IDENTITY_UNAVAILABLE`, `TARGET_NOT_SENDABLE`        | domain invariant 阻止                   |
-|  429 | `LOGIN_RATE_LIMITED`                                 | 登录限流；响应不暴露 username 存在性    |
-|  503 | `RUNTIME_UNAVAILABLE`, `RELEASE_GATE_CLOSED`         | 安全门或 runtime 不可用                 |
+|  429 | `RATE_LIMITED`                                       | 登录限流；响应不暴露 username 存在性    |
+|  503 | `SERVICE_NOT_INITIALIZED`, `AUTH_SERVICE_UNAVAILABLE`, `RUNTIME_UNAVAILABLE`, `RELEASE_GATE_CLOSED` | 初始化、安全门或 runtime 不可用 |
 
 ## 2. Auth
 
 | Method / Path                           | Guard | Request                         | Response                                                                            | Side effects                                                                                      |
 | --------------------------------------- | ----- | ------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `POST /auth/login`                      | L     | `{username,password}`           | `{admin:{id,username}, csrfToken, idleExpiresAt, absoluteExpiresAt}` + `Set-Cookie` | uniform password verify；成功创建/rotate Session、清失败计数、Audit；失败增加 limiter/lock、Audit |
+| `POST /auth/login`                      | L     | `{username,password}`           | `{admin:{id,username}, csrfToken, idleExpiresAt, absoluteExpiresAt}` + `Set-Cookie` | uniform password verify；成功创建/rotate Session、Audit；V4-2 使用 memory IP/username admission + Argon2 gate，不读写 persisted failure/lock fields |
 | `GET /auth/me`                          | S     | —                               | `{admin,csrfToken,idleExpiresAt,absoluteExpiresAt,recentlyReauthenticated}`         | bounded lastSeen/idle expiry refresh；不 rotate raw token                                         |
 | `POST /auth/logout`                     | M     | `{}`                            | `204`                                                                               | revoke current session、clear cookie、Audit                                                       |
 | `POST /auth/reauth`                     | M     | `{password}`                    | `{reauthenticatedUntil}`                                                            | 验证当前 Admin，Session 标记 5 分钟 recent re-auth；失败 rate-limit/Audit                         |
@@ -68,6 +68,8 @@
 | `POST /auth/sessions/:sessionId/revoke` | R     | `{expectedSessionVersion}`      | `204`                                                                               | revoke selected session、Audit；当前 session 时同时 clear cookie                                  |
 
 未初始化时 `/auth/login` 返回统一 `SERVICE_NOT_INITIALIZED`，不提供公网 setup。初始化/重置只通过 hidden-stdin operator CLI。
+
+V4-2 的 milestone authority 是 [V4-2 Implementation Specification](./specs/v4-2-implementation-spec.md)：该 Milestone 的 login 只使用 bounded process-memory trusted-IP/normalized-username admission + process-wide Argon2 gate；不清零、增加或检查 `failedLoginCount`/`lockedUntil`/`lastFailedLoginAt`。上表保留的 reauth/password/session-management endpoints 是 future draft，不属于 V4-2。
 
 ## 3. Overview
 

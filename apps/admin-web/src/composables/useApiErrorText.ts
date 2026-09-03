@@ -1,3 +1,5 @@
+import { isRef, type Ref } from 'vue';
+
 import { useTranslation } from '../i18n';
 import { apiErrorTranslationKey } from '../i18n/apiErrorCodes';
 
@@ -25,12 +27,13 @@ export type ApiErrorSource = ApiErrorLike | undefined | string;
 export function useApiErrorText() {
   const { t } = useTranslation();
 
-  function apiErrorText(source: ApiErrorSource): string {
-    if (typeof source === 'string') return source;
-    if (source === null || source === undefined) return '';
-    const key = apiErrorTranslationKey(source.code);
+  function apiErrorText(source: ApiErrorSource | Ref<ApiErrorSource>): string {
+    const unwrapped = isRef(source) ? source.value : source;
+    if (typeof unwrapped === 'string') return unwrapped;
+    if (unwrapped === null || unwrapped === undefined) return '';
+    const key = apiErrorTranslationKey(unwrapped.code);
     if (key !== null) return t(key);
-    const message = source.message?.trim();
+    const message = unwrapped.message?.trim();
     if (message !== undefined && message !== '') return message;
     return t('errors.api.unknown');
   }

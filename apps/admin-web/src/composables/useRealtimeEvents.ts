@@ -7,9 +7,14 @@ export interface RealtimeState {
   readonly connectionState: Readonly<Ref<RealtimeConnectionState>>;
   readonly reconnectGeneration: Readonly<Ref<number>>;
   readonly subscribe: (subscriber: RealtimeEventSubscriber) => () => void;
+  readonly connect?: () => void;
+  readonly disconnect?: () => void;
 }
 
-export function useRealtimeEvents(client = new RealtimeClient()): RealtimeState {
+export function useRealtimeEvents(
+  client = new RealtimeClient(),
+  autoConnect = true,
+): RealtimeState & { connect: () => void; disconnect: () => void } {
   const connectionState = ref<RealtimeConnectionState>('DISCONNECTED');
   const reconnectGeneration = ref(0);
   let previousState: RealtimeConnectionState = 'DISCONNECTED';
@@ -21,7 +26,10 @@ export function useRealtimeEvents(client = new RealtimeClient()): RealtimeState 
     connectionState.value = state;
   });
 
-  onMounted(() => client.connect());
+  onMounted(() => {
+    if (autoConnect) client.connect();
+  });
+
   onBeforeUnmount(() => {
     unsubscribeState();
     client.disconnect();
@@ -31,5 +39,7 @@ export function useRealtimeEvents(client = new RealtimeClient()): RealtimeState 
     connectionState: readonly(connectionState),
     reconnectGeneration: readonly(reconnectGeneration),
     subscribe: (subscriber) => client.subscribe(subscriber),
+    connect: () => client.connect(),
+    disconnect: () => client.disconnect(),
   };
 }

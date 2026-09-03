@@ -20,7 +20,7 @@ function lookup(node: MessageMap, path: string): string | undefined {
 
 describe('API error code translation mapping', () => {
   it('covers every known server error code with non-empty zh-CN and en-US copy', () => {
-    expect(KNOWN_API_ERROR_CODES).toHaveLength(21);
+    expect(KNOWN_API_ERROR_CODES).toHaveLength(31);
     for (const code of KNOWN_API_ERROR_CODES) {
       const key = apiErrorTranslationKey(code);
       expect(key, `missing translation key for ${code}`).not.toBeNull();
