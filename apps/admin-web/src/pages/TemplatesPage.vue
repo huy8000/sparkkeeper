@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue';
 
-import { ApiError } from '../api/client';
+import { ApiError, isApiError } from '../api/client';
 import { REALTIME_REFRESH_DELAY_MS } from '../api/realtimePolicy';
 import { useAdminApp } from '../appContext';
 import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
@@ -180,7 +180,7 @@ async function saveTemplate(input: MessageTemplateInput): Promise<void> {
     await templates.load();
     toasts.notify('success', t('templatesPage.savedToast'));
   } catch (error) {
-    mutationError.value = error instanceof ApiError ? error : t('templatesPage.saveErrorToast');
+    mutationError.value = isApiError(error) ? error : t('templatesPage.saveErrorToast');
     toasts.notify('error', t('templatesPage.saveErrorToast'));
   } finally {
     submitting.value = false;

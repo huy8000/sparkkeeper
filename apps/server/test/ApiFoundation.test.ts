@@ -6,6 +6,8 @@ import test, { type TestContext } from 'node:test';
 
 import {
   AccountRepository,
+  AdminAuthRepository,
+  createDatabase,
   DailyRunRepository,
   FriendRepository,
   ScheduleRepository,
@@ -13,6 +15,7 @@ import {
   SystemEventRepository,
   type Account,
   type DailyRun,
+  type DatabaseClient,
   type Friend,
   type Schedule,
   type SendRecord,
@@ -32,12 +35,19 @@ import {
 import { createServer } from '../src/http/createServer.js';
 import type { ApiServices } from '../src/http/services/ApiServices.js';
 import { StatusService } from '../src/http/services/StatusService.js';
+import { PasswordHasher } from '../src/security/PasswordHasher.js';
+import { LoginRateLimiter } from '../src/security/LoginRateLimiter.js';
+import { AdminAuthenticationService } from '../src/security/AdminAuthenticationService.js';
+import { defaultRandomSource } from '../src/security/TokenUtils.js';
+import { AdminSessionService } from '../src/security/AdminSessionService.js';
+import { createAuthenticatedTestSession, type TestAuthSession } from './authFixture.js';
 
 const FIXED_NOW = new Date('2026-01-04T03:04:05.000Z');
 const UNKNOWN_UUID = '00000000-0000-4000-8000-000000000000';
 
 interface ApiFixture {
   readonly application: ApiApplication;
+  readonly session: TestAuthSession;
   readonly directory: string;
   readonly databasePath: string;
   readonly profilePath: string;
@@ -56,7 +66,10 @@ interface ApiFixture {
 }
 
 test('HTTP config defaults to loopback and the existing port convention', () => {
-  const config = resolveHttpConfig({});
+  const config = resolveHttpConfig({
+    SPARKKEEPER_ADMIN_SECURITY_MODE: 'development',
+    SPARKKEEPER_ADMIN_CANONICAL_ORIGIN: 'http://127.0.0.1:8080',
+  });
   assert.equal(config.host, DEFAULT_HTTP_HOST);
   assert.equal(config.host, '127.0.0.1');
   assert.equal(config.port, DEFAULT_HTTP_PORT);
@@ -65,14 +78,39 @@ test('HTTP config defaults to loopback and the existing port convention', () => 
 });
 
 test('HTTP config permits only explicit bind changes and validates PORT', () => {
-  assert.equal(resolveHttpConfig({ HOST: '192.0.2.10' }).host, '192.0.2.10');
-  assert.throws(() => resolveHttpConfig({ PORT: '0' }), /PORT/);
-  assert.throws(() => resolveHttpConfig({ PORT: 'not-a-port' }), /PORT/);
+  assert.equal(
+    resolveHttpConfig({
+      HOST: '192.0.2.10',
+      SPARKKEEPER_ADMIN_SECURITY_MODE: 'development',
+      SPARKKEEPER_ADMIN_CANONICAL_ORIGIN: 'http://127.0.0.1:8080',
+    }).host,
+    '192.0.2.10',
+  );
+  assert.throws(
+    () =>
+      resolveHttpConfig({
+        PORT: '0',
+        SPARKKEEPER_ADMIN_SECURITY_MODE: 'development',
+        SPARKKEEPER_ADMIN_CANONICAL_ORIGIN: 'http://127.0.0.1:8080',
+      }),
+    /PORT/,
+  );
+  assert.throws(
+    () =>
+      resolveHttpConfig({
+        PORT: 'not-a-port',
+        SPARKKEEPER_ADMIN_SECURITY_MODE: 'development',
+        SPARKKEEPER_ADMIN_CANONICAL_ORIGIN: 'http://127.0.0.1:8080',
+      }),
+    /PORT/,
+  );
 });
 
 test('V2 read-only API foundation', async (context) => {
-  const fixture = createFixture(context);
+  const fixture = await createFixture(context);
   const { server } = fixture.application;
+  const { session } = fixture;
+  const authHeaders = { cookie: session.cookieHeader };
 
   await context.test('health reports ready without sensitive metadata', async () => {
     const response = await server.inject({ method: 'GET', url: '/api/health' });
@@ -81,18 +119,17 @@ test('V2 read-only API foundation', async (context) => {
       success: true,
       data: {
         serviceName: 'SparkKeeper',
-        version: 'test-release',
         status: 'READY',
-        database: { status: 'READY' },
-        migration: { status: 'READY' },
-        timestamp: FIXED_NOW.toISOString(),
       },
     });
-    assertSensitiveValuesAbsent(response.body, fixture);
   });
 
   await context.test('runtime status preserves disabled scheduler and send defaults', async () => {
-    const response = await server.inject({ method: 'GET', url: '/api/runtime/status' });
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/runtime/status',
+      headers: authHeaders,
+    });
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.json(), {
       success: true,
@@ -114,7 +151,7 @@ test('V2 read-only API foundation', async (context) => {
   });
 
   await context.test('accounts list and detail expose only the read contract', async () => {
-    const list = await server.inject({ method: 'GET', url: '/api/accounts' });
+    const list = await server.inject({ method: 'GET', url: '/api/accounts', headers: authHeaders });
     assert.equal(list.statusCode, 200);
     assert.equal(list.json().data.length, 2);
     assert.deepEqual(Object.keys(list.json().data[0]).sort(), [
@@ -129,6 +166,7 @@ test('V2 read-only API foundation', async (context) => {
     const detail = await server.inject({
       method: 'GET',
       url: `/api/accounts/${fixture.account.id}`,
+      headers: authHeaders,
     });
     assert.equal(detail.statusCode, 200);
     assert.equal(detail.json().data.id, fixture.account.id);
@@ -136,14 +174,15 @@ test('V2 read-only API foundation', async (context) => {
   });
 
   await context.test('accounts distinguish invalid ids and missing entities', async () => {
-    await assertValidationError(server, '/api/accounts/not-an-id');
-    await assertNotFound(server, `/api/accounts/${UNKNOWN_UUID}`, 'ACCOUNT_NOT_FOUND');
+    await assertValidationError(server, '/api/accounts/not-an-id', authHeaders);
+    await assertNotFound(server, `/api/accounts/${UNKNOWN_UUID}`, 'ACCOUNT_NOT_FOUND', authHeaders);
   });
 
   await context.test('friends list, detail, and disabled state are readable', async () => {
     const list = await server.inject({
       method: 'GET',
       url: `/api/accounts/${fixture.account.id}/friends`,
+      headers: authHeaders,
     });
     assert.equal(list.statusCode, 200);
     assert.equal(list.json().data.length, 2);
@@ -158,14 +197,15 @@ test('V2 read-only API foundation', async (context) => {
     const detail = await server.inject({
       method: 'GET',
       url: `/api/friends/${fixture.enabledFriend.id}`,
+      headers: authHeaders,
     });
     assert.equal(detail.statusCode, 200);
     assert.equal(detail.json().data.displayName, 'Fixture Friend A');
   });
 
   await context.test('friends validate ids and report missing entities', async () => {
-    await assertValidationError(server, '/api/friends/not-an-id');
-    await assertNotFound(server, `/api/friends/${UNKNOWN_UUID}`, 'FRIEND_NOT_FOUND');
+    await assertValidationError(server, '/api/friends/not-an-id', authHeaders);
+    await assertNotFound(server, `/api/friends/${UNKNOWN_UUID}`, 'FRIEND_NOT_FOUND', authHeaders);
   });
 
   await context.test(
@@ -174,6 +214,7 @@ test('V2 read-only API foundation', async (context) => {
       const list = await server.inject({
         method: 'GET',
         url: `/api/accounts/${fixture.account.id}/schedules`,
+        headers: authHeaders,
       });
       assert.equal(list.statusCode, 200);
       assert.equal(list.json().data.length, 1);
@@ -182,6 +223,7 @@ test('V2 read-only API foundation', async (context) => {
       const empty = await server.inject({
         method: 'GET',
         url: `/api/accounts/${fixture.secondAccount.id}/schedules`,
+        headers: authHeaders,
       });
       assert.equal(empty.statusCode, 200);
       assert.deepEqual(empty.json().data, []);
@@ -189,27 +231,35 @@ test('V2 read-only API foundation', async (context) => {
       const detail = await server.inject({
         method: 'GET',
         url: `/api/schedules/${fixture.schedule.id}`,
+        headers: authHeaders,
       });
       assert.equal(detail.statusCode, 200);
       assert.equal(detail.json().data.timezone, 'UTC');
-      await assertNotFound(server, `/api/schedules/${UNKNOWN_UUID}`, 'SCHEDULE_NOT_FOUND');
+      await assertNotFound(
+        server,
+        `/api/schedules/${UNKNOWN_UUID}`,
+        'SCHEDULE_NOT_FOUND',
+        authHeaders,
+      );
     },
   );
 
   await context.test('run history supports bounded filters and limit', async () => {
-    const all = await server.inject({ method: 'GET', url: '/api/runs' });
+    const all = await server.inject({ method: 'GET', url: '/api/runs', headers: authHeaders });
     assert.equal(all.statusCode, 200);
     assert.equal(all.json().data.length, 3);
 
     const accountFiltered = await server.inject({
       method: 'GET',
       url: `/api/runs?accountId=${fixture.account.id}`,
+      headers: authHeaders,
     });
     assert.equal(accountFiltered.json().data.length, 3);
 
     const dateFiltered = await server.inject({
       method: 'GET',
       url: '/api/runs?businessDate=2026-01-02',
+      headers: authHeaders,
     });
     assert.deepEqual(
       dateFiltered.json().data.map((run: { readonly id: string }) => run.id),
@@ -219,13 +269,18 @@ test('V2 read-only API foundation', async (context) => {
     const statusFiltered = await server.inject({
       method: 'GET',
       url: '/api/runs?status=FAILED',
+      headers: authHeaders,
     });
     assert.deepEqual(
       statusFiltered.json().data.map((run: { readonly id: string }) => run.id),
       [fixture.failedRun.id],
     );
 
-    const limited = await server.inject({ method: 'GET', url: '/api/runs?limit=1' });
+    const limited = await server.inject({
+      method: 'GET',
+      url: '/api/runs?limit=1',
+      headers: authHeaders,
+    });
     assert.equal(limited.statusCode, 200);
     assert.equal(limited.json().data.length, 1);
     assert.equal(limited.json().data[0].id, fixture.failedRun.id);
@@ -234,11 +289,11 @@ test('V2 read-only API foundation', async (context) => {
   await context.test(
     'run query validation rejects dates, statuses, limits, and extras',
     async () => {
-      await assertValidationError(server, '/api/runs?businessDate=2026-02-30');
-      await assertValidationError(server, '/api/runs?status=UNSUPPORTED');
-      await assertValidationError(server, '/api/runs?limit=0');
-      await assertValidationError(server, '/api/runs?limit=101');
-      await assertValidationError(server, '/api/runs?unexpected=true');
+      await assertValidationError(server, '/api/runs?businessDate=2026-02-30', authHeaders);
+      await assertValidationError(server, '/api/runs?status=UNSUPPORTED', authHeaders);
+      await assertValidationError(server, '/api/runs?limit=0', authHeaders);
+      await assertValidationError(server, '/api/runs?limit=101', authHeaders);
+      await assertValidationError(server, '/api/runs?unexpected=true', authHeaders);
     },
   );
 
@@ -246,16 +301,18 @@ test('V2 read-only API foundation', async (context) => {
     const detail = await server.inject({
       method: 'GET',
       url: `/api/runs/${fixture.readyRun.id}`,
+      headers: authHeaders,
     });
     assert.equal(detail.statusCode, 200);
     assert.equal(detail.json().data.status, 'READY');
-    await assertNotFound(server, `/api/runs/${UNKNOWN_UUID}`, 'RUN_NOT_FOUND');
+    await assertNotFound(server, `/api/runs/${UNKNOWN_UUID}`, 'RUN_NOT_FOUND', authHeaders);
   });
 
   await context.test('send records expose failure state but never message content', async () => {
     const response = await server.inject({
       method: 'GET',
       url: `/api/runs/${fixture.failedRun.id}/send-records`,
+      headers: authHeaders,
     });
     assert.equal(response.statusCode, 200);
     assert.equal(response.json().data.length, 1);
@@ -272,6 +329,7 @@ test('V2 read-only API foundation', async (context) => {
     const response = await server.inject({
       method: 'GET',
       url: `/api/runs/${fixture.failedRun.id}/events`,
+      headers: authHeaders,
     });
     assert.equal(response.statusCode, 200);
     assert.equal(response.json().data.length, 1);
@@ -305,22 +363,40 @@ test('V2 read-only API foundation', async (context) => {
       const response = await server.inject({
         method: 'GET',
         url,
-        headers: { authorization: 'Bearer fixture-only-token', cookie: 'fixture-only-cookie' },
+        headers: {
+          cookie: session.cookieHeader,
+          authorization: 'Bearer fixture-only-token',
+        },
       });
       assert.equal(response.statusCode, 200);
       assertSensitiveValuesAbsent(response.body, fixture);
-      assert.doesNotMatch(
-        response.body,
-        /fixture-only-token|fixture-only-cookie|"Authorization"\s*:/iu,
-      );
+      assert.doesNotMatch(response.body, /fixture-only-token|"Authorization"\s*:/iu);
       assert.doesNotMatch(response.body, /stack|messageText|chatText|databasePath/iu);
     }
   });
 });
 
+function createTestAuthServices(client: DatabaseClient): Pick<ApiServices, 'auth' | 'sessions'> {
+  const authRepo = new AdminAuthRepository(client);
+  const hasher = new PasswordHasher();
+  const rateLimiter = new LoginRateLimiter();
+  const auth = new AdminAuthenticationService(authRepo, hasher, rateLimiter, defaultRandomSource);
+  const sessions = new AdminSessionService(authRepo);
+  return { auth, sessions };
+}
+
 test('health explicitly reports database and migration degradation', async (context) => {
-  const server = createServer({
+  const dir = mkdtempSync(path.join(tmpdir(), 'sparkkeeper-health-deg-test-'));
+  const db = createDatabase({ databasePath: path.join(dir, 'test.db') });
+  db.migrate();
+  const authServices = createTestAuthServices(db);
+
+  const { server } = createServer({
     logger: false,
+    config: resolveHttpConfig({
+      SPARKKEEPER_ADMIN_SECURITY_MODE: 'development',
+      SPARKKEEPER_ADMIN_CANONICAL_ORIGIN: 'http://127.0.0.1:8080',
+    }),
     services: {
       status: new StatusService({
         database: { ping: () => failProbe() },
@@ -335,35 +411,84 @@ test('health explicitly reports database and migration degradation', async (cont
       }),
       read: emptyReadService(),
       configuration: unavailableConfigurationService(),
+      ...authServices,
     },
   });
-  context.after(() => server.close());
+  context.after(async () => {
+    await server.close();
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
 
   const response = await server.inject({ method: 'GET', url: '/api/health' });
   assert.equal(response.statusCode, 200);
-  assert.equal(response.json().data.status, 'DEGRADED');
-  assert.equal(response.json().data.database.status, 'UNAVAILABLE');
-  assert.equal(response.json().data.migration.status, 'NOT_READY');
+  assert.deepEqual(response.json(), {
+    success: true,
+    data: {
+      serviceName: 'SparkKeeper',
+      status: 'DEGRADED',
+    },
+  });
 });
 
 test('unexpected exceptions return a safe 500 without raw diagnostics', async (context) => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'sparkkeeper-500-test-'));
+  const db = createDatabase({ databasePath: path.join(dir, 'test.db') });
+  db.migrate();
+  const authServices = createTestAuthServices(db);
+
   const privateDiagnostic = 'SQL fixture failure at /private/runtime/location with token';
   const read = emptyReadService({
     listAccounts: () => {
       throw new Error(privateDiagnostic);
     },
   });
-  const server = createServer({
+  const { server } = createServer({
     logger: false,
+    config: resolveHttpConfig({
+      SPARKKEEPER_ADMIN_SECURITY_MODE: 'development',
+      SPARKKEEPER_ADMIN_CANONICAL_ORIGIN: 'http://127.0.0.1:8080',
+    }),
     services: {
       status: readyStatusService(),
       read,
       configuration: unavailableConfigurationService(),
+      ...authServices,
     },
   });
-  context.after(() => server.close());
 
-  const response = await server.inject({ method: 'GET', url: '/api/accounts' });
+  context.after(async () => {
+    await server.close();
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  authServices.auth['authRepo'].bootstrapInitialAdminWithAudit({
+    username: 'Admin_500',
+    passwordHash: await new PasswordHasher().hash(['Valid', 'Password', '1234', '!'].join('')),
+    now: new Date(),
+  });
+
+  const loginRes = await server.inject({
+    method: 'POST',
+    url: '/api/auth/login',
+    headers: {
+      host: '127.0.0.1:8080',
+      origin: 'http://127.0.0.1:8080',
+      'sec-fetch-site': 'same-origin',
+      'content-type': 'application/json',
+    },
+    payload: { username: 'Admin_500', password: ['Valid', 'Password', '1234', '!'].join('') },
+  });
+  assert.equal(loginRes.statusCode, 200);
+  const setCookie = loginRes.headers['set-cookie'] as string;
+  const cookieValue = setCookie.split(';', 1)[0]!;
+
+  const response = await server.inject({
+    method: 'GET',
+    url: '/api/accounts',
+    headers: { cookie: cookieValue },
+  });
   assert.equal(response.statusCode, 500);
   assert.deepEqual(response.json(), {
     success: false,
@@ -396,7 +521,7 @@ test('API application closes Fastify and its owned database without a TCP listen
   }
 });
 
-function createFixture(context: TestContext): ApiFixture {
+async function createFixture(context: TestContext): Promise<ApiFixture> {
   const directory = mkdtempSync(path.join(tmpdir(), 'sparkkeeper-api-test-'));
   const databasePath = path.join(directory, 'fixture.db');
   const profilePath = path.join(directory, 'profile-fixture-private');
@@ -415,6 +540,8 @@ function createFixture(context: TestContext): ApiFixture {
     await application.close();
     rmSync(directory, { recursive: true, force: true });
   });
+
+  const session = await createAuthenticatedTestSession(application);
 
   const accounts = new AccountRepository(application.database);
   const friends = new FriendRepository(application.database);
@@ -497,6 +624,7 @@ function createFixture(context: TestContext): ApiFixture {
 
   return {
     application,
+    session,
     directory,
     databasePath,
     profilePath,
@@ -520,6 +648,8 @@ function disabledEnvironment(): ServerEnvironment {
     SCHEDULER_ENABLED: 'false',
     SCHEDULER_ALLOW_REAL_SEND: 'false',
     APP_TIMEZONE: 'UTC',
+    SPARKKEEPER_ADMIN_SECURITY_MODE: 'development',
+    SPARKKEEPER_ADMIN_CANONICAL_ORIGIN: 'http://127.0.0.1:8080',
   };
 }
 
@@ -577,8 +707,12 @@ function failProbe(): never {
   throw new Error('Fixture database is unavailable.');
 }
 
-async function assertValidationError(server: ApiApplication['server'], url: string): Promise<void> {
-  const response = await server.inject({ method: 'GET', url });
+async function assertValidationError(
+  server: ApiApplication['server'],
+  url: string,
+  headers?: Record<string, string>,
+): Promise<void> {
+  const response = await server.inject({ method: 'GET', url, headers });
   assert.equal(response.statusCode, 400);
   assert.deepEqual(response.json(), {
     success: false,
@@ -590,8 +724,9 @@ async function assertNotFound(
   server: ApiApplication['server'],
   url: string,
   code: string,
+  headers?: Record<string, string>,
 ): Promise<void> {
-  const response = await server.inject({ method: 'GET', url });
+  const response = await server.inject({ method: 'GET', url, headers });
   assert.equal(response.statusCode, 404);
   assert.equal(response.json().success, false);
   assert.equal(response.json().error.code, code);

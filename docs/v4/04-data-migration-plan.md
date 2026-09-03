@@ -3,6 +3,7 @@
 > 状态：FROZEN
 > 数据库决定：V4.0.0 继续 SQLite + WAL + Drizzle + forward-only versioned migrations。
 > 已执行 migration `0000`–`0007` immutable；只能新增 `0008+`。
+> 政策：V4 是第一个真实生产基线；V3 是未实际生产使用的开发原型。本文保留已接受的开发/历史 preservation baseline，不代表当前存在真实生产数据迁移义务，也不授权新增 V3 compatibility bridge。
 
 ## 1. 目标与不变量
 
@@ -17,6 +18,8 @@ Migration 必须：
 - 可重复执行而不重复 backfill bridge row；
 - 失败时事务回滚，应用 fail closed；
 - 不承诺 SQL rollback；回退只能停服并恢复完整备份。
+
+这些不变量约束已经接受的 V4-1 legacy structures 与显式历史 fixture 升级路径。Compatibility 为 `BEST_EFFORT_ONLY`；V4 architecture/security correctness 优先。除非未来明确 Spec 要求，不扩展 Friend/Schedule compatibility，不为假设的 V3 部署新增迁移负担，也不在本次政策对齐中删除已接受结构。
 
 ## 2. Physical compatibility strategy
 
@@ -275,7 +278,7 @@ CLI 不读取/输出 cookie/token/profile contents。
 
 ## 11. Backup / rollback
 
-V4 migration 是 forward-only。正式升级前备份完整 data root，并在 DB/Browser 均停止时完成。若 migration/app verification 失败：
+V4 migration 是 forward-only。若未来显式授权从历史 V3 data root 执行升级，升级前必须备份完整 data root，并在 DB/Browser 均停止时完成。若 migration/app verification 失败：
 
 1. 停止新版本；
 2. 保存失败日志（不得包含 secret/data dump）；

@@ -18,16 +18,45 @@ export interface ApiFailure {
   readonly error: {
     readonly code: string;
     readonly message: string;
+    readonly retryAfter?: number | undefined;
   };
 }
 
+export interface AdminUserDto {
+  readonly id: string;
+  readonly username: string;
+}
+
+export interface AuthSessionResponseData {
+  readonly admin: AdminUserDto;
+  readonly csrfToken: string;
+  readonly idleExpiresAt: string;
+  readonly absoluteExpiresAt: string;
+  readonly recentlyReauthenticated: boolean;
+}
+
+export interface LoginInput {
+  readonly username: string;
+  readonly password: string;
+}
+
+export type AuthErrorCode =
+  | 'VALIDATION_ERROR'
+  | 'INVALID_CREDENTIALS'
+  | 'UNAUTHENTICATED'
+  | 'SESSION_EXPIRED'
+  | 'SESSION_REVOKED'
+  | 'ORIGIN_REJECTED'
+  | 'CSRF_REJECTED'
+  | 'REAUTH_REQUIRED'
+  | 'RATE_LIMITED'
+  | 'SERVICE_NOT_INITIALIZED'
+  | 'AUTH_SERVICE_UNAVAILABLE'
+  | 'INTERNAL_ERROR';
+
 export interface Health {
   readonly serviceName: 'SparkKeeper';
-  readonly version: string;
   readonly status: 'READY' | 'DEGRADED';
-  readonly database: { readonly status: 'READY' | 'UNAVAILABLE' };
-  readonly migration: { readonly status: 'READY' | 'NOT_READY' };
-  readonly timestamp: string;
 }
 
 export interface RuntimeStatus {

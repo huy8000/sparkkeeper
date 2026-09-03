@@ -1,6 +1,6 @@
 # V4-1 Implementation Specification — Architecture & Data Model Foundation
 
-> 状态：FROZEN / READY FOR IMPLEMENTATION
+> 状态：MERGED / ACCEPTED IMPLEMENTATION BASELINE
 > Spec owner / reviewer：Codex
 > Implementer：Development Agent
 > Branch：`feature/v4-1-data-model-foundation`

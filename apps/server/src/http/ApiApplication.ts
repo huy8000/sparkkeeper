@@ -1,5 +1,6 @@
 import {
   AccountRepository,
+  AdminAuthRepository,
   createDatabase,
   DailyRunRepository,
   FriendRepository,
@@ -29,11 +30,16 @@ import {
 import { resolveSchedulerConfig, type SchedulerEnvironment } from '../config/SchedulerConfig.js';
 import { PINO_REDACT_PATHS } from '../observability/RuntimeLogger.js';
 import { RuntimeEventHub } from '../realtime/RuntimeEventHub.js';
+import { AdminAuthenticationService } from '../security/AdminAuthenticationService.js';
+import { AdminSessionService } from '../security/AdminSessionService.js';
+import { LoginRateLimiter } from '../security/LoginRateLimiter.js';
+import { PasswordHasher } from '../security/PasswordHasher.js';
 import { resolveHttpConfig, type HttpConfig, type HttpEnvironment } from './config/HttpConfig.js';
 import { createServer } from './createServer.js';
-import { localMutationGuardOptions } from './plugins/MutationGuard.js';
+import type { AdminAuthGuardRegistration } from './plugins/AdminAuthGuards.js';
 import { ApiConfigurationService } from './services/ApiConfigurationService.js';
 import { ApiReadService } from './services/ApiReadService.js';
+import type { ApiServices } from './services/ApiServices.js';
 import { StatusService } from './services/StatusService.js';
 import {
   ManualRunService,
@@ -58,6 +64,7 @@ export interface CreateApiApplicationOptions {
   readonly realtime?: RuntimeEventHub;
   readonly sseHeartbeatMs?: number;
   readonly sseRetryMs?: number;
+  readonly sseSessionRevalidateMs?: number;
   readonly coordinator?: RunExecutionCoordinator;
   readonly manualRunRunnerFactory?: ManualRunRunnerFactory;
   readonly onManualRunBackgroundFailure?: NonNullable<
@@ -69,11 +76,13 @@ export interface CreateApiApplicationOptions {
 
 export interface ApiApplication {
   readonly server: FastifyInstance;
+  readonly authGuards: AdminAuthGuardRegistration;
   readonly database: DatabaseClient;
   readonly config: HttpConfig;
   readonly realtime: RuntimeEventHub;
   readonly manualRun: ManualRunService;
   readonly notifications: NotificationService;
+  readonly services: ApiServices;
   closeHttp(): Promise<void>;
   stopManualRuns(): Promise<void>;
   stopNotifications(): Promise<void>;
@@ -81,12 +90,17 @@ export interface ApiApplication {
   close(): Promise<void>;
 }
 
-const HTTP_REDACT_PATHS = [
+export const HTTP_REDACT_PATHS = [
   ...PINO_REDACT_PATHS,
   'req.headers.authorization',
   'req.headers.cookie',
   'request.headers.authorization',
   'request.headers.cookie',
+  // A02: raw client IP must never reach log output.
+  'req.remoteAddress',
+  'req.remotePort',
+  'remoteAddress',
+  'remotePort',
 ] as const;
 
 export function createApiApplication(options: CreateApiApplicationOptions = {}): ApiApplication {
@@ -203,6 +217,13 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
           }
         : { onBackgroundFailure: options.onManualRunBackgroundFailure }),
     });
+
+    const authRepo = new AdminAuthRepository(database);
+    const hasher = new PasswordHasher();
+    const rateLimiter = new LoginRateLimiter();
+    const authService = new AdminAuthenticationService(authRepo, hasher, rateLimiter);
+    const sessionService = new AdminSessionService(authRepo);
+
     const services = {
       status: new StatusService({
         database,
@@ -229,6 +250,8 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
         version: config.version,
         ...(options.clock === undefined ? {} : { clock: options.clock }),
       }),
+      auth: authService,
+      sessions: sessionService,
       read: new ApiReadService({
         accounts,
         friends,
@@ -251,20 +274,23 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
       }),
       manualRun,
     };
-    const server = createServer({
+    const { server, authGuards } = createServer({
       services,
+      config,
       logger:
         options.logger ??
         ({
           level: observabilityConfig.logLevel,
           redact: { paths: [...HTTP_REDACT_PATHS], censor: '[REDACTED]' },
         } satisfies FastifyServerOptions['logger']),
-      mutationGuard: localMutationGuardOptions(config.port),
+      clock: options.clock,
       realtime: {
         events: realtime,
-        access: localMutationGuardOptions(config.port),
         ...(options.sseHeartbeatMs === undefined ? {} : { heartbeatMs: options.sseHeartbeatMs }),
         ...(options.sseRetryMs === undefined ? {} : { retryMs: options.sseRetryMs }),
+        ...(options.sseSessionRevalidateMs === undefined
+          ? {}
+          : { sessionRevalidateMs: options.sseSessionRevalidateMs }),
       },
     });
     backgroundDiagnostics.server = server;
@@ -295,11 +321,13 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
     };
     return {
       server,
+      authGuards,
       database,
       config,
       realtime,
       manualRun,
       notifications,
+      services,
       closeHttp,
       stopManualRuns,
       stopNotifications,

@@ -1,11 +1,13 @@
 import type {
   Account,
+  AuthSessionResponseData,
   ConfigureScheduleInput,
   CreateAccountInput,
   DailyRun,
   Friend,
   FriendConfigurationInput,
   Health,
+  LoginInput,
   RunFilters,
   RuntimeStatus,
   Schedule,
@@ -24,10 +26,11 @@ import type {
   UpdateFriendInput,
   UpdateMessageTemplateInput,
 } from '../types/api';
-import { ApiClient, type FetchImplementation } from './client';
+import { ApiClient, type ApiClientOptions, type FetchImplementation } from './client';
 import {
   parseAccount,
   parseAccounts,
+  parseAuthSessionResponse,
   parseDailyRun,
   parseDailyRuns,
   parseFriend,
@@ -37,6 +40,7 @@ import {
   parseMessageTemplateSummaries,
   parseManualRunAccepted,
   parseManualRunPreflight,
+  parseNoContent,
   parseNotificationConfiguration,
   parseNotificationDeliveryResult,
   parseRuntimeStatus,
@@ -47,6 +51,12 @@ import {
 } from './parsers';
 
 export interface SparkKeeperApi {
+  // Auth routes
+  login(input: LoginInput, signal?: AbortSignal): Promise<AuthSessionResponseData>;
+  getCurrentUser(signal?: AbortSignal): Promise<AuthSessionResponseData>;
+  logout(signal?: AbortSignal): Promise<void>;
+
+  // App routes
   getHealth(signal?: AbortSignal): Promise<Health>;
   getRuntimeStatus(signal?: AbortSignal): Promise<RuntimeStatus>;
   listAccounts(signal?: AbortSignal): Promise<Account[]>;
@@ -101,11 +111,16 @@ export interface SparkKeeperApi {
 }
 
 export function createSparkKeeperApi(
-  baseUrl?: string,
+  optionsOrBaseUrl?: string | ApiClientOptions,
   fetchImplementation?: FetchImplementation,
 ): SparkKeeperApi {
-  const client = new ApiClient(baseUrl, fetchImplementation);
+  const client = new ApiClient(optionsOrBaseUrl, fetchImplementation);
+
   return {
+    login: (input, signal) => client.login('/auth/login', input, parseAuthSessionResponse, signal),
+    getCurrentUser: (signal) => client.get('/auth/me', parseAuthSessionResponse, signal),
+    logout: (signal) => client.mutate('POST', '/auth/logout', {}, parseNoContent, signal),
+
     getHealth: (signal) => client.get('/health', parseHealth, signal),
     getRuntimeStatus: (signal) => client.get('/runtime/status', parseRuntimeStatus, signal),
     listAccounts: (signal) => client.get('/accounts', parseAccounts, signal),
@@ -131,14 +146,15 @@ export function createSparkKeeperApi(
         parseFriend,
         signal,
       ),
-    updateFriend: (friendId, input, signal) =>
-      client.mutate(
+    updateFriend(friendId, input, signal) {
+      return client.mutate(
         'PATCH',
         `/friends/${encodeURIComponent(friendId)}`,
         input,
         parseFriend,
         signal,
-      ),
+      );
+    },
     listSchedules: (accountId, signal) =>
       client.get(`/accounts/${encodeURIComponent(accountId)}/schedules`, parseSchedules, signal),
     configureSchedule: (accountId, input, signal) =>

@@ -62,16 +62,17 @@ Branch：`feature/v4-2-admin-authentication`
 
 交付：
 
-- hidden-stdin initial admin/reset CLI；
-- Argon2id password lifecycle；
-- DB-backed opaque sessions、idle/absolute expiry、logout/password change/revoke；
-- login per-IP/user rate limit + persisted lock；
-- exact canonical Origin/Fetch Metadata/synchronizer CSRF；
-- protected Fastify routes/SSE；
-- Login route/layout/bootstrap/401 behavior；
-- Caddy/Nginx internal topology draft and security regression tests。
+- hidden-stdin first-Admin bootstrap CLI（无 default credential/Web setup）；
+- exact username/password contract 与 Argon2id hash/verify/upward-only rehash；
+- DB-backed opaque sessions、idle/absolute expiry、logout、revocation/version/disabled validation；
+- bounded process-memory trusted-IP/normalized-username admission + process-wide Argon2 gate；V4-1 failure/lock columns 保留但 V4-2 runtime 不使用；
+- exact canonical Origin/authority/Fetch Metadata/JSON/session-bound synchronizer CSRF；
+- protected Fastify REST/SSE 与 recent-auth guard foundation；
+- minimal Login route/layout/bootstrap/401/logout behavior；
+- auth AuditEvent、redaction 与 security regression tests；
+- production cookie/application proxy-trust contract，但不改 Caddy/Nginx/生产部署。
 
-Exit：未认证只能访问 minimal health/login；no default password/setup page；security tests PASS。
+Exit：未认证只能访问 minimal health/login；no default password/setup page；password change/session management UI 与 Caddy production rollout 保留给后续 Spec；V4-2 invariant/failure/proof 与 security tests PASS。
 
 ### V4-3 — Douyin Account Onboarding
 

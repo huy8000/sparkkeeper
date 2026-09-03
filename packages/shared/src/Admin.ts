@@ -15,12 +15,16 @@ export class AdminValidationError extends Error {
   }
 }
 
+export const ADMIN_USERNAME_REGEX = /^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/;
+
 export function validateAdminUsername(username: string): string {
-  const trimmed = username.trim();
-  if (trimmed.length === 0) {
-    throw new AdminValidationError('INVALID_USERNAME', 'Admin username must not be empty.');
+  if (typeof username !== 'string' || !ADMIN_USERNAME_REGEX.test(username)) {
+    throw new AdminValidationError(
+      'INVALID_USERNAME',
+      'Admin username must be 3-64 characters matching ^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$.',
+    );
   }
-  return trimmed;
+  return username;
 }
 
 export function normalizeAdminUsername(username: string): string {

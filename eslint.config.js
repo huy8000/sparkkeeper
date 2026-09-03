@@ -25,5 +25,18 @@ export default tseslint.config(
       },
     },
   },
+  {
+    // Node worker harness files (.mjs): Node host APIs are not ECMAScript
+    // built-ins, so no-undef needs the explicit globals here.
+    files: ['**/*.mjs'],
+    languageOptions: {
+      globals: {
+        setImmediate: 'readonly',
+        Buffer: 'readonly',
+        process: 'readonly',
+        console: 'readonly',
+      },
+    },
+  },
   eslintConfigPrettier,
 );

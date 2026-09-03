@@ -78,24 +78,10 @@ export function idParamsSchema(name: string): object {
 export const healthSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['serviceName', 'version', 'status', 'database', 'migration', 'timestamp'],
+  required: ['serviceName', 'status'],
   properties: {
     serviceName: { const: 'SparkKeeper' },
-    version: { type: 'string' },
     status: { type: 'string', enum: ['READY', 'DEGRADED'] },
-    database: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['status'],
-      properties: { status: { type: 'string', enum: ['READY', 'UNAVAILABLE'] } },
-    },
-    migration: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['status'],
-      properties: { status: { type: 'string', enum: ['READY', 'NOT_READY'] } },
-    },
-    timestamp: isoTimestampSchema,
   },
 } as const;
 

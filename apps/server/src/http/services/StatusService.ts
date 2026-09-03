@@ -19,11 +19,7 @@ export interface StatusServiceOptions {
 
 export interface HealthStatus {
   readonly serviceName: typeof SERVICE_NAME;
-  readonly version: string;
   readonly status: 'READY' | 'DEGRADED';
-  readonly database: { readonly status: 'READY' | 'UNAVAILABLE' };
-  readonly migration: { readonly status: 'READY' | 'NOT_READY' };
-  readonly timestamp: string;
 }
 
 export interface RuntimeStatus {
@@ -53,11 +49,7 @@ export class StatusService {
     const ready = databaseReady && migrationReady;
     return {
       serviceName: SERVICE_NAME,
-      version: this.options.version,
       status: ready ? 'READY' : 'DEGRADED',
-      database: { status: databaseReady ? 'READY' : 'UNAVAILABLE' },
-      migration: { status: migrationReady ? 'READY' : 'NOT_READY' },
-      timestamp: this.clock().toISOString(),
     };
   }
 

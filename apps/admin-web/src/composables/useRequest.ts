@@ -37,7 +37,11 @@ function safeError(error: unknown): ApiError {
       );
 }
 
-export function useRequest<T>(loader: (signal: AbortSignal) => Promise<T>): RequestState<T> {
+export function useRequest<T>(
+  loader: (signal: AbortSignal) => Promise<T>,
+  options?: { immediate?: boolean },
+): RequestState<T> {
+  const immediate = options?.immediate ?? true;
   const data = shallowRef<T | null>(null);
   const error = ref<ApiError | null>(null);
   const loading = ref(false);
@@ -81,7 +85,11 @@ export function useRequest<T>(loader: (signal: AbortSignal) => Promise<T>): Requ
     }
   }
 
-  onMounted(() => void load());
+  onMounted(() => {
+    if (immediate) {
+      void load();
+    }
+  });
   onBeforeUnmount(cancel);
 
   return {

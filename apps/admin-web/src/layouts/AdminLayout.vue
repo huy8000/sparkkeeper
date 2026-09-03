@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* global Event, HTMLSelectElement */
 import { computed, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 import { useAdminApp } from '../appContext';
 import BrandMark from '../components/BrandMark.vue';
@@ -14,6 +14,7 @@ import { useTranslation } from '../i18n';
 import { classifyRuntimeReadiness } from '../operations/runtimeReadiness';
 
 const route = useRoute();
+const router = useRouter();
 const app = useAdminApp();
 const theme = useTheme();
 const { locale } = useLocale();
@@ -49,6 +50,11 @@ function navigationClasses(section: string): Record<string, boolean> {
 /** Locale switching is presentation-only: no reload, no route change, no mutation. */
 function handleLocaleChange(event: Event): void {
   setLocale((event.target as HTMLSelectElement).value as AppLocale);
+}
+
+async function handleLogout(): Promise<void> {
+  await app.auth.logout();
+  await router.push('/login');
 }
 </script>
 
@@ -164,6 +170,17 @@ function handleLocaleChange(event: Event): void {
               <option value="zh-CN">简体中文</option>
               <option value="en-US">English</option>
             </select>
+          </div>
+          <div v-if="app.auth.user.value" class="admin-user-menu">
+            <span class="admin-user-menu__name">{{ app.auth.user.value.username }}</span>
+            <button
+              class="button button--secondary button--compact button--logout"
+              type="button"
+              :disabled="app.auth.isLoggingOut.value"
+              @click="handleLogout"
+            >
+              {{ t('auth.logout') }}
+            </button>
           </div>
           <button
             class="theme-toggle"

@@ -19,6 +19,7 @@ export function registerNotificationRoutes(server: FastifyInstance, services: Ap
   server.get(
     '/api/notification-config',
     {
+      config: { auth: 'S' },
       schema: {
         response: {
           200: successEnvelopeSchema(notificationConfigurationSchema),
@@ -32,6 +33,7 @@ export function registerNotificationRoutes(server: FastifyInstance, services: Ap
   server.put<{ Body: NotificationConfigurationInput }>(
     '/api/notification-config',
     {
+      config: { auth: 'M' },
       schema: {
         body: notificationConfigurationBodySchema,
         response: {
@@ -46,6 +48,7 @@ export function registerNotificationRoutes(server: FastifyInstance, services: Ap
   server.post<{ Body: Record<string, never> }>(
     '/api/notification-config/test',
     {
+      config: { auth: 'M' },
       schema: {
         body: { type: 'object', additionalProperties: false },
         response: {

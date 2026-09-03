@@ -28,6 +28,7 @@ export function registerRunRoutes(server: FastifyInstance, services: ApiServices
   server.get<{ Querystring: RunQuery }>(
     '/api/runs',
     {
+      config: { auth: 'S' },
       schema: {
         querystring: runQuerySchema,
         response: {
@@ -42,6 +43,7 @@ export function registerRunRoutes(server: FastifyInstance, services: ApiServices
   server.get<{ Params: RunParams }>(
     '/api/runs/:runId',
     {
+      config: { auth: 'S' },
       schema: {
         params: idParamsSchema('runId'),
         response: {
@@ -56,6 +58,7 @@ export function registerRunRoutes(server: FastifyInstance, services: ApiServices
   server.get<{ Params: RunParams }>(
     '/api/runs/:runId/send-records',
     {
+      config: { auth: 'S' },
       schema: {
         params: idParamsSchema('runId'),
         response: {
@@ -70,6 +73,7 @@ export function registerRunRoutes(server: FastifyInstance, services: ApiServices
   server.get<{ Params: RunParams }>(
     '/api/runs/:runId/events',
     {
+      config: { auth: 'S' },
       schema: {
         params: idParamsSchema('runId'),
         response: {

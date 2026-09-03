@@ -117,20 +117,8 @@ function retryAll(): void {
                 <dd><StatusBadge :status="health.data.value.status" /></dd>
               </div>
               <div>
-                <dt>{{ t('systemPage.database') }}</dt>
-                <dd><StatusBadge :status="health.data.value.database.status" /></dd>
-              </div>
-              <div>
-                <dt>{{ t('systemPage.migration') }}</dt>
-                <dd><StatusBadge :status="health.data.value.migration.status" /></dd>
-              </div>
-              <div>
-                <dt>{{ t('systemPage.version') }}</dt>
-                <dd>{{ health.data.value.version }}</dd>
-              </div>
-              <div>
-                <dt>{{ t('systemPage.reported') }}</dt>
-                <dd>{{ formatTimestamp(health.data.value.timestamp) }}</dd>
+                <dt>{{ t('systemPage.serviceName') }}</dt>
+                <dd>{{ health.data.value.serviceName }}</dd>
               </div>
             </dl>
           </template>

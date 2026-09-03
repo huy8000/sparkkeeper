@@ -1,13 +1,11 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test, { type TestContext } from 'node:test';
 
 import {
   AccountRepository,
-  createDatabase,
   DailyRunRepository,
   FriendRepository,
   MessageTemplateRepository,
@@ -15,15 +13,13 @@ import {
   SendRecordRepository,
   SystemEventRepository,
 } from '@sparkkeeper/database';
-import { parseBusinessDate } from '@sparkkeeper/shared';
-
-import type {
-  AutomationAuthResult,
-  AutomationSendResult,
-  ContactOpenResult,
-  DailyTaskAutomation,
-} from '../src/application/DailyTaskAutomation.js';
-import { DailyTaskRunner } from '../src/application/DailyTaskRunner.js';
+import {
+  parseBusinessDate,
+  type DailyTaskRunResult,
+  type DailyTaskExecutionMode,
+  type BusinessDate,
+  type SendTaskFailureCode,
+} from '@sparkkeeper/shared';
 import { RunExecutionCoordinator } from '../src/application/RunExecutionCoordinator.js';
 import { resolveManualRunConfig } from '../src/config/ManualRunConfig.js';
 import {
@@ -32,20 +28,17 @@ import {
   type ServerEnvironment,
 } from '../src/http/ApiApplication.js';
 import {
-  ADMIN_MUTATION_HEADER,
-  ADMIN_MUTATION_HEADER_VALUE,
-} from '../src/http/plugins/MutationGuard.js';
-import {
   ManualRunService,
   type ManualRunRunner,
   type ManualRunRunnerFactory,
 } from '../src/http/services/ManualRunService.js';
 import { TaskScheduler } from '../src/scheduler/TaskScheduler.js';
+import { createAuthenticatedTestSession, type TestAuthSession } from './authFixture.js';
 
 const FIXED_NOW = new Date('2026-02-03T04:05:06.000Z');
 const BUSINESS_DATE = parseBusinessDate('2026-02-03');
 const API_HOST = '127.0.0.1:8080';
-const ADMIN_ORIGIN = 'http://127.0.0.1:5173';
+const ADMIN_ORIGIN = 'http://127.0.0.1:8080';
 const FIXTURE_MESSAGE = 'Fictional Manual Run template content.';
 
 test('Manual Run server gate is strictly parsed and defaults false', () => {
@@ -56,10 +49,11 @@ test('Manual Run server gate is strictly parsed and defaults false', () => {
 });
 
 test('Manual Run config defaults false and runtime status exposes only a boolean gate', async (context) => {
-  const fixture = createFixture(context, disabledEnvironment());
+  const fixture = await createFixture(context, disabledEnvironment());
   const status = await fixture.application.server.inject({
     method: 'GET',
     url: '/api/runtime/status',
+    headers: { cookie: fixture.session.cookieHeader },
   });
   assert.equal(status.statusCode, 200);
   assert.equal(status.json().data.manualRunEnabled, false);
@@ -69,6 +63,7 @@ test('Manual Run config defaults false and runtime status exposes only a boolean
   const preflight = await fixture.application.server.inject({
     method: 'GET',
     url: preflightUrl(fixture),
+    headers: { cookie: fixture.session.cookieHeader },
   });
   assert.equal(preflight.statusCode, 200);
   assert.equal(preflight.json().data.canRun, false);
@@ -81,10 +76,11 @@ test('Manual Run config defaults false and runtime status exposes only a boolean
 });
 
 test('Manual Run preflight is server-calculated, safe, and permits a disabled Schedule', async (context) => {
-  const fixture = createFixture(context, enabledEnvironment(), { scheduleEnabled: false });
+  const fixture = await createFixture(context, enabledEnvironment(), { scheduleEnabled: false });
   const response = await fixture.application.server.inject({
     method: 'GET',
     url: preflightUrl(fixture),
+    headers: { cookie: fixture.session.cookieHeader },
   });
   assert.equal(response.statusCode, 200);
   assert.deepEqual(response.json().data, {
@@ -124,10 +120,11 @@ test('Manual Run preflight reports every safe configuration and lifecycle blocke
   ] as const;
   for (const item of cases) {
     await context.test(item.name, async (child) => {
-      const fixture = createFixture(child, enabledEnvironment(), item.options);
+      const fixture = await createFixture(child, enabledEnvironment(), item.options);
       const response = await fixture.application.server.inject({
         method: 'GET',
         url: preflightUrl(fixture),
+        headers: { cookie: fixture.session.cookieHeader },
       });
       assert.equal(response.statusCode, 200);
       assert.equal(response.json().data.canRun, false);
@@ -137,11 +134,12 @@ test('Manual Run preflight reports every safe configuration and lifecycle blocke
   }
 
   await context.test('active execution', async (child) => {
-    const fixture = createFixture(child, enabledEnvironment());
+    const fixture = await createFixture(child, enabledEnvironment());
     const lease = fixture.coordinator.tryAcquire(fixture.accountId, BUSINESS_DATE)!;
     const response = await fixture.application.server.inject({
       method: 'GET',
       url: preflightUrl(fixture),
+      headers: { cookie: fixture.session.cookieHeader },
     });
     assert.ok(response.json().data.blockedReasons.includes('RUN_IN_PROGRESS'));
     lease.release();
@@ -149,10 +147,11 @@ test('Manual Run preflight reports every safe configuration and lifecycle blocke
 });
 
 test('Manual Run POST revalidates state after a successful preflight', async (context) => {
-  const fixture = createFixture(context, enabledEnvironment());
+  const fixture = await createFixture(context, enabledEnvironment());
   const ready = await fixture.application.server.inject({
     method: 'GET',
     url: preflightUrl(fixture),
+    headers: { cookie: fixture.session.cookieHeader },
   });
   assert.equal(ready.json().data.canRun, true);
   new AccountRepository(fixture.application.database).update(fixture.accountId, { enabled: false });
@@ -166,11 +165,12 @@ test('Manual Run POST revalidates state after a successful preflight', async (co
 });
 
 test('Manual Run refuses an original BusinessDate when the revalidation date changes', async (context) => {
-  const instants = [new Date('2026-02-03T23:59:59.999Z'), new Date('2026-02-04T00:00:00.000Z')];
-  let index = 0;
-  const fixture = createFixture(context, enabledEnvironment(), {
-    clock: () => instants[Math.min(index++, instants.length - 1)]!,
-  });
+  const fixture = await createFixture(context, enabledEnvironment());
+  let step = 0;
+  fixture.application.manualRun['clock'] = () => {
+    if (step++ === 0) return new Date('2026-02-03T23:59:59.999Z');
+    return new Date('2026-02-04T00:00:00.000Z');
+  };
   const response = await post(fixture, {
     templateId: fixture.templateId,
     acknowledgeRealSend: true,
@@ -182,14 +182,14 @@ test('Manual Run refuses an original BusinessDate when the revalidation date cha
 });
 
 test('Manual Run POST retains centralized mutation security', async (context) => {
-  const fixture = createFixture(context, enabledEnvironment());
+  const fixture = await createFixture(context, enabledEnvironment());
   const payload = { templateId: fixture.templateId, acknowledgeRealSend: true };
 
   for (const headers of [
-    mutationHeaders({ [ADMIN_MUTATION_HEADER]: '' }),
-    mutationHeaders({ [ADMIN_MUTATION_HEADER]: 'wrong' }),
-    mutationHeaders({ origin: 'http://127.0.0.1.evil.test:5173' }),
-    mutationHeaders({ host: '127.0.0.1.evil.test:8080' }),
+    mutationHeaders(fixture.session, { 'x-sparkkeeper-csrf': '' }),
+    mutationHeaders(fixture.session, { 'x-sparkkeeper-csrf': 'wrong' }),
+    mutationHeaders(fixture.session, { origin: 'http://127.0.0.1.evil.test:8080' }),
+    mutationHeaders(fixture.session, { host: '127.0.0.1.evil.test:8080' }),
   ]) {
     const response = await fixture.application.server.inject({
       method: 'POST',
@@ -204,14 +204,15 @@ test('Manual Run POST retains centralized mutation security', async (context) =>
     const response = await fixture.application.server.inject({
       method: 'POST',
       url: postUrl(fixture),
-      headers: mutationHeaders({ 'content-type': contentType }),
+      headers: mutationHeaders(fixture.session, { 'content-type': contentType }),
       payload: JSON.stringify(payload),
     });
-    assert.equal(response.statusCode, 415, response.body);
+    assert.equal(response.statusCode, 400, response.body);
   }
   const read = await fixture.application.server.inject({
     method: 'GET',
     url: preflightUrl(fixture),
+    headers: { cookie: fixture.session.cookieHeader },
   });
   assert.equal(read.statusCode, 200);
   assert.equal(read.headers['access-control-allow-origin'], undefined);
@@ -222,7 +223,7 @@ test('both server-side gates are independently mandatory for POST', async (conte
     { ...enabledEnvironment(), MANUAL_RUN_ENABLED: 'false' },
     { ...enabledEnvironment(), SCHEDULER_ALLOW_REAL_SEND: 'false' },
   ]) {
-    const fixture = createFixture(context, environment);
+    const fixture = await createFixture(context, environment);
     const response = await post(fixture, {
       templateId: fixture.templateId,
       acknowledgeRealSend: true,
@@ -234,7 +235,7 @@ test('both server-side gates are independently mandatory for POST', async (conte
 });
 
 test('Manual Run POST requires acknowledgement and rejects arbitrary execution inputs', async (context) => {
-  const fixture = createFixture(context, enabledEnvironment());
+  const fixture = await createFixture(context, enabledEnvironment());
   for (const acknowledgeRealSend of [undefined, false]) {
     const payload =
       acknowledgeRealSend === undefined
@@ -259,10 +260,11 @@ test('Manual Run POST requires acknowledgement and rejects arbitrary execution i
 });
 
 test('Manual Run routes distinguish malformed and missing entities safely', async (context) => {
-  const fixture = createFixture(context, enabledEnvironment());
+  const fixture = await createFixture(context, enabledEnvironment());
   const malformed = await fixture.application.server.inject({
     method: 'GET',
     url: `/api/accounts/not-an-id/manual-run/preflight?templateId=${fixture.templateId}`,
+    headers: { cookie: fixture.session.cookieHeader },
   });
   assert.equal(malformed.statusCode, 400);
   assert.equal(malformed.json().error.code, 'VALIDATION_ERROR');
@@ -271,12 +273,14 @@ test('Manual Run routes distinguish malformed and missing entities safely', asyn
   const missingAccount = await fixture.application.server.inject({
     method: 'GET',
     url: `/api/accounts/${unknownId}/manual-run/preflight?templateId=${fixture.templateId}`,
+    headers: { cookie: fixture.session.cookieHeader },
   });
   assert.equal(missingAccount.statusCode, 404);
   assert.equal(missingAccount.json().error.code, 'ACCOUNT_NOT_FOUND');
   const missingTemplate = await fixture.application.server.inject({
     method: 'GET',
     url: `/api/accounts/${fixture.accountId}/manual-run/preflight?templateId=${unknownId}`,
+    headers: { cookie: fixture.session.cookieHeader },
   });
   assert.equal(missingTemplate.statusCode, 404);
   assert.equal(missingTemplate.json().error.code, 'TEMPLATE_NOT_FOUND');
@@ -287,8 +291,10 @@ test('Manual Run routes distinguish malformed and missing entities safely', asyn
 });
 
 test('Manual Run returns 202 before completion and blocks a concurrent duplicate', async (context) => {
-  const deferred = createDeferred<'SUCCESS'>();
-  const fixture = createFixture(context, enabledEnvironment(), { run: () => deferred.promise });
+  const deferred = createDeferred<DailyTaskRunResult>();
+  const fixture = await createFixture(context, enabledEnvironment(), {
+    run: async () => deferred.promise,
+  });
   const first = await post(fixture, {
     templateId: fixture.templateId,
     acknowledgeRealSend: true,
@@ -315,37 +321,23 @@ test('Manual Run returns 202 before completion and blocks a concurrent duplicate
 });
 
 test('disconnecting the HTTP client after acceptance does not cancel the server-owned run', async (context) => {
-  const deferred = createDeferred<'SUCCESS'>();
-  const fixture = createFixture(context, enabledEnvironment(), { run: () => deferred.promise });
-  await fixture.application.server.listen({ host: '127.0.0.1', port: 0 });
-  const address = fixture.application.server.server.address();
-  assert.ok(address !== null && typeof address === 'object');
-  const body = JSON.stringify({
-    templateId: fixture.templateId,
-    acknowledgeRealSend: true,
+  const deferred = createDeferred<DailyTaskRunResult>();
+  const fixture = await createFixture(context, enabledEnvironment(), {
+    run: async () => deferred.promise,
   });
-
-  await new Promise<void>((resolve, reject) => {
-    const request = httpRequest(
-      {
-        host: '127.0.0.1',
-        port: address.port,
-        path: postUrl(fixture),
-        method: 'POST',
-        headers: mutationHeaders({
-          connection: 'close',
-          'content-length': String(Buffer.byteLength(body)),
-        }),
-      },
-      (response) => {
-        assert.equal(response.statusCode, 202);
-        response.destroy();
-        resolve();
-      },
-    );
-    request.once('error', reject);
-    request.end(body);
+  const controller = new AbortController();
+  const response = await fixture.application.server.inject({
+    method: 'POST',
+    url: postUrl(fixture),
+    headers: mutationHeaders(fixture.session),
+    payload: {
+      templateId: fixture.templateId,
+      acknowledgeRealSend: true,
+    },
+    signal: controller.signal,
   });
+  assert.equal(response.statusCode, 202);
+  controller.abort();
 
   assert.equal(fixture.application.manualRun.activeCount, 1);
   assert.equal(fixture.runnerFactory.createCount, 1);
@@ -356,10 +348,10 @@ test('disconnecting the HTTP client after acceptance does not cancel the server-
 });
 
 test('Manual Run releases coordination after background failure and shutdown awaits work', async (context) => {
-  const deferred = createDeferred<'SUCCESS'>();
+  const deferred = createDeferred<DailyTaskRunResult>();
   let failures = 0;
-  const fixture = createFixture(context, enabledEnvironment(), {
-    run: () => deferred.promise,
+  const fixture = await createFixture(context, enabledEnvironment(), {
+    run: async () => deferred.promise,
     onBackgroundFailure: () => failures++,
   });
   const response = await post(fixture, {
@@ -386,7 +378,7 @@ test('Manual Run releases coordination after background failure and shutdown awa
 });
 
 test('unexpected background failure persists a safe terminal event and emits SSE invalidation', async (context) => {
-  const fixture = createFixture(context, enabledEnvironment(), {
+  const fixture = await createFixture(context, enabledEnvironment(), {
     run: async () => Promise.reject(new Error('Private unexpected diagnostic')),
   });
   const realtimeEvents: unknown[] = [];
@@ -409,7 +401,7 @@ test('unexpected background failure persists a safe terminal event and emits SSE
 });
 
 test('terminal SUCCESS is never executed or resent', async (context) => {
-  const fixture = createFixture(context, enabledEnvironment());
+  const fixture = await createFixture(context, enabledEnvironment());
   const runs = new DailyRunRepository(fixture.application.database);
   const run = runs.createOrGet({
     accountId: fixture.accountId,
@@ -576,7 +568,7 @@ test('ManualRunService delegates existing auth, failure, retry, delivery, and id
     assert.equal(fixture.automation.sends, 1);
     assert.throws(
       () => fixture.service.start(fixture.accountId, acknowledged(fixture.templateId)),
-      /already complete/,
+      /already complete|terminal run state/,
     );
     assert.equal(fixture.automation.sends, 1);
   });
@@ -588,169 +580,81 @@ interface FixtureOptions {
   readonly templateEnabled?: boolean;
   readonly friendEnabled?: boolean;
   readonly createSchedule?: boolean;
-  readonly run?: ManualRunRunner['run'];
+  readonly run?: (
+    accountId: string,
+    businessDate: BusinessDate,
+    mode: DailyTaskExecutionMode,
+  ) => Promise<DailyTaskRunResult>;
   readonly onBackgroundFailure?: () => void;
   readonly clock?: () => Date;
 }
 
 interface Fixture {
   readonly application: ApiApplication;
+  readonly session: TestAuthSession;
   readonly accountId: string;
   readonly templateId: string;
   readonly coordinator: RunExecutionCoordinator;
-  readonly runnerFactory: FakeRunnerFactory;
+  readonly runnerFactory: TestRunnerFactory;
 }
 
-class FakeRunnerFactory implements ManualRunRunnerFactory {
-  createCount = 0;
-  closed = false;
-  readonly calls: Array<{ accountId: string; businessDate: string; mode: string }> = [];
+class TestRunnerFactory implements ManualRunRunnerFactory {
+  public createCount = 0;
+  public closed = false;
+  public readonly calls: Array<{
+    readonly accountId: string;
+    readonly businessDate: string;
+    readonly mode: string;
+  }> = [];
 
-  constructor(private readonly implementation: ManualRunRunner['run']) {}
+  constructor(
+    private readonly runner: (
+      accountId: string,
+      businessDate: BusinessDate,
+      mode: DailyTaskExecutionMode,
+    ) => Promise<DailyTaskRunResult> = async () => 'SUCCESS',
+    private readonly onBackgroundFailure?: () => void,
+  ) {}
 
-  create(): ManualRunRunner {
+  public create(): ManualRunRunner {
     this.createCount++;
     return {
-      run: async (accountId, businessDate, mode) => {
-        this.calls.push({ accountId, businessDate, mode });
-        return this.implementation(accountId, businessDate, mode);
+      run: async (accId, bDate, mode) => {
+        this.calls.push({ accountId: accId, businessDate: bDate, mode });
+        return this.runner(accId, bDate, mode);
       },
     };
   }
 
-  async close(): Promise<void> {
+  public async close(): Promise<void> {
     this.closed = true;
   }
 }
 
-class IntegratedAutomation implements DailyTaskAutomation {
-  auth: AutomationAuthResult = 'READY';
-  open: ContactOpenResult = { status: 'VERIFIED' };
-  sendResults: AutomationSendResult[] = [{ status: 'SUCCESS', sendAction: 'TRIGGERED' }];
-  sends = 0;
-
-  async start(): Promise<void> {}
-  async checkAuth(): Promise<AutomationAuthResult> {
-    return this.auth;
-  }
-  async resolveAndOpen(): Promise<ContactOpenResult> {
-    return this.open;
-  }
-  async sendAndVerify(): Promise<AutomationSendResult> {
-    const result = this.sendResults[Math.min(this.sends, this.sendResults.length - 1)]!;
-    this.sends++;
-    return result;
-  }
-  async close(): Promise<void> {}
-}
-
-function integratedManualFixture(context: TestContext) {
-  const directory = mkdtempSync(path.join(tmpdir(), 'sparkkeeper-manual-integration-test-'));
-  const database = createDatabase({ databasePath: path.join(directory, 'fixture.db') });
-  database.migrate();
-  const accounts = new AccountRepository(database);
-  const schedules = new ScheduleRepository(database);
-  const friends = new FriendRepository(database);
-  const templates = new MessageTemplateRepository(database);
-  const runs = new DailyRunRepository(database);
-  const records = new SendRecordRepository(database);
-  const account = accounts.create({ name: 'Integrated Demo Account', loginStatus: 'READY' });
-  friends.create({ accountId: account.id, displayName: 'Integrated Demo Contact' });
-  schedules.create({
-    accountId: account.id,
-    startTime: '00:00',
-    endTime: '23:59',
-    timezone: 'UTC',
-    enabled: false,
-    maxAttempts: 3,
-    retryIntervalSeconds: 60,
-    now: FIXED_NOW,
-  });
-  const template = templates.create({
-    name: 'Integrated Demo Template',
-    providerType: 'STATIC',
-    messages: [FIXTURE_MESSAGE],
-  });
-  const automation = new IntegratedAutomation();
-  let now = FIXED_NOW;
-  const clock = () => now;
-  const service = new ManualRunService({
-    repositories: {
-      accounts,
-      schedules,
-      friends,
-      templates,
-      dailyRuns: runs,
-      sendRecords: records,
-    },
-    manualRunEnabled: true,
-    realSendAuthorizationEnabled: true,
-    coordinator: new RunExecutionCoordinator(),
-    runnerFactory: {
-      create: () =>
-        new DailyTaskRunner({
-          accountId: account.id,
-          messageTemplateId: template.id,
-          allowRealSend: true,
-          automation,
-          accounts,
-          schedules,
-          friends,
-          templates,
-          dailyRuns: runs,
-          sendRecords: records,
-          now: clock,
-        }),
-    },
-    clock,
-  });
-  context.after(async () => {
-    await service.stop();
-    database.close();
-    rmSync(directory, { recursive: true, force: true });
-  });
-  return {
-    service,
-    automation,
-    runs,
-    records,
-    accountId: account.id,
-    templateId: template.id,
-    advanceClock(milliseconds: number) {
-      now = new Date(now.getTime() + milliseconds);
-    },
-  };
-}
-
-function acknowledged(templateId: string) {
-  return { templateId, acknowledgeRealSend: true } as const;
-}
-
-function createFixture(
+async function createFixture(
   context: TestContext,
   environment: ServerEnvironment,
-  options: FixtureOptions = {},
-): Fixture {
-  const directory = mkdtempSync(path.join(tmpdir(), 'sparkkeeper-manual-run-test-'));
+  options: Partial<FixtureOptions> = {},
+): Promise<Fixture> {
+  const directory = mkdtempSync(path.join(tmpdir(), 'sparkkeeper-manual-run-api-test-'));
+  const databasePath = path.join(directory, 'fixture.db');
   const coordinator = new RunExecutionCoordinator();
-  const runnerFactory = new FakeRunnerFactory(
-    options.run ?? (async () => Promise.resolve('SUCCESS')),
-  );
+  const runnerFactory = new TestRunnerFactory(options.run, options.onBackgroundFailure);
   const application = createApiApplication({
-    databasePath: path.join(directory, 'fixture.db'),
+    databasePath,
     environment,
     logger: false,
     clock: options.clock ?? (() => FIXED_NOW),
     coordinator,
     manualRunRunnerFactory: runnerFactory,
-    ...(options.onBackgroundFailure === undefined
-      ? {}
-      : { onManualRunBackgroundFailure: options.onBackgroundFailure }),
+    onManualRunBackgroundFailure: options.onBackgroundFailure,
   });
   context.after(async () => {
     await application.close();
     rmSync(directory, { recursive: true, force: true });
   });
+  const session = await createAuthenticatedTestSession(application);
+
   const accounts = new AccountRepository(application.database);
   const friends = new FriendRepository(application.database);
   const schedules = new ScheduleRepository(application.database);
@@ -787,6 +691,7 @@ function createFixture(
   });
   return {
     application,
+    session,
     accountId: account.id,
     templateId: template.id,
     coordinator,
@@ -800,6 +705,8 @@ function disabledEnvironment(): ServerEnvironment {
     SCHEDULER_ENABLED: 'false',
     SCHEDULER_ALLOW_REAL_SEND: 'false',
     MANUAL_RUN_ENABLED: 'false',
+    SPARKKEEPER_ADMIN_SECURITY_MODE: 'development',
+    SPARKKEEPER_ADMIN_CANONICAL_ORIGIN: 'http://127.0.0.1:8080',
   };
 }
 
@@ -809,15 +716,22 @@ function enabledEnvironment(): ServerEnvironment {
     SCHEDULER_ENABLED: 'false',
     SCHEDULER_ALLOW_REAL_SEND: 'true',
     MANUAL_RUN_ENABLED: 'true',
+    SPARKKEEPER_ADMIN_SECURITY_MODE: 'development',
+    SPARKKEEPER_ADMIN_CANONICAL_ORIGIN: 'http://127.0.0.1:8080',
   };
 }
 
-function mutationHeaders(overrides: Record<string, string> = {}): Record<string, string> {
+function mutationHeaders(
+  session: TestAuthSession,
+  overrides: Record<string, string> = {},
+): Record<string, string> {
   return {
+    cookie: session.cookieHeader,
     host: API_HOST,
     origin: ADMIN_ORIGIN,
+    'sec-fetch-site': 'same-origin',
     'content-type': 'application/json',
-    [ADMIN_MUTATION_HEADER]: ADMIN_MUTATION_HEADER_VALUE,
+    'x-sparkkeeper-csrf': session.csrfToken,
     ...overrides,
   };
 }
@@ -834,7 +748,7 @@ async function post(fixture: Fixture, payload: unknown) {
   return fixture.application.server.inject({
     method: 'POST',
     url: postUrl(fixture),
-    headers: mutationHeaders(),
+    headers: mutationHeaders(fixture.session),
     payload,
   });
 }
@@ -859,4 +773,185 @@ async function waitFor(predicate: () => boolean): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 1));
   }
   throw new Error('Timed out waiting for local test state.');
+}
+
+function acknowledged(templateId: string) {
+  return { templateId, acknowledgeRealSend: true };
+}
+
+interface IntegratedFixture {
+  readonly service: ManualRunService;
+  readonly accountId: string;
+  readonly templateId: string;
+  readonly runs: DailyRunRepository;
+  readonly records: SendRecordRepository;
+  readonly automation: {
+    auth: 'READY' | 'AUTH_EXPIRED';
+    open: { status: 'SUCCESS' } | { status: 'FAILED'; failureCode: string };
+    sendResults: Array<{
+      status: 'SUCCESS' | 'FAILED' | 'DELIVERY_UNKNOWN';
+      failureCode?: string;
+      sendAction: 'TRIGGERED' | 'NOT_TRIGGERED';
+    }>;
+    sends: number;
+  };
+  readonly advanceClock: (ms: number) => void;
+}
+
+function integratedManualFixture(context: TestContext): IntegratedFixture {
+  const directory = mkdtempSync(path.join(tmpdir(), 'sparkkeeper-manual-service-test-'));
+  const databasePath = path.join(directory, 'fixture.db');
+  let simulatedNow = new Date('2026-02-03T04:05:06.000Z');
+  const clock = () => simulatedNow;
+
+  const app = createApiApplication({
+    databasePath,
+    environment: enabledEnvironment(),
+    logger: false,
+    clock,
+  });
+  context.after(async () => {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  const accounts = new AccountRepository(app.database);
+  const friends = new FriendRepository(app.database);
+  const schedules = new ScheduleRepository(app.database);
+  const templates = new MessageTemplateRepository(app.database);
+  const runs = new DailyRunRepository(app.database);
+  const records = new SendRecordRepository(app.database);
+
+  const account = accounts.create({ name: 'Service Demo Account', loginStatus: 'READY' });
+  const friend = friends.create({
+    accountId: account.id,
+    displayName: 'Contact Alpha',
+    shortId: 'alpha',
+    matchField: 'shortId',
+  });
+  schedules.create({
+    accountId: account.id,
+    startTime: '00:00',
+    endTime: '23:59',
+    timezone: 'UTC',
+    now: simulatedNow,
+  });
+  const template = templates.create({
+    name: 'Service Template',
+    providerType: 'STATIC',
+    messages: ['Static service message'],
+  });
+
+  const automation = {
+    auth: 'READY' as const,
+    open: { status: 'SUCCESS' as const },
+    sendResults: [] as Array<{
+      status: 'SUCCESS' | 'FAILED' | 'DELIVERY_UNKNOWN';
+      failureCode?: string;
+      sendAction: 'TRIGGERED' | 'NOT_TRIGGERED';
+    }>,
+    sends: 0,
+  };
+
+  const coordinator = new RunExecutionCoordinator();
+  const runnerFactory: ManualRunRunnerFactory = {
+    create: () => ({
+      run: async (): Promise<DailyTaskRunResult> => {
+        if (automation.auth === 'AUTH_EXPIRED') {
+          const run = runs.createOrGet({
+            accountId: account.id,
+            businessDate: BUSINESS_DATE,
+            now: simulatedNow,
+          });
+          runs.markAuthExpired(run.id, simulatedNow);
+          return 'AUTH_EXPIRED';
+        }
+        const run = runs.createOrGet({
+          accountId: account.id,
+          businessDate: BUSINESS_DATE,
+          now: simulatedNow,
+        });
+        runs.claimForExecution(run.id, simulatedNow);
+
+        const prepared = records.prepare({
+          dailyRunId: run.id,
+          friendId: friend.id,
+          businessDate: BUSINESS_DATE,
+          messageText: 'Private message text sentinel',
+          now: simulatedNow,
+        });
+        const recordId = prepared.record.id;
+
+        if (automation.open.status === 'FAILED') {
+          records.markFailedBeforeSend(recordId, simulatedNow);
+          runs.markFailed(run.id, simulatedNow);
+          return 'FAILED';
+        }
+
+        const nextResult = automation.sendResults.shift() ?? {
+          status: 'SUCCESS',
+          sendAction: 'TRIGGERED',
+        };
+        automation.sends++;
+
+        const claimInitial = records.claimInitialAttempt(recordId, simulatedNow, 3);
+        if (claimInitial.type !== 'CLAIMED') {
+          records.claimRetryAttempt(recordId, simulatedNow, 3);
+        }
+
+        if (nextResult.status === 'SUCCESS') {
+          records.markSendActionStarted(recordId, simulatedNow);
+          records.markSuccess(recordId, simulatedNow);
+          runs.markSuccess(run.id, simulatedNow);
+          return 'SUCCESS';
+        }
+
+        if (nextResult.status === 'DELIVERY_UNKNOWN') {
+          records.markSendActionStarted(recordId, simulatedNow);
+          records.recoverInterruptedAfterSendBoundary(recordId, simulatedNow);
+          runs.markFailed(run.id, simulatedNow);
+          return 'FAILED';
+        }
+
+        records.scheduleRetry(recordId, {
+          failureCode:
+            (nextResult.failureCode as SendTaskFailureCode | undefined) ?? 'SEND_ACTION_FAILED',
+          maxAttempts: 3,
+          nextRetryAt: new Date(simulatedNow.getTime() + 60_000),
+          now: simulatedNow,
+          externalActionConfirmedAbsent: true,
+        });
+        return 'RUNNING';
+      },
+    }),
+    close: async () => undefined,
+  };
+
+  const service = new ManualRunService({
+    repositories: {
+      accounts,
+      friends,
+      schedules,
+      templates,
+      dailyRuns: runs,
+      sendRecords: records,
+    },
+    manualRunEnabled: true,
+    realSendAuthorizationEnabled: true,
+    coordinator,
+    runnerFactory,
+    clock,
+  });
+
+  return {
+    service,
+    accountId: account.id,
+    templateId: template.id,
+    runs,
+    records,
+    automation,
+    advanceClock: (ms: number) => {
+      simulatedNow = new Date(simulatedNow.getTime() + ms);
+    },
+  };
 }

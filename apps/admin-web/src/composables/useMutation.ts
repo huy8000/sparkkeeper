@@ -19,6 +19,13 @@ export interface MutationState {
   readonly clearError: () => void;
 }
 
+function isApiError(cause: unknown): cause is ApiError {
+  return (
+    cause instanceof ApiError ||
+    (typeof cause === 'object' && cause !== null && 'code' in cause && 'httpStatus' in cause)
+  );
+}
+
 export function useMutation(): MutationState {
   const { t } = useTranslation();
   const submitting = ref(false);
@@ -39,7 +46,7 @@ export function useMutation(): MutationState {
       await onSuccess(result);
       success.value = successMessage;
     } catch (cause) {
-      error.value = cause instanceof ApiError ? cause : t('common.saveFailed');
+      error.value = isApiError(cause) ? cause : t('common.saveFailed');
     } finally {
       submitting.value = false;
     }
