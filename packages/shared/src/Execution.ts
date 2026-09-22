@@ -132,10 +132,10 @@ export class ExecutionValidationError extends Error {
 
 export function validateIdempotencyKey(key: string): string {
   const trimmed = key.trim();
-  if (trimmed.length === 0) {
+  if (trimmed.length === 0 || trimmed.length > 128 || !/^[\x20-\x7E]+$/.test(trimmed)) {
     throw new ExecutionValidationError(
       'INVALID_IDEMPOTENCY_KEY',
-      'Idempotency key must not be empty.',
+      'Idempotency key must contain 1 to 128 printable ASCII characters.',
     );
   }
   return trimmed;

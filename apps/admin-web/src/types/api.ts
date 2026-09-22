@@ -1,4 +1,5 @@
 import type {
+  AccountLoginSessionSummary,
   DailyRunStatus,
   FriendMatchField,
   LoginStatus,
@@ -7,6 +8,22 @@ import type {
   SystemEventLevel,
   MessageProviderType,
 } from '@sparkkeeper/shared';
+
+export type { AccountLoginSessionSummary } from '@sparkkeeper/shared';
+
+export interface StartAccountLoginInput {
+  readonly purpose: 'ADD_ACCOUNT' | 'RELOGIN';
+  readonly accountId?: string;
+}
+
+export interface StartAccountLoginResponse {
+  readonly session: AccountLoginSessionSummary;
+  readonly consolePath: string;
+}
+
+export interface ActiveAccountLoginResponse {
+  readonly session: AccountLoginSessionSummary | null;
+}
 
 export interface ApiSuccess<T> {
   readonly success: true;

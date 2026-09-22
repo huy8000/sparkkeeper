@@ -22,8 +22,8 @@ test('V4Migration: fresh database migration creates all 23 tables with PRAGMA st
   const result = client.migrate();
   const inspection = client.inspect();
 
-  assert.equal(result.appliedMigrationCount, 9);
-  assert.equal(inspection.appliedMigrationCount, 9);
+  assert.equal(result.appliedMigrationCount, 10);
+  assert.equal(inspection.appliedMigrationCount, 10);
   assert.equal(inspection.pragmas.journalMode, 'wal');
   assert.equal(inspection.pragmas.foreignKeys, 1);
   assert.equal(inspection.tables.length, 24);
@@ -102,7 +102,7 @@ test('V4Migration: upgrades V3 database non-destructively and executes backfills
 
   // Perform migration to V4
   const migrationResult = client.migrate();
-  assert.equal(migrationResult.appliedMigrationCount, 9);
+  assert.equal(migrationResult.appliedMigrationCount, 10);
   assert.equal(migrationResult.accountsSchemaVerified, true);
   assert.equal(migrationResult.legacyFriendBindingsSchemaVerified, true);
   assert.equal(migrationResult.legacyScheduleImportsSchemaVerified, true);
@@ -155,7 +155,7 @@ test('V4Migration: upgrades V3 database non-destructively and executes backfills
 
   // Idempotency: re-running migration is safe and doesn't duplicate backfills
   const repeatMigration = client.migrate();
-  assert.equal(repeatMigration.appliedMigrationCount, 9);
+  assert.equal(repeatMigration.appliedMigrationCount, 10);
 
   const sqliteAfter = new BetterSqlite3(databasePath, { readonly: true });
   try {

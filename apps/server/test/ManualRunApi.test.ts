@@ -164,6 +164,29 @@ test('Manual Run POST revalidates state after a successful preflight', async (co
   assert.equal(fixture.runnerFactory.createCount, 0);
 });
 
+test('Manual Run fails closed while an Account is transaction-A PROVISIONING', async (context) => {
+  const fixture = await createFixture(context, enabledEnvironment());
+  new AccountRepository(fixture.application.database).update(fixture.accountId, {
+    profileState: 'PROVISIONING',
+  });
+
+  const preflight = await fixture.application.server.inject({
+    method: 'GET',
+    url: preflightUrl(fixture),
+    headers: { cookie: fixture.session.cookieHeader },
+  });
+  assert.equal(preflight.statusCode, 404, preflight.body);
+  assert.equal(preflight.json().error.code, 'ACCOUNT_NOT_FOUND');
+  const response = await post(fixture, {
+    templateId: fixture.templateId,
+    acknowledgeRealSend: true,
+  });
+  assert.equal(response.statusCode, 404, response.body);
+  assert.equal(response.json().error.code, 'ACCOUNT_NOT_FOUND');
+  assert.equal(fixture.runnerFactory.createCount, 0);
+  assert.equal(new DailyRunRepository(fixture.application.database).list().length, 0);
+});
+
 test('Manual Run refuses an original BusinessDate when the revalidation date changes', async (context) => {
   const fixture = await createFixture(context, enabledEnvironment());
   let step = 0;

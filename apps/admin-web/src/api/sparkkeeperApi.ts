@@ -1,8 +1,9 @@
 import type {
   Account,
+  AccountLoginSessionSummary,
+  ActiveAccountLoginResponse,
   AuthSessionResponseData,
   ConfigureScheduleInput,
-  CreateAccountInput,
   DailyRun,
   Friend,
   FriendConfigurationInput,
@@ -25,10 +26,15 @@ import type {
   UpdateAccountInput,
   UpdateFriendInput,
   UpdateMessageTemplateInput,
+  StartAccountLoginInput,
+  StartAccountLoginResponse,
 } from '../types/api';
 import { ApiClient, type ApiClientOptions, type FetchImplementation } from './client';
 import {
   parseAccount,
+  parseAccountLoginSessionSummary,
+  parseActiveAccountLogin,
+  parseStartAccountLogin,
   parseAccounts,
   parseAuthSessionResponse,
   parseDailyRun,
@@ -61,7 +67,18 @@ export interface SparkKeeperApi {
   getRuntimeStatus(signal?: AbortSignal): Promise<RuntimeStatus>;
   listAccounts(signal?: AbortSignal): Promise<Account[]>;
   getAccount(accountId: string, signal?: AbortSignal): Promise<Account>;
-  createAccount(input: CreateAccountInput, signal?: AbortSignal): Promise<Account>;
+  startAccountLogin(
+    input: StartAccountLoginInput,
+    idempotencyKey: string,
+    signal?: AbortSignal,
+  ): Promise<StartAccountLoginResponse>;
+  getActiveAccountLogin(signal?: AbortSignal): Promise<ActiveAccountLoginResponse>;
+  getAccountLogin(sessionId: string, signal?: AbortSignal): Promise<AccountLoginSessionSummary>;
+  cancelAccountLogin(
+    sessionId: string,
+    expectedUpdatedAt: string,
+    signal?: AbortSignal,
+  ): Promise<AccountLoginSessionSummary>;
   updateAccount(
     accountId: string,
     input: UpdateAccountInput,
@@ -126,8 +143,31 @@ export function createSparkKeeperApi(
     listAccounts: (signal) => client.get('/accounts', parseAccounts, signal),
     getAccount: (accountId, signal) =>
       client.get(`/accounts/${encodeURIComponent(accountId)}`, parseAccount, signal),
-    createAccount: (input, signal) =>
-      client.mutate('POST', '/accounts', input, parseAccount, signal),
+    startAccountLogin: (input, idempotencyKey, signal) =>
+      client.mutateIdempotent(
+        'POST',
+        '/account-login-sessions',
+        input,
+        parseStartAccountLogin,
+        idempotencyKey,
+        signal,
+      ),
+    getActiveAccountLogin: (signal) =>
+      client.get('/account-login-sessions/active', parseActiveAccountLogin, signal),
+    getAccountLogin: (sessionId, signal) =>
+      client.get(
+        `/account-login-sessions/${encodeURIComponent(sessionId)}`,
+        parseAccountLoginSessionSummary,
+        signal,
+      ),
+    cancelAccountLogin: (sessionId, expectedUpdatedAt, signal) =>
+      client.mutate(
+        'POST',
+        `/account-login-sessions/${encodeURIComponent(sessionId)}/cancel`,
+        { expectedUpdatedAt },
+        parseAccountLoginSessionSummary,
+        signal,
+      ),
     updateAccount: (accountId, input, signal) =>
       client.mutate(
         'PATCH',

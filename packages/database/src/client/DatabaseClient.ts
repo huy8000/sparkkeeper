@@ -300,6 +300,7 @@ const EXPECTED_ACCOUNT_LOGIN_SESSION_COLUMNS: readonly DatabaseColumnState[] = [
   { name: 'failure_code', type: 'TEXT', notNull: false, primaryKey: false },
   { name: 'created_at', type: 'INTEGER', notNull: true, primaryKey: false },
   { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'idempotency_key_digest', type: 'TEXT', notNull: false, primaryKey: false },
 ];
 
 const EXPECTED_AVATAR_ASSET_COLUMNS: readonly DatabaseColumnState[] = [

@@ -39,7 +39,7 @@
 - mutation DTO 带 `expectedUpdatedAt` 或 `expectedVersion` 时，冲突返回 409；
 - async mutation 返回 202 与 durable ID；
 - browser/send/onboarding/sync POST 客户端不得自动 retry；网络不确定时通过 GET 查询；
-- Send/Test mutation 强制 `Idempotency-Key`，最大 128 ASCII chars，按 Admin+endpoint namespace 存储。
+- Onboarding/Send/Test mutation 强制 `Idempotency-Key`，最大 128 printable ASCII chars，按 Admin+endpoint namespace 存储 digest，不记录原值。
 
 ### 1.4 通用错误
 
@@ -83,16 +83,20 @@ V4-2 的 milestone authority 是 [V4-2 Implementation Specification](./specs/v4-
 | -------------------------------------------- | ----- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `GET /accounts`                              | S     | cursor/filter                                                | Account summaries（same-origin avatar URL）                                             | read-only                                                                                       |
 | `GET /accounts/:accountId`                   | S     | —                                                            | Account detail + profile/auth/sync derived status                                       | read-only；无 absolute profile path                                                             |
-| `POST /account-login-sessions`               | M + I | `{purpose:"ADD_ACCOUNT"}` 或 `{purpose:"RELOGIN",accountId}` | `202 {loginSessionId,status,expiresAt,consolePath}`                                     | reserve slot/profile lease；创建 durable session；启动 ephemeral console；绝不发送              |
-| `GET /account-login-sessions/:id`            | S     | —                                                            | status、expiresAt、safe failureCode、`resultAccountId?`                                 | read-only；READY 后 server 可自动 finalize Account                                              |
-| `POST /account-login-sessions/:id/cancel`    | M     | `{expectedUpdatedAt}`                                        | session summary                                                                         | 关闭 console/browser、释放 lease、staging profile quarantine/cleanup、Audit                     |
-| `GET /account-login-sessions/:id/console`    | S     | HTML request                                                 | no-store no-frame console shell                                                         | 每次校验 active session/TTL；不返回 VNC password/internal port                                  |
-| `GET /account-login-sessions/:id/console/ws` | S     | WebSocket upgrade                                            | proxied noVNC stream                                                                    | 持续校验 session；完成/过期即关闭                                                               |
+| `POST /account-login-sessions`               | M + I | `Idempotency-Key`；`{purpose:"ADD_ACCOUNT"}` 或 `{purpose:"RELOGIN",accountId}` | `202 {loginSessionId,status,expiresAt,consolePath}` | reserve global slot/profile lease；创建 durable session；启动 ephemeral console；绝不发送       |
+| `GET /account-login-sessions/active`         | S     | —                                                            | current Admin 的 active safe summary 或 null                                             | refresh/recovery；不得暴露其他 Admin/Account                                                    |
+| `GET /account-login-sessions/:id`            | S     | —                                                            | status、expiresAt、safe failureCode、`resultAccountId?`                                 | owner-only read；READY 后 server 自动 finalize Account                                          |
+| `POST /account-login-sessions/:id/cancel`    | M     | `{expectedUpdatedAt}`                                        | session summary                                                                         | 仅 READY 前 CAS；关闭 console/browser、释放 lease、staging profile quarantine/cleanup、Audit    |
+| `GET /account-login-sessions/:id/console`    | S     | HTML request                                                 | no-store no-frame console shell                                                         | owner/active/TTL/lease 校验；不返回 VNC password/internal port                                  |
+| `GET /account-login-sessions/:id/console/assets/*` | S | allowlisted local asset                                     | authenticated pinned noVNC asset                                                        | no traversal/CDN/source map                                                                      |
+| `GET /account-login-sessions/:id/console/ws` | S     | same-origin WebSocket upgrade                                | proxied noVNC stream                                                                    | owner/active/TTL/lease 连续校验；完成/过期/认证失效即关闭                                       |
 | `POST /accounts/:accountId/auth-checks`      | M + I | `{}`                                                         | `202 {operationId}`                                                                     | account profile lease、normal `/chat` auth check；不 sync、不发送                               |
 | `GET /account-auth-checks/:operationId`      | S     | —                                                            | `{operationId,accountId,status,resultLoginStatus?,failureCode?,startedAt?,finishedAt?}` | read-only；不返回页面证据/路径                                                                  |
 | `POST /accounts/:accountId/unbind`           | D     | `{confirmationText,expectedUpdatedAt}`                       | Account detail（UNBOUND）                                                               | cancel operations、disable Tasks、quarantine profile、Contacts unavailable、Audit；不删 history |
 
 Account 自动创建发生在 AccountLoginSession READY 后的 server-side completion state machine，不允许客户端提交 displayName/secUid/profile path。
+
+V4-3 的 milestone authority 是 [V4-3 Implementation Specification](./specs/v4-3-implementation-spec.md)。V4-3 只实现上表的 AccountLoginSession start/active/status/cancel/console 与既有 Account read surface；`auth-checks` 和 `unbind` 保留为 future draft，不属于 V4-3。
 
 ## 5. Contacts / Sync / Identity / Legacy Binding
 

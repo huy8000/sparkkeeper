@@ -10,6 +10,7 @@ import AccountOverviewPage from '../pages/AccountOverviewPage.vue';
 import AccountSchedulePage from '../pages/AccountSchedulePage.vue';
 import AccountsPage from '../pages/AccountsPage.vue';
 import LoginPage from '../pages/LoginPage.vue';
+import AccountLoginSessionPage from '../pages/AccountLoginSessionPage.vue';
 import OverviewPage from '../pages/OverviewPage.vue';
 import NotFoundPage from '../pages/NotFoundPage.vue';
 import NotificationsPage from '../pages/NotificationsPage.vue';
@@ -89,6 +90,11 @@ export function createAdminRouter(authController?: AuthController): Router {
             path: 'accounts',
             component: AccountsPage,
             meta: { title: 'nav.accounts', section: 'accounts' },
+          },
+          {
+            path: 'account-login-sessions/:sessionId',
+            component: AccountLoginSessionPage,
+            meta: { title: 'accountLogin.title', section: 'accounts' },
           },
           {
             path: 'accounts/:accountId',

@@ -2,6 +2,8 @@ export {
   BrowserSession,
   BrowserSessionError,
   type BrowserSessionHandle,
+  type BrowserProcessTrackingOptions,
+  type BrowserSessionOptions,
 } from './browser/BrowserSession.js';
 export {
   DEFAULT_BROWSER_LOCALE,
@@ -15,6 +17,9 @@ export {
 export {
   AuthDetectionError,
   AuthDetector,
+  AccountIdentityExtractionError,
+  AccountOnboardingDetector,
+  DouyinAccountIdentityExtractor,
   ContactResolver,
   DOUYIN_CHAT_URL,
   DouyinChatPage,
@@ -30,6 +35,8 @@ export {
   type AuthDetectionResult,
   type AuthDetectorOptions,
   type AuthStatus,
+  type AccountIdentityExtractionErrorCode,
+  type AccountOnboardingDetectionResult,
   type ChatReadinessResult,
   type ContactConversationSource,
   type ContactResolveResult,

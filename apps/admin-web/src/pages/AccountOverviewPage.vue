@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 
 import {
   invalidatesWorkspaceFriends,
@@ -19,10 +20,44 @@ import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useRequest } from '../composables/useRequest';
 import { useTranslation } from '../i18n';
 import { formatTimestamp } from '../utils/format';
+import { ApiError } from '../api/client';
+import { useApiErrorText } from '../composables/useApiErrorText';
 
 const app = useAdminApp();
+const router = useRouter();
 const workspace = useAccountWorkspace();
 const { t } = useTranslation();
+const { apiErrorText } = useApiErrorText();
+const reloginBusy = ref(false);
+const reloginError = ref<ApiError | null>(null);
+const reloginKey = ref<string | null>(null);
+
+async function startRelogin(): Promise<void> {
+  if (reloginBusy.value) return;
+  reloginBusy.value = true;
+  reloginError.value = null;
+  reloginKey.value ??= globalThis.crypto.randomUUID();
+  try {
+    const result = await app.api.startAccountLogin(
+      { purpose: 'RELOGIN', accountId: workspace.accountId.value },
+      reloginKey.value,
+    );
+    await router.push(`/account-login-sessions/${result.session.id}`);
+  } catch (error) {
+    reloginError.value =
+      error instanceof ApiError
+        ? error
+        : new ApiError('UNEXPECTED_ERROR', t('common.unexpectedError'), 0, 'MALFORMED');
+    if (reloginError.value.kind === 'NETWORK') {
+      const active = await app.api.getActiveAccountLogin().catch(() => null);
+      if (active?.session?.accountId === workspace.accountId.value) {
+        await router.push(`/account-login-sessions/${active.session.id}`);
+      }
+    }
+  } finally {
+    reloginBusy.value = false;
+  }
+}
 const friends = useRequest((signal) => app.api.listFriends(workspace.accountId.value, signal));
 const schedules = useRequest((signal) => app.api.listSchedules(workspace.accountId.value, signal));
 const runs = useRequest((signal) =>
@@ -84,7 +119,16 @@ const hasRefreshError = computed(
         <h3>{{ t('accountOverviewTab.title') }}</h3>
         <p>{{ t('accountOverviewTab.subtitle') }}</p>
       </div>
+      <button
+        class="button button--secondary"
+        type="button"
+        :disabled="reloginBusy"
+        @click="startRelogin"
+      >
+        {{ t('accountLogin.relogin') }}
+      </button>
     </header>
+    <p v-if="reloginError" role="alert">{{ apiErrorText(reloginError) }}</p>
 
     <section
       class="account-readiness-card"

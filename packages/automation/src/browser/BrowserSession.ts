@@ -11,6 +11,15 @@ export interface BrowserSessionHandle {
   readonly page: Page;
 }
 
+export interface BrowserProcessTrackingOptions {
+  readonly launcherExecutablePath: string;
+  readonly identityFilePath: string;
+}
+
+export interface BrowserSessionOptions {
+  readonly processTracking?: BrowserProcessTrackingOptions;
+}
+
 export class BrowserSessionError extends Error {
   public constructor(message: string, options?: ErrorOptions) {
     super(message, options);
@@ -25,7 +34,10 @@ export class BrowserSession {
   private startOperation: Promise<BrowserSessionHandle> | undefined;
   private closeOperation: Promise<void> | undefined;
 
-  public constructor(private readonly config: BrowserSessionConfig) {}
+  public constructor(
+    private readonly config: BrowserSessionConfig,
+    private readonly options: BrowserSessionOptions = {},
+  ) {}
 
   public isRunning(): boolean {
     return this.state === 'running' && this.context !== undefined;
@@ -88,11 +100,24 @@ export class BrowserSession {
   }
 
   protected launchContext(): Promise<BrowserContext> {
+    const tracking = this.options.processTracking;
+    const trackedLaunchOptions =
+      tracking === undefined
+        ? {}
+        : {
+            executablePath: tracking.launcherExecutablePath,
+            env: {
+              ...definedEnvironment(process.env),
+              SPARKKEEPER_CHROMIUM_EXECUTABLE: chromium.executablePath(),
+              SPARKKEEPER_CHROMIUM_IDENTITY_FILE: tracking.identityFilePath,
+            },
+          };
     return chromium.launchPersistentContext(this.config.userDataDir, {
       headless: this.config.headless,
       locale: this.config.locale,
       timezoneId: this.config.timezoneId,
       viewport: this.config.viewport,
+      ...trackedLaunchOptions,
     });
   }
 
@@ -122,10 +147,9 @@ export class BrowserSession {
         throw cause;
       }
 
-      throw new BrowserSessionError(
-        `Failed to start persistent Chromium with profile "${this.config.userDataDir}".`,
-        { cause },
-      );
+      throw new BrowserSessionError('Failed to start the persistent Chromium browser session.', {
+        cause,
+      });
     }
   }
 
@@ -176,10 +200,9 @@ export class BrowserSession {
       await context.close();
     } catch (cause) {
       if (this.context === context) {
-        throw new BrowserSessionError(
-          `Failed to close persistent Chromium using profile "${this.config.userDataDir}".`,
-          { cause },
-        );
+        throw new BrowserSessionError('Failed to close the persistent Chromium browser session.', {
+          cause,
+        });
       }
     } finally {
       if (this.context === context) {
@@ -229,4 +252,10 @@ export class BrowserSession {
     this.page = undefined;
     this.state = 'idle';
   }
+}
+
+function definedEnvironment(environment: NodeJS.ProcessEnv): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(environment).filter((entry): entry is [string, string] => entry[1] !== undefined),
+  );
 }

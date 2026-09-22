@@ -139,13 +139,27 @@ export class ApiClient {
     return this.request(method, path, parser, signal, body);
   }
 
+  async mutateIdempotent<T, TBody>(
+    method: 'POST' | 'PATCH' | 'PUT' | 'DELETE',
+    path: string,
+    body: TBody,
+    parser: Parser<T>,
+    idempotencyKey: string,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    if (!/^[\x20-\x7e]{1,128}$/u.test(idempotencyKey) || idempotencyKey.trim() !== idempotencyKey) {
+      throw new ApiError('VALIDATION_ERROR', 'Invalid idempotency key.', 0, 'MALFORMED');
+    }
+    return this.request(method, path, parser, signal, body, { idempotencyKey });
+  }
+
   private async request<T>(
     method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
     path: string,
     parser: Parser<T>,
     signal?: AbortSignal,
     body?: unknown,
-    options?: { readonly isLogin?: boolean },
+    options?: { readonly isLogin?: boolean; readonly idempotencyKey?: string },
   ): Promise<T> {
     const headers: Record<string, string> = {
       Accept: 'application/json',
@@ -158,6 +172,9 @@ export class ApiClient {
         const csrfToken = this.csrfTokenProvider?.();
         if (csrfToken) {
           headers[CSRF_HEADER] = csrfToken;
+        }
+        if (options?.idempotencyKey !== undefined) {
+          headers['Idempotency-Key'] = options.idempotencyKey;
         }
       }
     }

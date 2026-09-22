@@ -265,7 +265,7 @@ test('retry state and original message snapshot persist through close, reopen an
 
   const reopened = createDatabase({ databasePath: fixture.databasePath });
   context.after(() => reopened.close());
-  assert.equal(reopened.migrate().appliedMigrationCount, 9);
+  assert.equal(reopened.migrate().appliedMigrationCount, 10);
   const persisted = new SendRecordRepository(reopened).findById(fixture.record.id);
   assert.equal(persisted?.status, 'RETRY_WAIT');
   assert.equal(persisted?.attemptCount, 1);

@@ -297,7 +297,7 @@ export const zhCN: TranslationSchema = {
   },
   accountsPage: {
     title: '已配置的账号',
-    subtitle: '查看账号元数据与登录状态。',
+    subtitle: '通过受保护的登录会话添加抖音账号。',
     create: '创建账号',
     createPanelTitle: '创建账号',
     createPanelDescription: '配置一个本地账号记录。',
@@ -309,6 +309,30 @@ export const zhCN: TranslationSchema = {
     columnEnabled: '启用状态',
     columnLoginStatus: '登录状态',
     columnUpdated: '更新时间',
+  },
+  accountLogin: {
+    title: '抖音账号登录',
+    add: '添加抖音账号',
+    relogin: '重新登录',
+    purpose: '流程',
+    instructions: '打开受保护的控制台并手动完成扫码登录。本页面不处理凭证或二维码内容。',
+    activeNotice: '已有登录流程正在进行。',
+    viewSession: '查看登录会话',
+    remaining: '剩余 {seconds} 秒',
+    openConsole: '打开受保护控制台',
+    cancel: '取消登录',
+    failed: '失败代码',
+    status: {
+      PENDING: '待启动',
+      STARTING: '正在启动',
+      AWAITING_USER: '等待手动登录',
+      READY_DETECTED: '已检测到登录',
+      COMPLETING: '正在完成账号档案',
+      COMPLETED: '已完成',
+      EXPIRED: '已过期',
+      CANCELLED: '已取消',
+      FAILED: '失败',
+    },
   },
   account: {
     backToAccounts: '← 账号',
@@ -347,7 +371,7 @@ export const zhCN: TranslationSchema = {
       unknownTitle: '登录状态需要关注',
       readyTitle: '已就绪，可执行已配置的自动化',
       authExpiredDescription:
-        'SparkKeeper 已停止该账号的安全发送流程。登录维护必须在本页面之外完成。',
+        'SparkKeeper 已停止该账号的安全发送流程。可通过重新登录更新账号档案。',
       unknownDescription: 'SparkKeeper 目前无法确认持久浏览器会话。未知状态不会被视为就绪。',
       readyDescription:
         '登录状态已就绪。自动化仍需遵循下方显示的账号、好友、执行计划与服务端关卡。',

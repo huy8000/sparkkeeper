@@ -8,6 +8,7 @@ export function registerAuthRoutes(
   server: FastifyInstance,
   services: ApiServices,
   config: HttpConfig,
+  onAdminSessionInvalidated?: () => void,
 ): void {
   // POST /api/auth/login (Class L)
   server.post(
@@ -103,7 +104,8 @@ export function registerAuthRoutes(
       const now = request.authContext?.now ?? new Date();
 
       if (token) {
-        services.sessions.logout(token, now);
+        const result = services.sessions.logout(token, now);
+        if (result.outcome === 'SUCCESS') onAdminSessionInvalidated?.();
       }
 
       reply.setCookie(config.cookie.name, '', {

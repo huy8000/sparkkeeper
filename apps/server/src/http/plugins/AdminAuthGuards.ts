@@ -146,7 +146,7 @@ export function registerAdminAuthGuards(
 
     // Class L: Public login endpoint
     if (authClass === 'L') {
-      assertOriginAndFetchMetadata(request, config);
+      assertSameOriginRequest(request, config);
       assertJsonContentType(request);
       return;
     }
@@ -190,7 +190,7 @@ export function registerAdminAuthGuards(
 
     // Class M & R: Protected mutation checks
     if (authClass === 'M' || authClass === 'R') {
-      assertOriginAndFetchMetadata(request, config);
+      assertSameOriginRequest(request, config);
       assertJsonContentType(request);
 
       // Validate session-bound CSRF token
@@ -221,7 +221,7 @@ export function registerAdminAuthGuards(
   };
 }
 
-function assertOriginAndFetchMetadata(request: FastifyRequest, config: HttpConfig): void {
+export function assertSameOriginRequest(request: FastifyRequest, config: HttpConfig): void {
   // 1. Host / Authority check
   const host = request.headers.host?.toLowerCase();
   if (host !== config.canonicalAuthority.toLowerCase()) {

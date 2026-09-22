@@ -26,7 +26,7 @@ function createFailingAdapter(): ArgonAdapter {
     },
   };
 }
-import { createDatabase } from '@sparkkeeper/database';
+import { AccountRepository, createDatabase } from '@sparkkeeper/database';
 import {
   bootstrapTestAdmin,
   createAuthenticatedTestSession,
@@ -387,9 +387,9 @@ test('A02 - complete sentinel matrix: injected into real surfaces, absent from a
       () => undefined,
     );
     // CSRF rejection with request-body marker injected in the actual payload.
-    await injectAuthenticated(app, session, {
-      method: 'POST',
-      url: '/api/accounts',
+    const csrfRejected = await injectAuthenticated(app, session, {
+      method: 'PATCH',
+      url: '/api/accounts/00000000-0000-4000-8000-000000000001',
       payload: { name: bodyMarker },
       headers: {
         'user-agent': uaSentinel,
@@ -397,6 +397,8 @@ test('A02 - complete sentinel matrix: injected into real surfaces, absent from a
         'x-sparkkeeper-csrf': 'deliberately-invalid-csrf-token-43charsxx',
       },
     });
+    assert.equal(csrfRejected.statusCode, 403);
+    assert.equal(JSON.parse(csrfRejected.body).error.code, 'CSRF_REJECTED');
     // invalid cookie (actual Cookie header with raw token shape)
     await app.server.inject({
       method: 'GET',
@@ -1589,13 +1591,14 @@ test('A20/A21 - origin/fetch table on real L and M routes with hasher=0 and hand
 
     const composed = await composeWithObservedHasher(ctx);
     let bizHandlerCalls = 0;
+    const account = new AccountRepository(ctx.app.database).create({ name: 'A20 Control Account' });
     const configuration = ctx.app.services.configuration as unknown as {
-      createAccount: (...a: unknown[]) => unknown;
+      updateAccount: (...a: unknown[]) => unknown;
     };
-    const originalCreate = configuration.createAccount.bind(configuration);
-    (configuration as Record<string, unknown>)['createAccount'] = (...a: unknown[]) => {
+    const originalUpdate = configuration.updateAccount.bind(configuration);
+    (configuration as Record<string, unknown>)['updateAccount'] = (...a: unknown[]) => {
       bizHandlerCalls += 1;
-      return originalCreate(...a);
+      return originalUpdate(...a);
     };
 
     const post = async (
@@ -1614,8 +1617,8 @@ test('A20/A21 - origin/fetch table on real L and M routes with hasher=0 and hand
         }) as never;
       }
       return composed.server.inject({
-        method: 'POST',
-        url: '/api/accounts',
+        method: 'PATCH',
+        url: `/api/accounts/${account.id}`,
         headers,
         payload: { name: 'A20 Probe' } as Record<string, unknown>,
       }) as never;
@@ -1809,11 +1812,11 @@ test('A20/A21 - origin/fetch table on real L and M routes with hasher=0 and hand
     assert.equal(composed.verifyCalls(), 0, 'hasher not entered');
     assert.equal(bizHandlerCalls, 0, 'mutation business handler not entered');
 
-    // Control: the same mutation with valid headers succeeds (201), proving
+    // Control: the same mutation with valid headers succeeds (200), proving
     // the marker can leave zero only because the guard rejected.
     const control = await composed.server.inject({
-      method: 'POST',
-      url: '/api/accounts',
+      method: 'PATCH',
+      url: `/api/accounts/${account.id}`,
       headers: {
         cookie: baseSession.cookie,
         host: canonicalAuthority,
@@ -1824,7 +1827,7 @@ test('A20/A21 - origin/fetch table on real L and M routes with hasher=0 and hand
       },
       payload: { name: 'A20 Control' } as Record<string, unknown>,
     });
-    assert.equal(control.statusCode, 201);
+    assert.equal(control.statusCode, 200);
     assert.equal(bizHandlerCalls, 1);
     await composed.close();
 
@@ -1887,27 +1890,34 @@ test('A22 - every registered M route rejects missing/bad CSRF with handler=0 (in
 
     // Per-route side-effect markers: every handler service method for these
     // mutations is counted; a rejected proof must never enter business logic.
-    const sideEffectTargets: Array<[string, () => unknown]> = [
-      ['auth.logout', () => ctx.app.services.sessions],
-      ['configuration.createAccount', () => ctx.app.services.configuration],
-    ];
-    void sideEffectTargets;
     let handlerCalls = 0;
     const configuration = ctx.app.services.configuration as unknown as {
-      createAccount: (...a: unknown[]) => unknown;
+      updateAccount: (...a: unknown[]) => unknown;
     };
-    const originalCreate = configuration.createAccount.bind(configuration);
-    (configuration as Record<string, unknown>)['createAccount'] = (...a: unknown[]) => {
+    const originalUpdate = configuration.updateAccount.bind(configuration);
+    (configuration as Record<string, unknown>)['updateAccount'] = (...a: unknown[]) => {
       handlerCalls += 1;
-      return originalCreate(...a);
+      return originalUpdate(...a);
     };
+    for (const method of ['start', 'cancel'] as const) {
+      const original = ctx.app.onboarding[method].bind(ctx.app.onboarding) as (
+        ...a: unknown[]
+      ) => unknown;
+      (ctx.app.onboarding as unknown as Record<string, unknown>)[method] = (...a: unknown[]) => {
+        handlerCalls += 1;
+        return original(...a);
+      };
+    }
 
     // Fixture bodies keyed by ACTUAL registered method + normalized path.
     // Routes registered with concrete parameter URLs; fixtures use the same
     // literal paths the inventory reports.
     const bodies: Record<string, unknown> = {
       'POST /api/auth/logout': {},
-      'POST /api/accounts': { name: 'A22 Probe' },
+      'POST /api/account-login-sessions': { purpose: 'ADD_ACCOUNT' },
+      'POST /api/account-login-sessions/:sessionId/cancel': {
+        expectedUpdatedAt: '2030-01-01T00:00:00.000Z',
+      },
       'PATCH /api/accounts/:accountId': { name: 'A22 Probe' },
       'POST /api/accounts/:accountId/friends': { displayName: 'A22 Probe' },
       'PATCH /api/friends/:friendId': { displayName: 'A22 Probe' },
@@ -1942,6 +1952,7 @@ test('A22 - every registered M route rejects missing/bad CSRF with handler=0 (in
       const body = bodies[key];
       assert.ok(body !== undefined, `M route lacks CSRF-proof fixture: ${key}`);
       const concreteUrl = route.url
+        .replace(':sessionId', '00000000-0000-4000-8000-000000000007')
         .replace(':accountId', '00000000-0000-4000-8000-000000000001')
         .replace(':friendId', '00000000-0000-4000-8000-000000000002')
         .replace(':templateId', '00000000-0000-4000-8000-000000000006');
@@ -2052,12 +2063,13 @@ test('A24 - valid same-origin session drives /me, protected GET, mutation, and l
       headers: { cookie: session.cookieHeader },
     });
     assert.equal(biz.statusCode, 200);
+    const account = new AccountRepository(ctx.app.database).create({ name: 'A24 Control Account' });
     const mutation = await injectAuthenticated(ctx.app, session, {
-      method: 'POST',
-      url: '/api/accounts',
+      method: 'PATCH',
+      url: `/api/accounts/${account.id}`,
       payload: { name: 'A24 Probe' },
     });
-    assert.equal(mutation.statusCode, 201);
+    assert.equal(mutation.statusCode, 200);
     const out = await injectAuthenticated(ctx.app, session, {
       method: 'POST',
       url: '/api/auth/logout',
@@ -2793,6 +2805,8 @@ test('A31 - one complete seam/resource mapping: V4-1 busy contract, non-semantic
       'second',
       'secondConnection',
       'earlyCheck',
+      'database', // DatabaseClient.close(): void
+      'owner', // ws.close(): void; the test separately awaits its close event
     ]);
     const testDir = path.resolve(process.cwd(), 'test');
     const unawaitedCloses: string[] = [];
@@ -2830,6 +2844,7 @@ test('A31 - one complete seam/resource mapping: V4-1 busy contract, non-semantic
 test('V42-RR-02 - exact bidirectional route map derived from Fastify registration metadata', async () => {
   const ctx = createCtx();
   try {
+    await ctx.app.server.ready();
     // Reviewed expected map: method + path -> expected auth class. This map is
     // the acceptance source; the actual side derives purely from onRoute
     // metadata. Both directions must match exactly.
@@ -2840,7 +2855,13 @@ test('V42-RR-02 - exact bidirectional route map derived from Fastify registratio
       'POST /api/auth/logout': 'M',
       'GET /api/runtime/status': 'S',
       'GET /api/accounts': 'S',
-      'POST /api/accounts': 'M',
+      'POST /api/account-login-sessions': 'M',
+      'GET /api/account-login-sessions/active': 'S',
+      'GET /api/account-login-sessions/:sessionId': 'S',
+      'POST /api/account-login-sessions/:sessionId/cancel': 'M',
+      'GET /api/account-login-sessions/:sessionId/console': 'S',
+      'GET /api/account-login-sessions/:sessionId/console/assets/*': 'S',
+      'GET /api/account-login-sessions/:sessionId/console/ws': 'S',
       'GET /api/accounts/:accountId': 'S',
       'PATCH /api/accounts/:accountId': 'M',
       'GET /api/accounts/:accountId/friends': 'S',
@@ -2904,11 +2925,11 @@ test('V42-RR-02 - exact bidirectional route map derived from Fastify registratio
     const logical = inventory.filter((r) => r.method !== 'HEAD');
     const classes = { P: 0, L: 0, S: 0, M: 0, R: 0 } as Record<string, number>;
     for (const route of logical) classes[route.authClass] += 1;
-    assert.equal(logical.length, 30);
+    assert.equal(logical.length, 36);
     assert.equal(classes.P, 1);
     assert.equal(classes.L, 1);
-    assert.equal(classes.S, 17);
-    assert.equal(classes.M, 11);
+    assert.equal(classes.S, 22);
+    assert.equal(classes.M, 12);
     assert.equal(classes.R, 0);
 
     // Registration-time rejection of an invalid truthy class (runtime config).
@@ -3570,8 +3591,8 @@ test('F16 - cross-origin/bad Host/protocol: 403 ORIGIN_REJECTED with hasher=0 (c
         DEFAULT_TEST_PASSWORD,
       );
       const mRes = await composed.server.inject({
-        method: 'POST',
-        url: '/api/accounts',
+        method: 'PATCH',
+        url: '/api/accounts/00000000-0000-4000-8000-000000000001',
         headers: {
           cookie: mSession.cookieHeader,
           host: ctx.app.config.canonicalAuthority,
@@ -3633,8 +3654,11 @@ test('F16 - cross-origin/bad Host/protocol: 403 ORIGIN_REJECTED with hasher=0 (c
       ];
       for (const [label, headers] of schemeCases) {
         const schemeRes = await composed.server.inject({
-          method: 'POST',
-          url: headers.cookie === undefined ? '/api/auth/login' : '/api/accounts',
+          method: headers.cookie === undefined ? 'POST' : 'PATCH',
+          url:
+            headers.cookie === undefined
+              ? '/api/auth/login'
+              : '/api/accounts/00000000-0000-4000-8000-000000000001',
           headers,
           payload:
             headers.cookie === undefined
@@ -3684,16 +3708,16 @@ test('F17 - missing Origin with valid Referer: 403 ORIGIN_REJECTED on L and M, n
     // M route: mutation rejected; business handler never entered.
     let handlerCalls = 0;
     const configuration = ctx.app.services.configuration as unknown as {
-      createAccount: (...a: unknown[]) => unknown;
+      updateAccount: (...a: unknown[]) => unknown;
     };
-    const original = configuration.createAccount.bind(configuration);
-    (configuration as Record<string, unknown>)['createAccount'] = (...a: unknown[]) => {
+    const original = configuration.updateAccount.bind(configuration);
+    (configuration as Record<string, unknown>)['updateAccount'] = (...a: unknown[]) => {
       handlerCalls += 1;
       return original(...a);
     };
     const mRes = await ctx.app.server.inject({
-      method: 'POST',
-      url: '/api/accounts',
+      method: 'PATCH',
+      url: '/api/accounts/00000000-0000-4000-8000-000000000001',
       headers: {
         cookie: session.cookieHeader,
         host: ctx.app.config.canonicalAuthority,
@@ -3739,16 +3763,16 @@ test('F18 - missing/bad Fetch Metadata: 403 ORIGIN_REJECTED, no downstream marke
     );
     let handlerCalls = 0;
     const configuration = ctx.app.services.configuration as unknown as {
-      createAccount: (...a: unknown[]) => unknown;
+      updateAccount: (...a: unknown[]) => unknown;
     };
-    const original = configuration.createAccount.bind(configuration);
-    (configuration as Record<string, unknown>)['createAccount'] = (...a: unknown[]) => {
+    const original = configuration.updateAccount.bind(configuration);
+    (configuration as Record<string, unknown>)['updateAccount'] = (...a: unknown[]) => {
       handlerCalls += 1;
       return original(...a);
     };
     const mRes = await ctx.app.server.inject({
-      method: 'POST',
-      url: '/api/accounts',
+      method: 'PATCH',
+      url: '/api/accounts/00000000-0000-4000-8000-000000000001',
       headers: {
         cookie: session.cookieHeader,
         host: ctx.app.config.canonicalAuthority,
@@ -3776,18 +3800,30 @@ test('F19 - every M route: missing/duplicate/bad/cross-session CSRF with handler
 
     let handlerCalls = 0;
     const configuration = ctx.app.services.configuration as unknown as {
-      createAccount: (...a: unknown[]) => unknown;
+      updateAccount: (...a: unknown[]) => unknown;
     };
-    const original = configuration.createAccount.bind(configuration);
-    (configuration as Record<string, unknown>)['createAccount'] = (...a: unknown[]) => {
+    const original = configuration.updateAccount.bind(configuration);
+    (configuration as Record<string, unknown>)['updateAccount'] = (...a: unknown[]) => {
       handlerCalls += 1;
       return original(...a);
     };
+    for (const method of ['start', 'cancel'] as const) {
+      const originalOnboarding = ctx.app.onboarding[method].bind(ctx.app.onboarding) as (
+        ...a: unknown[]
+      ) => unknown;
+      (ctx.app.onboarding as unknown as Record<string, unknown>)[method] = (...a: unknown[]) => {
+        handlerCalls += 1;
+        return originalOnboarding(...a);
+      };
+    }
 
     // Fixture bodies keyed by the ACTUAL registered URL (registration-derived).
     const bodies: Record<string, unknown> = {
       'POST /api/auth/logout': {},
-      'POST /api/accounts': { name: 'F19 Probe' },
+      'POST /api/account-login-sessions': { purpose: 'ADD_ACCOUNT' },
+      'POST /api/account-login-sessions/:sessionId/cancel': {
+        expectedUpdatedAt: '2030-01-01T00:00:00.000Z',
+      },
       'PATCH /api/accounts/:accountId': { name: 'F19 Probe' },
       'POST /api/accounts/:accountId/friends': { displayName: 'F19 Probe' },
       'PATCH /api/friends/:friendId': { displayName: 'F19 Probe' },
@@ -3824,6 +3860,7 @@ test('F19 - every M route: missing/duplicate/bad/cross-session CSRF with handler
       const body = bodies[key];
       assert.ok(body !== undefined, `F19 fixture missing for ${key}`);
       const concreteUrl = route.url
+        .replace(':sessionId', '00000000-0000-4000-8000-000000000007')
         .replace(':accountId', '00000000-0000-4000-8000-000000000001')
         .replace(':friendId', '00000000-0000-4000-8000-000000000002')
         .replace(':templateId', '00000000-0000-4000-8000-000000000006');
@@ -4702,7 +4739,10 @@ test('V42-RR-03: every actual M route executes missing and wrong media -> 400 VA
     // Route-specific valid body fixture table; coverage-checked BOTH ways.
     const bodies: Record<string, unknown> = {
       'POST /api/auth/logout': {},
-      'POST /api/accounts': { name: 'Media Probe' },
+      'POST /api/account-login-sessions': { purpose: 'ADD_ACCOUNT' },
+      'POST /api/account-login-sessions/:sessionId/cancel': {
+        expectedUpdatedAt: '2030-01-01T00:00:00.000Z',
+      },
       'PATCH /api/accounts/:accountId': { name: 'Media Probe' },
       'POST /api/accounts/:accountId/friends': { displayName: 'Media Probe' },
       'PATCH /api/friends/:friendId': { displayName: 'Media Probe' },
@@ -4742,7 +4782,6 @@ test('V42-RR-03: every actual M route executes missing and wrong media -> 400 VA
     let businessHandlerCalls = 0;
     const configuration = app.services.configuration as unknown as Record<string, unknown>;
     for (const method of [
-      'createAccount',
       'updateAccount',
       'createFriend',
       'updateFriend',
@@ -4752,6 +4791,13 @@ test('V42-RR-03: every actual M route executes missing and wrong media -> 400 VA
     ]) {
       const original = (configuration[method] as (...a: unknown[]) => unknown).bind(configuration);
       configuration[method] = (...a: unknown[]) => {
+        businessHandlerCalls += 1;
+        return original(...a);
+      };
+    }
+    for (const method of ['start', 'cancel'] as const) {
+      const original = app.onboarding[method].bind(app.onboarding) as (...a: unknown[]) => unknown;
+      (app.onboarding as unknown as Record<string, unknown>)[method] = (...a: unknown[]) => {
         businessHandlerCalls += 1;
         return original(...a);
       };
@@ -4795,6 +4841,7 @@ test('V42-RR-03: every actual M route executes missing and wrong media -> 400 VA
       const body = bodies[key];
       assert.ok(body !== undefined, `missing media-proof fixture for actual M route: ${key}`);
       const concreteUrl = route.url
+        .replace(':sessionId', '00000000-0000-4000-8000-000000000007')
         .replace(':accountId', '00000000-0000-4000-8000-000000000001')
         .replace(':friendId', '00000000-0000-4000-8000-000000000002')
         .replace(':templateId', '00000000-0000-4000-8000-000000000006');

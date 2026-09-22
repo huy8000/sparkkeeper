@@ -8,9 +8,11 @@
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
     "admin:bootstrap": "tsx src/admin-cli.ts bootstrap",
+    "native:build": "node scripts/build-native.mjs",
+    "prebuild": "pnpm native:build",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "pretest": "pnpm --filter @sparkkeeper/shared build && pnpm --filter @sparkkeeper/message-engine build && pnpm --filter @sparkkeeper/database build && pnpm --filter @sparkkeeper/automation build && pnpm --filter @sparkkeeper/notifier build",
+    "pretest": "pnpm native:build && pnpm --filter @sparkkeeper/shared build && pnpm --filter @sparkkeeper/message-engine build && pnpm --filter @sparkkeeper/database build && pnpm --filter @sparkkeeper/automation build && pnpm --filter @sparkkeeper/notifier build",
     "test": "tsx --test test/*.test.ts",
     "scheduler:smoke": "pnpm pretest && tsx scripts/scheduler-smoke.ts",
     "retry:smoke": "pnpm pretest && tsx scripts/retry-smoke.ts",
@@ -22,6 +24,8 @@
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
+    "@fastify/websocket": "^11.3.1",
+    "@novnc/novnc": "^1.7.0",
     "@sparkkeeper/automation": "workspace:*",
     "@sparkkeeper/database": "workspace:*",
     "@sparkkeeper/message-engine": "workspace:*",
@@ -30,6 +34,10 @@
     "argon2": "^0.45.1",
     "fastify": "^5.12.1",
     "pino": "^10.3.1",
-    "playwright": "^1.62.1"
+    "playwright": "^1.62.1",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
   }
 }
