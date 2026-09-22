@@ -1,5 +1,12 @@
 export { AuthDetectionError, AuthDetector } from './AuthDetector.js';
 export {
+  AccountIdentityExtractionError,
+  AccountOnboardingDetector,
+  DouyinAccountIdentityExtractor,
+  type AccountIdentityExtractionErrorCode,
+  type AccountOnboardingDetectionResult,
+} from './AccountOnboardingDetector.js';
+export {
   ContactResolver,
   normalizeDisplayName,
   type ContactConversationSource,

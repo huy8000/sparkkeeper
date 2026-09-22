@@ -22,7 +22,7 @@ test('read-only database access inspects V1 state without changing business data
 
   assert.throws(() => client.ping(), /closed/);
 
-  assert.equal(inspection.appliedMigrationCount, 9);
+  assert.equal(inspection.appliedMigrationCount, 10);
   assert.equal(inspection.pragmas.journalMode, 'wal');
   assert.equal(inspection.pragmas.foreignKeys, 1);
   assert.equal(inspection.pragmas.busyTimeoutMs, 5_000);

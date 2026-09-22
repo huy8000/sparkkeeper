@@ -1,5 +1,6 @@
 import {
   AccountRepository,
+  AccountOnboardingRepository,
   AdminAuthRepository,
   createDatabase,
   DailyRunRepository,
@@ -11,7 +12,9 @@ import {
   SystemEventRepository,
   type DatabaseClient,
   type DatabaseEnvironment,
+  resolveDatabasePath,
 } from '@sparkkeeper/database';
+import path from 'node:path';
 import {
   NodeWebhookTransport,
   NotificationService,
@@ -49,6 +52,10 @@ import {
 import { ProductionManualRunRunnerFactory } from './services/ProductionManualRunRunnerFactory.js';
 import { NotificationConfigurationService } from './services/NotificationConfigurationService.js';
 import { DatabaseNotificationConfigurationSource } from '../notifications/DatabaseNotificationConfigurationSource.js';
+import { AccountProfileStore } from '../onboarding/AccountProfileStore.js';
+import { AccountConsoleConnections } from '../onboarding/AuthenticatedConsoleGateway.js';
+import { AccountLoginWorkerSupervisor } from '../onboarding/AccountLoginWorkerSupervisor.js';
+import { AccountOnboardingManager } from '../onboarding/AccountOnboardingManager.js';
 
 export type ServerEnvironment = HttpEnvironment &
   SchedulerEnvironment &
@@ -72,6 +79,7 @@ export interface CreateApiApplicationOptions {
   >;
   readonly notificationAddressPolicy?: Pick<PublicDestinationPolicy, 'resolve'>;
   readonly notificationProvider?: NotificationProvider;
+  readonly onboardingSupervisor?: AccountLoginWorkerSupervisor;
 }
 
 export interface ApiApplication {
@@ -83,6 +91,9 @@ export interface ApiApplication {
   readonly manualRun: ManualRunService;
   readonly notifications: NotificationService;
   readonly services: ApiServices;
+  readonly onboarding: AccountOnboardingManager;
+  recoverOnboarding(): Promise<void>;
+  stopOnboarding(): Promise<void>;
   closeHttp(): Promise<void>;
   stopManualRuns(): Promise<void>;
   stopNotifications(): Promise<void>;
@@ -223,6 +234,25 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
     const rateLimiter = new LoginRateLimiter();
     const authService = new AdminAuthenticationService(authRepo, hasher, rateLimiter);
     const sessionService = new AdminSessionService(authRepo);
+    const onboardingRepository = new AccountOnboardingRepository(database);
+    const profileDataDirectory = path.dirname(
+      resolveDatabasePath({
+        ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+        ...(options.databasePath === undefined ? {} : { databasePath: options.databasePath }),
+        environment: databaseEnvironment,
+      }),
+    );
+    const onboardingSupervisor = options.onboardingSupervisor ?? new AccountLoginWorkerSupervisor();
+    const consoleConnections = new AccountConsoleConnections();
+    const onboarding = new AccountOnboardingManager({
+      repository: onboardingRepository,
+      profiles: new AccountProfileStore(profileDataDirectory),
+      supervisor: onboardingSupervisor,
+      invalidateConsole: (sessionId) => consoleConnections.close(sessionId),
+      releaseGateOpen: () =>
+        !schedulerConfig.enabled && !manualRunConfig.enabled && !schedulerConfig.allowRealSend,
+      ...(options.clock === undefined ? {} : { clock: options.clock }),
+    });
 
     const services = {
       status: new StatusService({
@@ -284,6 +314,16 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
           redact: { paths: [...HTTP_REDACT_PATHS], censor: '[REDACTED]' },
         } satisfies FastifyServerOptions['logger']),
       clock: options.clock,
+      onboarding,
+      console: {
+        config,
+        sessions: sessionService,
+        loginSessions: onboardingRepository,
+        supervisor: onboardingSupervisor,
+        leaseOwner: onboarding,
+        connections: consoleConnections,
+        clock: options.clock,
+      },
       realtime: {
         events: realtime,
         ...(options.sseHeartbeatMs === undefined ? {} : { heartbeatMs: options.sseHeartbeatMs }),
@@ -299,6 +339,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
     let databaseClosed = false;
     let manualRunsStopped = false;
     let notificationsStopped = false;
+    let onboardingStopped = false;
     const closeHttp = async (): Promise<void> => {
       if (httpClosed) return;
       await server.close();
@@ -319,6 +360,12 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
       await notifications.stop();
       notificationsStopped = true;
     };
+    const stopOnboarding = async (): Promise<void> => {
+      if (onboardingStopped) return;
+      consoleConnections.closeAll();
+      await onboarding.stop();
+      onboardingStopped = true;
+    };
     return {
       server,
       authGuards,
@@ -328,21 +375,28 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
       manualRun,
       notifications,
       services,
+      onboarding,
+      recoverOnboarding: () => onboarding.recover(),
+      stopOnboarding,
       closeHttp,
       stopManualRuns,
       stopNotifications,
       closeDatabase,
       async close(): Promise<void> {
         try {
-          await closeHttp();
+          await stopOnboarding();
         } finally {
           try {
-            await stopManualRuns();
+            await closeHttp();
           } finally {
             try {
-              await stopNotifications();
+              await stopManualRuns();
             } finally {
-              closeDatabase();
+              try {
+                await stopNotifications();
+              } finally {
+                closeDatabase();
+              }
             }
           }
         }

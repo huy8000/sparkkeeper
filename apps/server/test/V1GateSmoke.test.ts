@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
+
+import { createDatabase } from '@sparkkeeper/database';
 
 import { runV1GateSmoke } from '../src/readiness/V1GateSmoke.js';
 
@@ -18,4 +23,15 @@ test('V1 Gate smoke verifies release preparation entirely offline with safe outp
   assert.equal(output.includes('Alice'), false);
   assert.equal(output.includes('Bob'), false);
   assert.equal(output.includes('Hello'), false);
+});
+
+test('V1 Gate smoke migration inventory includes 0009', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'sparkkeeper-v1-migration-'));
+  const client = createDatabase({ databasePath: path.join(directory, 'test.db') });
+  try {
+    assert.equal(client.migrate().appliedMigrationCount, 10);
+  } finally {
+    client.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

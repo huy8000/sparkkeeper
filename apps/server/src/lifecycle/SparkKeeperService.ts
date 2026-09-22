@@ -44,6 +44,7 @@ export class SparkKeeperService {
     });
     this.application = application;
     try {
+      await application.recoverOnboarding();
       const address = await listenApiApplication(application);
       const schedulerService =
         this.scheduler ??
@@ -72,6 +73,11 @@ export class SparkKeeperService {
     this.application = undefined;
     let firstError: unknown;
 
+    try {
+      await application?.stopOnboarding();
+    } catch (error) {
+      firstError = error;
+    }
     try {
       await application?.closeHttp();
     } catch (error) {

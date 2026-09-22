@@ -109,6 +109,21 @@ export {
   type CreateAccountLoginSessionInput,
 } from './AccountLoginSessionRepository.js';
 export {
+  ACCOUNT_LOGIN_SESSION_TTL_MS,
+  ACCOUNT_ONBOARDING_DB_BUSY_TIMEOUT_MS,
+  AccountOnboardingRepository,
+  AccountOnboardingRepositoryError,
+  type AccountOnboardingRecoverySnapshot,
+  type AccountOnboardingSession,
+  type BeginCompletionResult,
+  type CancelAccountOnboardingResult,
+  type FinishCompletionResult,
+  type InteractiveTransitionResult,
+  type ReadyAccountOnboardingResult,
+  type StartAccountOnboardingInput,
+  type StartAccountOnboardingResult,
+} from './AccountOnboardingRepository.js';
+export {
   AvatarAssetRepository,
   AvatarAssetRepositoryError,
   type AvatarAsset,

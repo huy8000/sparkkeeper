@@ -50,6 +50,26 @@ test('list returns all persisted accounts', (context) => {
   );
 });
 
+test('ordinary reads hide PROVISIONING accounts unless internal recovery opts in', (context) => {
+  const { client } = createTemporaryDatabase(context);
+  const repository = new AccountRepository(client);
+  const provisioning = repository.create({
+    name: 'Transaction A Account',
+    profileState: 'PROVISIONING',
+    douyinSecUid: 'provisioning-sec-uid',
+  });
+
+  assert.equal(repository.findById(provisioning.id), undefined);
+  assert.equal(repository.findBySecUid('provisioning-sec-uid'), undefined);
+  assert.deepEqual(repository.list(), []);
+  assert.equal(
+    repository.findById(provisioning.id, { includeProvisioning: true })?.id,
+    provisioning.id,
+  );
+  assert.deepEqual(repository.list({ includeProvisioning: true }), [provisioning]);
+  assert.equal(repository.update(provisioning.id, { enabled: false }), undefined);
+});
+
 test('update changes enabled state, login status, login time, name, and updatedAt', (context) => {
   const { client } = createTemporaryDatabase(context);
   const repository = new AccountRepository(client);
@@ -126,6 +146,6 @@ test('account data persists after close, reopen, and a second migration', (conte
   assert.equal(persisted?.name, 'Test Account');
   assert.equal(persisted?.enabled, false);
   assert.equal(persisted?.loginStatus, 'READY');
-  assert.equal(reopened.inspect().appliedMigrationCount, 9);
+  assert.equal(reopened.inspect().appliedMigrationCount, 10);
   reopened.close();
 });

@@ -299,7 +299,7 @@ export const enUS = {
   },
   accountsPage: {
     title: 'Configured accounts',
-    subtitle: 'View account metadata and login state.',
+    subtitle: 'Add a Douyin account through an authenticated login session.',
     create: 'Create account',
     createPanelTitle: 'Create account',
     createPanelDescription: 'Configure a local account record.',
@@ -311,6 +311,31 @@ export const enUS = {
     columnEnabled: 'Enabled',
     columnLoginStatus: 'Login status',
     columnUpdated: 'Updated',
+  },
+  accountLogin: {
+    title: 'Douyin account login',
+    add: 'Add Douyin account',
+    relogin: 'Relogin',
+    purpose: 'Flow',
+    instructions:
+      'Open the protected console and complete QR login manually. This page never handles credentials or QR contents.',
+    activeNotice: 'A login flow is already active.',
+    viewSession: 'View login session',
+    remaining: '{seconds} seconds remaining',
+    openConsole: 'Open protected console',
+    cancel: 'Cancel login',
+    failed: 'Failure code',
+    status: {
+      PENDING: 'Pending',
+      STARTING: 'Starting',
+      AWAITING_USER: 'Waiting for manual login',
+      READY_DETECTED: 'Login detected',
+      COMPLETING: 'Finalizing Account profile',
+      COMPLETED: 'Completed',
+      EXPIRED: 'Expired',
+      CANCELLED: 'Cancelled',
+      FAILED: 'Failed',
+    },
   },
   account: {
     backToAccounts: '← Accounts',
@@ -350,7 +375,7 @@ export const enUS = {
       unknownTitle: 'Login status needs attention',
       readyTitle: 'Ready for configured automation',
       authExpiredDescription:
-        'SparkKeeper has stopped the safe sending flow for this account. Login maintenance must be completed outside this page.',
+        'SparkKeeper has stopped the safe sending flow for this account. Use Relogin to renew the Account profile.',
       unknownDescription:
         'SparkKeeper cannot currently confirm the persistent browser session. Unknown is not treated as ready.',
       readyDescription:

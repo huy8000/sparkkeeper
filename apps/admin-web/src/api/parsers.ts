@@ -1,5 +1,7 @@
 import type {
   Account,
+  AccountLoginSessionSummary,
+  ActiveAccountLoginResponse,
   AdminUserDto,
   AuthSessionResponseData,
   DailyRun,
@@ -15,7 +17,9 @@ import type {
   Schedule,
   SendRecord,
   SystemEvent,
+  StartAccountLoginResponse,
 } from '../types/api';
+import { ACCOUNT_LOGIN_FAILURE_CODES, ACCOUNT_LOGIN_SESSION_STATUSES } from '@sparkkeeper/shared';
 
 export type Parser<T> = (value: unknown) => T | undefined;
 
@@ -329,6 +333,99 @@ export const parseAccount: Parser<Account> = (value) => {
     createdAt: createdAt!,
     updatedAt: updatedAt!,
   };
+};
+
+const LOGIN_SUMMARY_FIELDS = new Set([
+  'id',
+  'purpose',
+  'accountId',
+  'status',
+  'expiresAt',
+  'startedAt',
+  'readyDetectedAt',
+  'completedAt',
+  'updatedAt',
+  'consoleAvailable',
+  'cancellable',
+  'failureCode',
+  'resultAccountId',
+]);
+
+export const parseAccountLoginSessionSummary: Parser<AccountLoginSessionSummary> = (value) => {
+  const data = record(value);
+  if (data === undefined || Object.keys(data).some((key) => !LOGIN_SUMMARY_FIELDS.has(key))) {
+    return undefined;
+  }
+  const id = string(data.id);
+  const purpose = oneOf(data.purpose, ['ADD_ACCOUNT', 'RELOGIN'] as const);
+  const accountId = nullableString(data.accountId);
+  const status = oneOf(data.status, ACCOUNT_LOGIN_SESSION_STATUSES);
+  const expiresAt = string(data.expiresAt);
+  const startedAt = nullableString(data.startedAt);
+  const readyDetectedAt = nullableString(data.readyDetectedAt);
+  const completedAt = nullableString(data.completedAt);
+  const updatedAt = string(data.updatedAt);
+  const consoleAvailable = boolean(data.consoleAvailable);
+  const cancellable = boolean(data.cancellable);
+  const failureCode =
+    data.failureCode === null ? null : oneOf(data.failureCode, ACCOUNT_LOGIN_FAILURE_CODES);
+  const resultAccountId = nullableString(data.resultAccountId);
+  if (
+    [
+      id,
+      purpose,
+      accountId,
+      status,
+      expiresAt,
+      startedAt,
+      readyDetectedAt,
+      completedAt,
+      updatedAt,
+      consoleAvailable,
+      cancellable,
+      failureCode,
+      resultAccountId,
+    ].some((item) => item === undefined)
+  )
+    return undefined;
+  return {
+    id: id!,
+    purpose: purpose!,
+    accountId: accountId!,
+    status: status!,
+    expiresAt: expiresAt!,
+    startedAt: startedAt!,
+    readyDetectedAt: readyDetectedAt!,
+    completedAt: completedAt!,
+    updatedAt: updatedAt!,
+    consoleAvailable: consoleAvailable!,
+    cancellable: cancellable!,
+    failureCode: failureCode!,
+    resultAccountId: resultAccountId!,
+  };
+};
+
+export const parseActiveAccountLogin: Parser<ActiveAccountLoginResponse> = (value) => {
+  const data = record(value);
+  if (data === undefined || Object.keys(data).length !== 1 || !Object.hasOwn(data, 'session')) {
+    return undefined;
+  }
+  if (data.session === null) return { session: null };
+  const session = parseAccountLoginSessionSummary(data.session);
+  return session === undefined ? undefined : { session };
+};
+
+export const parseStartAccountLogin: Parser<StartAccountLoginResponse> = (value) => {
+  const data = record(value);
+  if (data === undefined || Object.keys(data).length !== 2) return undefined;
+  const session = parseAccountLoginSessionSummary(data.session);
+  const consolePath = string(data.consolePath);
+  if (
+    session === undefined ||
+    consolePath !== `/api/account-login-sessions/${encodeURIComponent(session.id)}/console`
+  )
+    return undefined;
+  return { session, consolePath };
 };
 
 export const parseFriend: Parser<Friend> = (value) => {

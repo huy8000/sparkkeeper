@@ -9,12 +9,16 @@ import {
   type AccountProfileState,
   type LoginStatus,
 } from '@sparkkeeper/shared';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, ne } from 'drizzle-orm';
 
 import type { DatabaseClient } from '../client/DatabaseClient.js';
 import { accounts, type AccountRow, type NewAccountRow } from '../schema/index.js';
 
 export type Account = AccountRow;
+
+export interface AccountReadOptions {
+  readonly includeProvisioning?: boolean;
+}
 
 export interface CreateAccountInput {
   readonly name: string;
@@ -137,9 +141,17 @@ export class AccountRepository {
     }
   }
 
-  findById(id: string): Account | undefined {
+  findById(id: string, options: AccountReadOptions = {}): Account | undefined {
     try {
-      return this.client.orm.select().from(accounts).where(eq(accounts.id, id)).get();
+      return this.client.orm
+        .select()
+        .from(accounts)
+        .where(
+          options.includeProvisioning === true
+            ? eq(accounts.id, id)
+            : and(eq(accounts.id, id), ne(accounts.profileState, 'PROVISIONING')),
+        )
+        .get();
     } catch (error) {
       throw new AccountRepositoryError('findById', 'Failed to find account by id.', error);
     }
@@ -154,26 +166,30 @@ export class AccountRepository {
       return this.client.orm
         .select()
         .from(accounts)
-        .where(eq(accounts.douyinSecUid, trimmed))
+        .where(and(eq(accounts.douyinSecUid, trimmed), ne(accounts.profileState, 'PROVISIONING')))
         .get();
     } catch (error) {
       throw new AccountRepositoryError('findBySecUid', 'Failed to find account by secUid.', error);
     }
   }
 
-  list(options?: { lifecycleStatus?: AccountLifecycleStatus }): Account[] {
+  list(
+    options: { lifecycleStatus?: AccountLifecycleStatus; includeProvisioning?: boolean } = {},
+  ): Account[] {
     try {
-      if (options?.lifecycleStatus !== undefined) {
-        return this.client.orm
-          .select()
-          .from(accounts)
-          .where(eq(accounts.lifecycleStatus, options.lifecycleStatus))
-          .orderBy(asc(accounts.createdAt), asc(accounts.id))
-          .all();
-      }
       return this.client.orm
         .select()
         .from(accounts)
+        .where(
+          and(
+            options.lifecycleStatus === undefined
+              ? undefined
+              : eq(accounts.lifecycleStatus, options.lifecycleStatus),
+            options.includeProvisioning === true
+              ? undefined
+              : ne(accounts.profileState, 'PROVISIONING'),
+          ),
+        )
         .orderBy(asc(accounts.createdAt), asc(accounts.id))
         .all();
     } catch (error) {

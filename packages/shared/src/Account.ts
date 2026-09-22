@@ -41,6 +41,23 @@ export const ACCOUNT_LOGIN_SESSION_STATUSES = [
 ] as const;
 export type AccountLoginSessionStatus = (typeof ACCOUNT_LOGIN_SESSION_STATUSES)[number];
 
+/** Public, owner-safe V4-3 session projection. Never includes browser or identity material. */
+export interface AccountLoginSessionSummary {
+  readonly id: string;
+  readonly purpose: AccountLoginPurpose;
+  readonly accountId: string | null;
+  readonly status: AccountLoginSessionStatus;
+  readonly expiresAt: string;
+  readonly startedAt: string | null;
+  readonly readyDetectedAt: string | null;
+  readonly completedAt: string | null;
+  readonly updatedAt: string;
+  readonly consoleAvailable: boolean;
+  readonly cancellable: boolean;
+  readonly failureCode: AccountLoginFailureCode | null;
+  readonly resultAccountId: string | null;
+}
+
 export function isAccountLoginSessionStatus(value: unknown): value is AccountLoginSessionStatus {
   return (
     typeof value === 'string' &&
@@ -74,6 +91,7 @@ export class AccountValidationError extends Error {
   readonly code:
     | 'INVALID_ACCOUNT_NAME'
     | 'INVALID_DOUYIN_ID'
+    | 'INVALID_DOUYIN_PROFILE'
     | 'INVALID_PROFILE_STATE'
     | 'INVALID_LIFECYCLE_STATUS';
 
@@ -104,4 +122,89 @@ export function normalizeOptionalIdentifier(value: string | null | undefined): s
     );
   }
   return trimmed;
+}
+
+export interface DouyinAccountIdentity {
+  readonly displayName: string;
+  readonly douyinSecUid: string | null;
+  readonly douyinUniqueId: string | null;
+  readonly douyinShortId: string | null;
+  readonly avatarRemoteUrl: string | null;
+}
+
+export interface DouyinAccountIdentityInput {
+  readonly displayName: string;
+  readonly douyinSecUid?: string | null;
+  readonly douyinUniqueId?: string | null;
+  readonly douyinShortId?: string | null;
+  readonly avatarRemoteUrl?: string | null;
+}
+
+function boundedTrimmed(
+  value: string | null | undefined,
+  fieldName: string,
+  maxCodePoints: number,
+): string | null {
+  const normalized = normalizeOptionalIdentifier(value);
+  if (normalized !== null && [...normalized].length > maxCodePoints) {
+    throw new AccountValidationError(
+      'INVALID_DOUYIN_PROFILE',
+      `${fieldName} exceeds ${maxCodePoints} Unicode code points.`,
+    );
+  }
+  return normalized;
+}
+
+export function validateDouyinAccountIdentity(
+  input: DouyinAccountIdentityInput,
+): DouyinAccountIdentity {
+  const displayName = input.displayName.trim();
+  if (displayName.length === 0 || [...displayName].length > 100) {
+    throw new AccountValidationError(
+      'INVALID_DOUYIN_PROFILE',
+      'Douyin displayName must contain 1 to 100 Unicode code points.',
+    );
+  }
+
+  const douyinSecUid = boundedTrimmed(input.douyinSecUid, 'douyinSecUid', 256);
+  const douyinUniqueId = boundedTrimmed(input.douyinUniqueId, 'douyinUniqueId', 256);
+  const douyinShortId = boundedTrimmed(input.douyinShortId, 'douyinShortId', 256);
+  const avatarRemoteUrl = boundedTrimmed(input.avatarRemoteUrl, 'avatarRemoteUrl', 2048);
+
+  if (douyinSecUid === null && douyinUniqueId === null) {
+    throw new AccountValidationError(
+      'INVALID_DOUYIN_PROFILE',
+      'Douyin identity requires secUid or uniqueId.',
+    );
+  }
+
+  if (avatarRemoteUrl !== null) {
+    let parsed: URL;
+    try {
+      parsed = new URL(avatarRemoteUrl);
+    } catch {
+      throw new AccountValidationError(
+        'INVALID_DOUYIN_PROFILE',
+        'avatarRemoteUrl must be an absolute HTTP(S) URL.',
+      );
+    }
+    if (
+      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+      parsed.username.length > 0 ||
+      parsed.password.length > 0
+    ) {
+      throw new AccountValidationError(
+        'INVALID_DOUYIN_PROFILE',
+        'avatarRemoteUrl must be an HTTP(S) URL without embedded credentials.',
+      );
+    }
+  }
+
+  return {
+    displayName,
+    douyinSecUid,
+    douyinUniqueId,
+    douyinShortId,
+    avatarRemoteUrl,
+  };
 }

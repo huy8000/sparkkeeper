@@ -68,6 +68,10 @@ export function createV1EightDatabase(context: TestContext): TemporaryDatabase {
   return createHistoricalDatabase(context, 'v1-eight', 8);
 }
 
+export function createV4FoundationDatabase(context: TestContext): TemporaryDatabase {
+  return createHistoricalDatabase(context, 'v4-foundation', 9);
+}
+
 export function insertLegacyAccount(
   databasePath: string,
   input: { id?: string; name: string; loginStatus?: string; nowMs?: number },

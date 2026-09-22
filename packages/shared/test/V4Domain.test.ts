@@ -68,6 +68,7 @@ import {
   validateContactDisplayName,
   validateCorrelationDigest,
   validateIdempotencyKey,
+  validateDouyinAccountIdentity,
   validateIdentityValue,
   validateOptionalContactString,
   validateResolutionNote,
@@ -190,6 +191,44 @@ test('Account domain enums, type guards, and validators', () => {
   assert.equal(normalizeOptionalIdentifier(null), null);
   assert.equal(normalizeOptionalIdentifier(undefined), null);
   assert.throws(() => normalizeOptionalIdentifier('   '), AccountValidationError);
+});
+
+test('Douyin Account identity validation is bounded and requires a stable public identifier', () => {
+  assert.deepEqual(
+    validateDouyinAccountIdentity({
+      displayName: '  Fixture Account  ',
+      douyinSecUid: ' sec-123 ',
+      avatarRemoteUrl: 'https://example.invalid/avatar.png',
+    }),
+    {
+      displayName: 'Fixture Account',
+      douyinSecUid: 'sec-123',
+      douyinUniqueId: null,
+      douyinShortId: null,
+      avatarRemoteUrl: 'https://example.invalid/avatar.png',
+    },
+  );
+  assert.throws(
+    () => validateDouyinAccountIdentity({ displayName: 'No stable id' }),
+    AccountValidationError,
+  );
+  assert.throws(
+    () =>
+      validateDouyinAccountIdentity({
+        displayName: 'a'.repeat(101),
+        douyinUniqueId: 'unique-1',
+      }),
+    AccountValidationError,
+  );
+  assert.throws(
+    () =>
+      validateDouyinAccountIdentity({
+        displayName: 'Fixture',
+        douyinUniqueId: 'unique-1',
+        avatarRemoteUrl: 'file:///private/avatar.png',
+      }),
+    AccountValidationError,
+  );
 });
 
 test('Contact domain enums, type guards, and validators', () => {
@@ -392,6 +431,10 @@ test('Execution domain enums, type guards, and validators', () => {
     'scheduled:task-1:2026-08-31',
   );
   assert.throws(() => validateIdempotencyKey('   '), ExecutionValidationError);
+  assert.equal(validateIdempotencyKey('a'.repeat(128)), 'a'.repeat(128));
+  assert.throws(() => validateIdempotencyKey('a'.repeat(129)), ExecutionValidationError);
+  assert.throws(() => validateIdempotencyKey('contains\nnewline'), ExecutionValidationError);
+  assert.throws(() => validateIdempotencyKey('非-ascii'), ExecutionValidationError);
 
   assert.equal(
     validateResolutionNote('  User checked physical device.  '),

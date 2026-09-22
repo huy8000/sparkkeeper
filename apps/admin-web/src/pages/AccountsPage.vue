@@ -1,36 +1,31 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 
 import { useAdminApp } from '../appContext';
-import AccountForm from '../components/AccountForm.vue';
 import AuthStatusBadge from '../components/AuthStatusBadge.vue';
 import BackgroundRefreshIndicator from '../components/BackgroundRefreshIndicator.vue';
 import EmptyState from '../components/EmptyState.vue';
 import ErrorState from '../components/ErrorState.vue';
-import FormPanel from '../components/FormPanel.vue';
 import LoadingState from '../components/LoadingState.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import StaleDataNotice from '../components/StaleDataNotice.vue';
 import { useRequest } from '../composables/useRequest';
 import { useApiErrorText } from '../composables/useApiErrorText';
-import { useMutation } from '../composables/useMutation';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { useTranslation } from '../i18n';
 import { formatTimestamp } from '../utils/format';
-import type { CreateAccountInput } from '../types/api';
+import { ApiError } from '../api/client';
 
 const app = useAdminApp();
+const router = useRouter();
 const { t } = useTranslation();
 const { apiErrorText } = useApiErrorText();
 const accounts = useRequest((signal) => app.api.listAccounts(signal));
-const creating = ref(false);
-const {
-  submitting,
-  error: formError,
-  success: successMessage,
-  execute,
-  clearError,
-} = useMutation();
+const active = useRequest((signal) => app.api.getActiveAccountLogin(signal));
+const submitting = ref(false);
+const startError = ref<ApiError | null>(null);
+const idempotencyKey = ref<string | null>(null);
 watch(app.refreshVersion, () => void accounts.load());
 useRealtimeRefresh(
   app.realtime,
@@ -38,20 +33,31 @@ useRealtimeRefresh(
   () => void accounts.load(),
 );
 
-async function createAccount(input: CreateAccountInput): Promise<void> {
-  await execute(
-    () => app.api.createAccount(input),
-    async () => {
-      creating.value = false;
-      await accounts.load();
-    },
-    t('accountsPage.savedToast'),
-  );
-}
-
-function closeForm(): void {
-  creating.value = false;
-  clearError();
+async function startAddAccount(): Promise<void> {
+  if (submitting.value) return;
+  submitting.value = true;
+  startError.value = null;
+  idempotencyKey.value ??= globalThis.crypto.randomUUID();
+  try {
+    const result = await app.api.startAccountLogin(
+      { purpose: 'ADD_ACCOUNT' },
+      idempotencyKey.value,
+    );
+    await router.push(`/account-login-sessions/${result.session.id}`);
+  } catch (error) {
+    startError.value =
+      error instanceof ApiError
+        ? error
+        : new ApiError('UNEXPECTED_ERROR', t('common.unexpectedError'), 0, 'MALFORMED');
+    if (startError.value.kind === 'NETWORK') {
+      await active.load();
+      if (active.data.value?.session) {
+        await router.push(`/account-login-sessions/${active.data.value.session.id}`);
+      }
+    }
+  } finally {
+    submitting.value = false;
+  }
 }
 </script>
 
@@ -64,8 +70,13 @@ function closeForm(): void {
         <p>{{ t('accountsPage.subtitle') }}</p>
       </div>
       <div class="page-actions">
-        <button class="button button--primary" type="button" @click="creating = true">
-          {{ t('accountsPage.create') }}
+        <button
+          class="button button--primary"
+          type="button"
+          :disabled="submitting || Boolean(active.data.value?.session)"
+          @click="startAddAccount"
+        >
+          {{ t('accountLogin.add') }}
         </button>
         <button class="button button--secondary" type="button" @click="accounts.load">
           {{ t('common.refresh') }}
@@ -78,20 +89,13 @@ function closeForm(): void {
       :error="accounts.refreshError.value"
       @retry="accounts.load"
     />
-    <p v-if="successMessage" class="success-message" role="status">{{ successMessage }}</p>
-    <FormPanel
-      v-if="creating"
-      :title="t('accountsPage.createPanelTitle')"
-      :description="t('accountsPage.createPanelDescription')"
-      @cancel="closeForm"
-    >
-      <AccountForm
-        :submitting="submitting"
-        :server-error="apiErrorText(formError)"
-        @submit="createAccount"
-        @cancel="closeForm"
-      />
-    </FormPanel>
+    <p v-if="startError" class="error-message" role="alert">{{ apiErrorText(startError) }}</p>
+    <p v-if="active.data.value?.session" class="notice" role="status">
+      {{ t('accountLogin.activeNotice') }}
+      <RouterLink :to="`/account-login-sessions/${active.data.value.session.id}`">{{
+        t('accountLogin.viewSession')
+      }}</RouterLink>
+    </p>
     <LoadingState v-if="accounts.initialLoading.value" :label="t('accountsPage.loading')" />
     <ErrorState
       v-else-if="accounts.initialError.value"

@@ -55,6 +55,7 @@ export interface CreateAccountLoginSessionInput {
   readonly accountId?: string | null;
   readonly pendingAccountId?: string | null;
   readonly createdByAdminUserId: string;
+  readonly idempotencyKeyDigest?: string | null;
   readonly expiresAt: Date;
   readonly now?: Date;
 }
@@ -144,6 +145,15 @@ export class AccountLoginSessionRepository {
 
     const accountId = normalizeOptionalIdentifier(input.accountId);
     const pendingAccountId = normalizeOptionalIdentifier(input.pendingAccountId);
+    const idempotencyKeyDigest = normalizeOptionalIdentifier(input.idempotencyKeyDigest);
+
+    if (idempotencyKeyDigest !== null && !/^[0-9a-f]{64}$/.test(idempotencyKeyDigest)) {
+      throw new AccountLoginSessionRepositoryError(
+        'create',
+        'VALIDATION_ERROR',
+        'idempotencyKeyDigest must be a lowercase SHA-256 hex digest.',
+      );
+    }
 
     if (input.purpose === 'ADD_ACCOUNT') {
       if (accountId !== null || pendingAccountId === null) {
@@ -187,6 +197,7 @@ export class AccountLoginSessionRepository {
       failureCode: null,
       createdAt: now,
       updatedAt: now,
+      idempotencyKeyDigest,
     };
 
     const deadlineAt = performance.now() + LOGIN_SESSION_CONTENTION_DEADLINE_MS;

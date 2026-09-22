@@ -134,7 +134,7 @@ test('an unexpected context close clears all running state', async () => {
   assert.equal(context.closeCalls, 0);
 });
 
-test('startup errors include the persistent profile path', async () => {
+test('startup errors preserve the cause without exposing the persistent profile path', async () => {
   class FailingBrowserSession extends BrowserSession {
     protected override async launchContext(): Promise<BrowserContext> {
       throw new Error('Chromium executable unavailable');
@@ -147,7 +147,7 @@ test('startup errors include the persistent profile path', async () => {
     session.start(),
     (error: unknown) =>
       error instanceof BrowserSessionError &&
-      error.message.includes(TEST_CONFIG.userDataDir) &&
+      !error.message.includes(TEST_CONFIG.userDataDir) &&
       error.cause instanceof Error,
   );
   assert.equal(session.isRunning(), false);

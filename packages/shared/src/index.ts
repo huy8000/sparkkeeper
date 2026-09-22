@@ -97,11 +97,15 @@ export {
   isAccountProfileState,
   normalizeOptionalIdentifier,
   validateAccountName,
+  validateDouyinAccountIdentity,
   type AccountLifecycleStatus,
   type AccountLoginFailureCode,
+  type AccountLoginSessionSummary,
   type AccountLoginPurpose,
   type AccountLoginSessionStatus,
   type AccountProfileState,
+  type DouyinAccountIdentity,
+  type DouyinAccountIdentityInput,
 } from './Account.js';
 
 export {

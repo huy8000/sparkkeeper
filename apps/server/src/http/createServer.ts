@@ -1,4 +1,5 @@
 import fastifyCookie from '@fastify/cookie';
+import fastifyWebsocket from '@fastify/websocket';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 
 import { resolveHttpConfig, type HttpConfig } from './config/HttpConfig.js';
@@ -8,6 +9,7 @@ import {
   type AdminAuthGuardRegistration,
 } from './plugins/AdminAuthGuards.js';
 import { registerAccountRoutes } from './routes/accountRoutes.js';
+import { registerAccountLoginSessionRoutes } from './routes/accountLoginSessionRoutes.js';
 import { registerAuthRoutes } from './routes/authRoutes.js';
 import { registerConfigurationRoutes } from './routes/configurationRoutes.js';
 import {
@@ -20,6 +22,11 @@ import { registerNotificationRoutes } from './routes/notificationRoutes.js';
 import { registerStatusRoutes } from './routes/statusRoutes.js';
 import { failure } from './serializers/envelope.js';
 import type { ApiServices } from './services/ApiServices.js';
+import type { AccountOnboardingManager } from '../onboarding/AccountOnboardingManager.js';
+import {
+  registerAuthenticatedConsoleRoutes,
+  type ConsoleRouteOptions,
+} from '../onboarding/AuthenticatedConsoleGateway.js';
 
 export interface CreateServerOptions {
   readonly services: ApiServices;
@@ -27,6 +34,8 @@ export interface CreateServerOptions {
   readonly logger?: FastifyServerOptions['logger'] | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly realtime?: RealtimeRouteRegistrationOptions | undefined;
+  readonly console?: ConsoleRouteOptions | undefined;
+  readonly onboarding?: AccountOnboardingManager | undefined;
 }
 
 export interface CreatedServer {
@@ -55,6 +64,7 @@ export function createServer(options: CreateServerOptions): CreatedServer {
 
   // Register cookie parser
   server.register(fastifyCookie);
+  server.register(fastifyWebsocket);
 
   // Register auth and mutation guards (returns actual registration metadata)
   const authGuards = registerAdminAuthGuards(server, {
@@ -97,13 +107,23 @@ export function createServer(options: CreateServerOptions): CreatedServer {
       .send(failure('INTERNAL_ERROR', 'An unexpected internal error occurred.'));
   });
 
-  registerAuthRoutes(server, options.services, config);
+  registerAuthRoutes(server, options.services, config, () =>
+    options.console?.connections?.closeAll(),
+  );
   registerStatusRoutes(server, options.services);
   registerAccountRoutes(server, options.services);
+  if (options.onboarding !== undefined) {
+    registerAccountLoginSessionRoutes(server, options.onboarding);
+  }
   registerConfigurationRoutes(server, options.services);
   registerRunRoutes(server, options.services);
   registerManualRunRoutes(server, options.services);
   registerNotificationRoutes(server, options.services);
+  if (options.console !== undefined) {
+    server.register(async (consoleServer) => {
+      registerAuthenticatedConsoleRoutes(consoleServer, options.console!);
+    });
+  }
   if (options.realtime !== undefined) {
     registerRealtimeRoutes(server, {
       ...options.realtime,

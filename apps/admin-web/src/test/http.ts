@@ -60,8 +60,8 @@ export function installApiFetch(override?: TestHandler): ReturnType<typeof vi.fn
         return success(runtimeFixture);
       case 'GET /api/accounts':
         return success([accountFixture]);
-      case 'POST /api/accounts':
-        return success(accountFixture, 201);
+      case 'GET /api/account-login-sessions/active':
+        return success({ session: null });
       case `GET /api/accounts/${ACCOUNT_ID}`:
       case `PATCH /api/accounts/${ACCOUNT_ID}`:
         return success(accountFixture);

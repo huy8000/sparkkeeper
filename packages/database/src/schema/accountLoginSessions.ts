@@ -28,6 +28,7 @@ export const accountLoginSessions = sqliteTable(
     failureCode: text('failure_code').$type<AccountLoginFailureCode>(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+    idempotencyKeyDigest: text('idempotency_key_digest'),
   },
   (table) => [
     check(
@@ -59,11 +60,18 @@ export const accountLoginSessions = sqliteTable(
       'account_login_sessions_failure_check',
       sql`(${table.status} = 'FAILED' and ${table.failureCode} is not null) or (${table.status} != 'FAILED' and ${table.failureCode} is null)`,
     ),
+    check(
+      'account_login_sessions_idempotency_digest_check',
+      sql`${table.idempotencyKeyDigest} is null or (length(${table.idempotencyKeyDigest}) = 64 and ${table.idempotencyKeyDigest} not glob '*[^0-9a-f]*')`,
+    ),
     uniqueIndex('account_login_sessions_active_relogin_idx')
       .on(table.accountId)
       .where(
         sql`${table.accountId} is not null and ${table.status} in ('PENDING', 'STARTING', 'AWAITING_USER', 'READY_DETECTED', 'COMPLETING')`,
       ),
+    uniqueIndex('account_login_sessions_admin_idempotency_unique_idx')
+      .on(table.createdByAdminUserId, table.idempotencyKeyDigest)
+      .where(sql`${table.idempotencyKeyDigest} is not null`),
   ],
 );
 

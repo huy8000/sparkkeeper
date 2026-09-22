@@ -3,7 +3,6 @@ import type { FastifyInstance } from 'fastify';
 import {
   accountSchema,
   configureScheduleBodySchema,
-  createAccountBodySchema,
   createFriendBodySchema,
   createTemplateBodySchema,
   friendSchema,
@@ -20,7 +19,6 @@ import {
 import { success } from '../serializers/envelope.js';
 import type {
   ConfigureScheduleInput,
-  CreateAccountConfigInput,
   FriendConfigInput,
   TemplateConfigInput,
   UpdateAccountConfigInput,
@@ -40,22 +38,6 @@ interface TemplateParams {
 }
 
 export function registerConfigurationRoutes(server: FastifyInstance, services: ApiServices): void {
-  server.post<{ Body: CreateAccountConfigInput }>(
-    '/api/accounts',
-    {
-      config: { auth: 'M' },
-      schema: {
-        body: createAccountBodySchema,
-        response: {
-          201: successEnvelopeSchema(accountSchema),
-          ...mutationErrorResponses,
-        },
-      },
-    },
-    async (request, reply) =>
-      reply.code(201).send(success(services.configuration.createAccount(request.body))),
-  );
-
   server.patch<{ Params: AccountParams; Body: UpdateAccountConfigInput }>(
     '/api/accounts/:accountId',
     {

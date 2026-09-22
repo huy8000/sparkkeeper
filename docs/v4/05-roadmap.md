@@ -42,6 +42,8 @@ V4-1 Foundation
 
 Branch：`feature/v4-1-data-model-foundation`
 
+Status：MERGED / ACCEPTED（PR #41）
+
 交付：
 
 - V4 shared domain types/validators；
@@ -59,6 +61,8 @@ Exit：fresh/upgrade/reopen/repeat migration PASS；零自动 Contact binding、
 ### V4-2 — Admin Authentication & Public Security Baseline
 
 Branch：`feature/v4-2-admin-authentication`
+
+Status：MERGED / ACCEPTED（PR #42）
 
 交付：
 
@@ -78,18 +82,22 @@ Exit：未认证只能访问 minimal health/login；no default password/setup pa
 
 Branch：`feature/v4-3-account-onboarding`
 
+Status：SPEC FROZEN / READY FOR IMPLEMENTATION
+
 交付：
 
-- AccountLoginSession manager/state machine/TTL/cancel/recovery；
+- AccountLoginSession manager/state machine/15-minute TTL/cancel/recovery；
+- global single login/relogin admission and browser-operation lease；
 - loopback-only authenticated console gateway；
-- staging→account-scoped profile lifecycle/lease；
-- user QR login READY detection；
-- account profile extraction and automatic Account creation；
-- relogin/AUTH_EXPIRED/unbind/quarantine；
-- Accounts UI onboarding/relogin/status；
-- controlled fixture/process tests。
+- Account-owned staging/final/quarantine profile lifecycle and reconciliation；
+- user QR login READY detection and minimum public Account identity extraction；
+- automatic Account completion and explicit Account-bound relogin；
+- Accounts/LoginSession minimal onboarding/relogin/status UI；
+- focused state-machine/concurrency/crash/security fixture tests。
 
-Exit：No-send Gate tests；真实 Account 验证留给单独 Gate B 授权。
+明确不包含：auth-check、unbind/hard delete、Contact Discovery、Resolver、send、Scheduler、private Douyin API、credential/token/cookie capture、CAPTCHA/risk-control bypass。
+
+Exit：No-send Gate tests；真实 Account 验证留给单独 Gate B 授权。Milestone authority 见 [V4-3 Implementation Specification](./specs/v4-3-implementation-spec.md)。
 
 ### V4-4 — Contact Discovery
 

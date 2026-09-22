@@ -101,6 +101,8 @@ test('AdminAuthApi: route classification inventory proves all non-health routes 
       { method: 'GET', url: '/api/auth/me' },
       { method: 'GET', url: '/api/runtime/status' },
       { method: 'GET', url: '/api/accounts' },
+      { method: 'GET', url: '/api/account-login-sessions/active' },
+      { method: 'GET', url: '/api/account-login-sessions/00000000-0000-4000-8000-000000000001' },
       { method: 'GET', url: '/api/accounts/00000000-0000-4000-8000-000000000001' },
       { method: 'GET', url: '/api/accounts/00000000-0000-4000-8000-000000000001/friends' },
       { method: 'GET', url: '/api/friends/00000000-0000-4000-8000-000000000002' },
@@ -121,7 +123,11 @@ test('AdminAuthApi: route classification inventory proves all non-health routes 
 
       // Class M (Mutation)
       { method: 'POST', url: '/api/auth/logout' },
-      { method: 'POST', url: '/api/accounts' },
+      { method: 'POST', url: '/api/account-login-sessions' },
+      {
+        method: 'POST',
+        url: '/api/account-login-sessions/00000000-0000-4000-8000-000000000001/cancel',
+      },
       { method: 'PATCH', url: '/api/accounts/00000000-0000-4000-8000-000000000001' },
       { method: 'POST', url: '/api/accounts/00000000-0000-4000-8000-000000000001/friends' },
       { method: 'PATCH', url: '/api/friends/00000000-0000-4000-8000-000000000002' },
@@ -968,8 +974,13 @@ test('AdminAuthApi: A22/A23 every Class M route strictly rejects missing, invali
       { method: 'POST' as const, url: '/api/auth/logout', payload: {} },
       {
         method: 'POST' as const,
-        url: '/api/accounts',
-        payload: { name: 'Test Account', accountType: 'MAIN' },
+        url: '/api/account-login-sessions',
+        payload: { purpose: 'ADD_ACCOUNT' },
+      },
+      {
+        method: 'POST' as const,
+        url: '/api/account-login-sessions/00000000-0000-4000-8000-000000000001/cancel',
+        payload: { expectedUpdatedAt: '2030-01-01T00:00:00.000Z' },
       },
       {
         method: 'PATCH' as const,

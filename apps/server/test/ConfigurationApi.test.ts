@@ -47,15 +47,16 @@ test('centralized local Admin mutation guard', async (context) => {
   const fixture = await createFixture(context);
   const { server } = fixture.application;
   const payload = { name: 'Guard Demo Account', enabled: true };
+  const accountUrl = `/api/accounts/${fixture.account.id}`;
 
   await context.test('accepts exact same-origin JSON with session and CSRF', async () => {
     const response = await server.inject({
-      method: 'POST',
-      url: '/api/accounts',
+      method: 'PATCH',
+      url: accountUrl,
       headers: mutationHeaders(fixture.session),
       payload,
     });
-    assert.equal(response.statusCode, 201);
+    assert.equal(response.statusCode, 200);
     assert.equal(response.json().success, true);
   });
 
@@ -65,8 +66,8 @@ test('centralized local Admin mutation guard', async (context) => {
       if (value === undefined) delete headers['x-sparkkeeper-csrf'];
       else headers['x-sparkkeeper-csrf'] = value;
       const response = await server.inject({
-        method: 'POST',
-        url: '/api/accounts',
+        method: 'PATCH',
+        url: accountUrl,
         headers,
         payload,
       });
@@ -82,8 +83,8 @@ test('centralized local Admin mutation guard', async (context) => {
       'null',
     ]) {
       const response = await server.inject({
-        method: 'POST',
-        url: '/api/accounts',
+        method: 'PATCH',
+        url: accountUrl,
         headers: mutationHeaders(fixture.session, { origin }),
         payload,
       });
@@ -94,8 +95,8 @@ test('centralized local Admin mutation guard', async (context) => {
   await context.test('blocks untrusted and spoof-like Host values exactly', async () => {
     for (const host of ['example.test', '127.0.0.1.evil.test:8080', 'localhost.evil:5173']) {
       const response = await server.inject({
-        method: 'POST',
-        url: '/api/accounts',
+        method: 'PATCH',
+        url: accountUrl,
         headers: mutationHeaders(fixture.session, { host }),
         payload,
       });
@@ -106,8 +107,8 @@ test('centralized local Admin mutation guard', async (context) => {
   await context.test('blocks non-JSON mutation media types', async () => {
     for (const contentType of ['application/x-www-form-urlencoded', 'text/plain']) {
       const response = await server.inject({
-        method: 'POST',
-        url: '/api/accounts',
+        method: 'PATCH',
+        url: accountUrl,
         headers: mutationHeaders(fixture.session, { 'content-type': contentType }),
         payload: 'name=Unsafe',
       });
@@ -134,15 +135,12 @@ test('Account configuration API', async (context) => {
   const fixture = await createFixture(context);
   const { server } = fixture.application;
 
-  await context.test('creates and trims an Account without writable runtime state', async () => {
+  await context.test('keeps legacy manual Account creation closed', async () => {
     const response = await mutate(server, fixture.session, 'POST', '/api/accounts', {
       name: '  Configured Demo Account  ',
       enabled: false,
     });
-    assert.equal(response.statusCode, 201);
-    assert.equal(response.json().data.name, 'Configured Demo Account');
-    assert.equal(response.json().data.enabled, false);
-    assert.equal(response.json().data.loginStatus, 'UNKNOWN');
+    assertError(response, 404, 'ROUTE_NOT_FOUND');
   });
 
   await context.test('updates name and enabled with exact PATCH semantics', async () => {
@@ -583,8 +581,8 @@ test('successful configuration mutations emit only safe CONFIG_CHANGED invalidat
   const account = await mutate(
     fixture.application.server,
     fixture.session,
-    'POST',
-    '/api/accounts',
+    'PATCH',
+    `/api/accounts/${fixture.account.id}`,
     {
       name: 'Realtime Demo Account',
     },

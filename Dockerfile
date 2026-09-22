@@ -28,7 +28,8 @@ RUN rm -rf /opt/sparkkeeper/server/src /opt/sparkkeeper/server/test /opt/sparkke
 FROM ${PLAYWRIGHT_IMAGE} AS app-runtime
 USER root
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends util-linux \
+    && apt-get install -y --no-install-recommends novnc openbox util-linux websockify x11vnc xvfb \
+    && ln -sf /usr/share/novnc/vnc.html /usr/share/novnc/index.html \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app/server
 COPY --from=build --chown=pwuser:pwuser /opt/sparkkeeper/server /app/server
@@ -44,10 +45,6 @@ COPY --from=build /workspace/apps/admin-web/dist /usr/share/nginx/html
 
 FROM app-runtime AS maintenance-runtime
 USER root
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends novnc openbox websockify x11vnc xvfb \
-    && ln -sf /usr/share/novnc/vnc.html /usr/share/novnc/index.html \
-    && rm -rf /var/lib/apt/lists/*
 COPY --chown=pwuser:pwuser docker/maintenance-entrypoint.sh /usr/local/bin/sparkkeeper-maintenance
 COPY --chown=pwuser:pwuser docker/maintenance-browser.mjs /app/server/maintenance-browser.mjs
 COPY --chown=pwuser:pwuser docker/maintenance-healthcheck.mjs /app/server/maintenance-healthcheck.mjs

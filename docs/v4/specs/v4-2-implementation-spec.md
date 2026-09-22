@@ -1,12 +1,13 @@
 # V4-2 Implementation Specification — Admin Authentication
 
-> Status: FROZEN / READY FOR IMPLEMENTATION  
+> Status: MERGED / ACCEPTED
 > Spec owner / reviewer: Codex  
 > Implementer: Development Agent  
 > Starting branch: `develop`  
 > Starting commit: `8a349add1e8d302faa256e7fe3db97d592320590`  
 > Required implementation branch: `feature/v4-2-admin-authentication`  
 > V4-1 state: `V4_1_MERGED` (`24bd692b14cc0dd72bfd6a8b9280f6aff8df251a` via PR #41)
+> Accepted implementation: `aeb9d0208a09a2b4114955feab140271d1025d5f` merged as `154156299be06ecb77ab643e459cda8d2e337c58` via PR #42
 
 ## 1. Objective
 
