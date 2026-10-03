@@ -43,6 +43,16 @@ export class BrowserOperationCoordinator {
     return this.active?.operationId === operationId;
   }
 
+  /** Read-only capability check; operation IDs alone are not lease ownership. */
+  isLeaseCurrent(lease: BrowserOperationLease): boolean {
+    return (
+      this.active !== undefined &&
+      this.active.token === lease.token &&
+      this.active.operationId === lease.operationId &&
+      this.active.profileKey === lease.profileKey
+    );
+  }
+
   current(): { readonly operationId: string; readonly profileKey: string } | undefined {
     if (!this.active) return undefined;
     return { operationId: this.active.operationId, profileKey: this.active.profileKey };

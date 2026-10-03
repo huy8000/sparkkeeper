@@ -118,6 +118,8 @@ Sync mutation 遇到 AUTH_EXPIRED 停止并更新 Account；partial/failed sync 
 
 V4-4 的 milestone authority 是 [V4-4 Implementation Specification](./specs/v4-4-implementation-spec.md)。只实现 Contact list/detail、sync start/status 和 cached avatar read；list envelope 附 safe `latestSync` 以支持刷新后恢复状态查询。Sync start 强制 `Idempotency-Key`（按 Admin + endpoint namespace 持久化 digest）。`preferred-identity`、legacy binding、Task references 与 sync cancel 不属于该 milestone；身份风险只读展示，不降低 D guard，也不新增 re-auth 实现。
 
+V4-5 的 milestone authority 是 [V4-5 Implementation Specification](./specs/v4-5-implementation-spec.md)。Stable Target Resolver 只提供内部接口，不新增 HTTP route/UI、durable resolver status 或生产浏览器入口。Contact GET/identity-ready 字段不触发 resolver，也不等于 live VERIFIED/send permission；不开放 preferred mutation、Test Send 或 name-only fallback。Resolver witness 不通过 HTTP/SSE 返回。
+
 ## 6. Templates
 
 | Method / Path                  | Guard | Request                                 | Response                            | Side effects                                                             |

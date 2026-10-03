@@ -103,7 +103,7 @@ Exit：No-send Gate tests；真实 Account 验证留给单独 Gate B 授权。Mi
 
 Branch：`feature/v4-4-contact-discovery`
 
-Status：IMPLEMENTED / PENDING INDEPENDENT REVIEW（未提交）；真实 discovery Gate B 未授权、未执行。当前 production adapter 无已验证结束证据时只允许 PARTIAL/FAILED，不推进 unseen stale；可靠 avatar/streak 提取不可用时为 placeholder/null。
+Status：MERGED / ACCEPTED（PR #44，`develop@2fd237f0405d3171c1606c27b9862763baabf950`）；不重新打开。真实 discovery Gate B 未执行。当前 production adapter 无已验证结束证据时只允许 PARTIAL/FAILED，不推进 unseen stale；可靠 avatar/streak 提取不可用时为 placeholder/null。
 
 交付：
 
@@ -121,8 +121,11 @@ Exit：fixture contract PASS；真实 discovery 留给独立授权 Gate B；无�
 
 Branch：`feature/v4-5-stable-target-resolver`
 
+Status：IMPLEMENTED / OFFLINE VERIFIED（Milestone Owner 自审；Git delivery 已获授权）。基线为 `develop@2fd237f0405d3171c1606c27b9862763baabf950`；Gate B 未执行，生产 DOM 完整性仍保守 fail closed。
+
 交付：
 
+- read-only Account/Contact/preferred Identity snapshot、eligibility 与完整 metadata version；
 - typed PersonResolver/GroupResolver；
 - preferred identity only/no silent fallback；
 - complete bounded uniqueness scan；
@@ -131,7 +134,7 @@ Branch：`feature/v4-5-stable-target-resolver`
 - legacy displayName-only production adapter removed from V4 path；
 - late-duplicate/virtual-index/type regression tests。
 
-Exit：all resolver fixtures PASS；no MessageSender invocation in resolver tests。
+Exit：all resolver fixtures PASS；no MessageSender invocation/composer action；稳定打开后精确当前身份复核。Milestone authority 见 [V4-5 Implementation Specification](./specs/v4-5-implementation-spec.md)。最小范围只含当前已落库 strong preferred identity 的内部解析接口，不新增 migration、HTTP/UI、worker 或真实浏览器 operation，不接入 legacy automation/发送。原 frozen 的人工 name-preferred 低置信度能力保留未来实现；本期不启用。缺失完整目录、稳定会话 anchor 或当前 header identity 时 fail closed，fixture 通过不表示真实页面已验证。
 
 ### V4-6 — Delivery Verification
 
