@@ -37,8 +37,8 @@ test('0010 upgrades populated 0009 without losing parent/identity/FK history or 
   sqlite.exec('CREATE INDEX fixture_contact_index ON contacts (last_seen_at)');
   sqlite.close();
   const before = Date.now();
-  assert.equal(client.migrate().appliedMigrationCount, 13);
-  assert.equal(client.migrate().appliedMigrationCount, 13);
+  assert.equal(client.migrate().appliedMigrationCount, 14);
+  assert.equal(client.migrate().appliedMigrationCount, 14);
   const reopened = createDatabase({ databasePath });
   t.after(() => reopened.close());
   reopened.migrate();

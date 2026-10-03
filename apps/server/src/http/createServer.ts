@@ -1,4 +1,6 @@
 import fastifyCookie from '@fastify/cookie';
+import { registerMigrationRoutes } from './routes/migrationRoutes.js';
+import type { MigrationApiService } from './services/MigrationApiService.js';
 import { registerTaskRoutes } from './routes/taskRoutes.js';
 import type { SendTaskScheduler } from '../scheduling/SendTaskScheduler.js';
 import { registerTestSendRoutes } from './routes/testSendRoutes.js';
@@ -36,6 +38,7 @@ import {
 } from '../onboarding/AuthenticatedConsoleGateway.js';
 
 export interface CreateServerOptions {
+  readonly migration?: MigrationApiService;
   readonly scheduling?: SendTaskScheduler;
   readonly testSend?: TestSendManager;
   readonly services: ApiServices;
@@ -135,7 +138,8 @@ export function createServer(options: CreateServerOptions): CreatedServer {
     registerAccountLoginSessionRoutes(server, options.onboarding);
   }
   registerConfigurationRoutes(server, options.services);
-  registerRunRoutes(server, options.services);
+  registerRunRoutes(server, options.services, options.migration);
+  if (options.migration) registerMigrationRoutes(server, options.migration);
   registerManualRunRoutes(server, options.services);
   registerNotificationRoutes(server, options.services);
   if (options.console !== undefined) {

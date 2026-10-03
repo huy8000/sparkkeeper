@@ -118,6 +118,12 @@ async function handleLogout(): Promise<void> {
           </span>
           <span>{{ t('nav.notifications') }}</span>
         </RouterLink>
+        <RouterLink to="/operations/migration" :class="navigationClasses('operations/migration')"
+          >Legacy 迁移</RouterLink
+        >
+        <RouterLink to="/operations/audit" :class="navigationClasses('operations/audit')"
+          >Audit</RouterLink
+        >
         <RouterLink to="/operations/system" :class="navigationClasses('operations/system')">
           <span class="navigation__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">

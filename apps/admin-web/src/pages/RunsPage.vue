@@ -103,6 +103,7 @@ async function resetFilters(): Promise<void> {
 
 <template>
   <div class="page-stack">
+    <RouterLink to="/history">查看统一 Legacy / V4 Run 历史</RouterLink>
     <header class="page-heading">
       <div>
         <p class="eyebrow">{{ t('runs.eyebrow') }}</p>

@@ -54,7 +54,7 @@ for (const mode of ['stop', 'recover'] as const)
       );
       const exited = once(worker, 'exit');
       const ready = once(worker.stdout!, 'data');
-      let browserPid: number | undefined;
+      let browserPid: number | undefined = undefined;
       t.after(async () => {
         for (const pid of [worker.pid, browserPid]) {
           if (!pid) continue;

@@ -1,5 +1,7 @@
 import {
   ScheduledSendRepository,
+  MigrationRepository,
+  SafeRuntimeEventRepository,
   TestSendRepository,
   TargetResolverSnapshotRepository,
   AccountRepository,
@@ -19,6 +21,8 @@ import {
   resolveDatabasePath,
 } from '@sparkkeeper/database';
 import path from 'node:path';
+import { V4SafeEventRelay } from '../observability/V4SafeEventRelay.js';
+import { MigrationApiService } from './services/MigrationApiService.js';
 import { SendTaskScheduler } from '../scheduling/SendTaskScheduler.js';
 import { TestSendManager, type TestSendRuntimeFactory } from '../test-send/TestSendManager.js';
 import { TargetResolutionService } from '../automation/TargetResolutionService.js';
@@ -156,6 +160,8 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
     const realtime = options.realtime ?? new RuntimeEventHub(options.clock);
     const backgroundDiagnostics: { server?: FastifyInstance } = {};
     const migration = database.migrate();
+    if (new MigrationRepository(database).hasPendingProfileBinding())
+      throw new Error('MIGRATION_RECOVERY_REQUIRED');
     const accounts = new AccountRepository(database);
     const friends = new FriendRepository(database);
     const schedules = new ScheduleRepository(database);
@@ -381,11 +387,16 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
     };
     const { server, authGuards } = createServer({
       services,
+      migration: new MigrationApiService(database, realtime, options.clock),
       config,
       logger:
         options.logger ??
         ({
           level: observabilityConfig.logLevel,
+          serializers: {
+            req: (request) => ({ method: request.method, id: request.id }),
+            res: (reply) => ({ statusCode: reply.statusCode ?? 0 }),
+          },
           redact: { paths: [...HTTP_REDACT_PATHS], censor: '[REDACTED]' },
         } satisfies FastifyServerOptions['logger']),
       clock: options.clock,
@@ -412,6 +423,12 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
       },
     });
     backgroundDiagnostics.server = server;
+    const eventRelay = new V4SafeEventRelay(
+      new SafeRuntimeEventRepository(database),
+      realtime,
+      notifications,
+    );
+    eventRelay.start();
 
     let httpClosed = false;
     let databaseClosed = false;
@@ -426,6 +443,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
     };
     const closeDatabase = (): void => {
       if (databaseClosed) return;
+      eventRelay.stop();
       database.close();
       databaseClosed = true;
     };

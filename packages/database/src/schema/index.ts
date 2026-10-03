@@ -74,3 +74,4 @@ export {
 } from './legacyScheduleImports.js';
 export { testSendIntents, type TestSendIntent } from './testSendIntents.js';
 export { scheduledRunSnapshots } from './scheduledRunSnapshots.js';
+export { legacyProfileBindings, v4SystemEvents } from './migrationObservability.js';

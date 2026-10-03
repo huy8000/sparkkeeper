@@ -6,6 +6,8 @@ export const CONFIG_ENTITY_TYPES = [
   'TEMPLATE',
   'SCHEDULE',
   'NOTIFICATION',
+  'MIGRATION',
+  'DELIVERY_RESOLUTION',
 ] as const;
 
 export type ConfigEntityType = (typeof CONFIG_ENTITY_TYPES)[number];

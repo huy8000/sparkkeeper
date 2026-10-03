@@ -22,11 +22,11 @@ test('V4Migration: fresh database migration creates all 24 domain tables with PR
   const result = client.migrate();
   const inspection = client.inspect();
 
-  assert.equal(result.appliedMigrationCount, 13);
-  assert.equal(inspection.appliedMigrationCount, 13);
+  assert.equal(result.appliedMigrationCount, 14);
+  assert.equal(inspection.appliedMigrationCount, 14);
   assert.equal(inspection.pragmas.journalMode, 'wal');
   assert.equal(inspection.pragmas.foreignKeys, 1);
-  assert.equal(inspection.tables.length, 26);
+  assert.equal(inspection.tables.length, 28);
 
   // Check that all 15 new V4 tables are schema compatible
   assert.equal(inspection.adminUsersSchemaCompatible, true);
@@ -102,7 +102,7 @@ test('V4Migration: upgrades V3 database non-destructively and executes backfills
 
   // Perform migration to V4
   const migrationResult = client.migrate();
-  assert.equal(migrationResult.appliedMigrationCount, 13);
+  assert.equal(migrationResult.appliedMigrationCount, 14);
   assert.equal(migrationResult.accountsSchemaVerified, true);
   assert.equal(migrationResult.legacyFriendBindingsSchemaVerified, true);
   assert.equal(migrationResult.legacyScheduleImportsSchemaVerified, true);
@@ -155,7 +155,7 @@ test('V4Migration: upgrades V3 database non-destructively and executes backfills
 
   // Idempotency: re-running migration is safe and doesn't duplicate backfills
   const repeatMigration = client.migrate();
-  assert.equal(repeatMigration.appliedMigrationCount, 13);
+  assert.equal(repeatMigration.appliedMigrationCount, 14);
 
   const sqliteAfter = new BetterSqlite3(databasePath, { readonly: true });
   try {

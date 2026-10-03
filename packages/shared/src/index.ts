@@ -214,3 +214,12 @@ export {
 } from './Contact.js';
 export type { TestSendPreview, TestSendAccepted, TestSendDetail } from './TestSend.js';
 export * from './ScheduledTask.js';
+export type {
+  RunSource,
+  UnifiedRun,
+  UnifiedSendRecord,
+  ResolutionSummary,
+  LegacyFriendSummary,
+  LegacyScheduleSummary,
+  Page,
+} from './Migration.js';

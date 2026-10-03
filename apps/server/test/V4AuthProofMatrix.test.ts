@@ -608,8 +608,8 @@ test('A02 - complete sentinel matrix: injected into real surfaces, absent from a
       await waitForSse(() => frames.join('').includes('event: ready'), 'ready frame received');
 
       // Representative runtime events (success and error level) published
-      // through the real hub. Messages are synthetic test-only markers — no
-      // forbidden secret category is placed on a legitimately-emitted field.
+      // through the real hub. V4-9 projects fixed messages at the boundary;
+      // producer text must never become telemetry, even when test-only.
       app.realtime.publish({
         type: 'RUNTIME_EVENT',
         data: { eventType: 'RUN_STARTED', level: 'info', message: 'a02 runtime probe started' },
@@ -619,7 +619,7 @@ test('A02 - complete sentinel matrix: injected into real surfaces, absent from a
         data: { eventType: 'TASK_FAILED', level: 'error', message: 'a02 runtime probe failed' },
       });
       await waitForSse(
-        () => frames.join('').includes('a02 runtime probe failed'),
+        () => frames.join('').includes('Task finished with failure'),
         'runtime event frame received',
       );
 
@@ -631,6 +631,11 @@ test('A02 - complete sentinel matrix: injected into real surfaces, absent from a
       await waitForSse(() => app.realtime.subscriberCount === 0, 'subscriber cleaned up');
 
       const sseOutput = frames.join('');
+      assert.equal(
+        sseOutput.includes('a02 runtime probe'),
+        false,
+        'producer text is not broadcast',
+      );
       assert.ok(sseOutput.includes('event: ready'), 'SSE frame witness received');
       for (const [label, sentinel] of [
         ['plaintext password', password],
@@ -2852,6 +2857,8 @@ test('A31 - one complete seam/resource mapping: V4-1 busy contract, non-semantic
       'secondConnection',
       'earlyCheck',
       'database', // DatabaseClient.close(): void
+      'restored', // V4-9 readonly restore verification DB: close(): void
+      'reopened', // V4-9 reopened profile-binding DB: close(): void
       'owner', // ws.close(): void; the test separately awaits its close event
     ]);
     const testDir = path.resolve(process.cwd(), 'test');
@@ -2940,6 +2947,17 @@ test('V42-RR-02 - exact bidirectional route map derived from Fastify registratio
       'GET /api/templates/:templateId': 'S',
       'PATCH /api/templates/:templateId': 'M',
       'GET /api/runs': 'S',
+      'GET /api/accounts/:accountId/legacy-friend-bindings': 'S',
+      'GET /api/legacy-schedule-imports': 'S',
+      'POST /api/legacy-friend-bindings/:bindingId/bind': 'R',
+      'POST /api/legacy-friend-bindings/:bindingId/dismiss': 'R',
+      'POST /api/legacy-schedule-imports/:importId/convert': 'R',
+      'POST /api/legacy-schedule-imports/:importId/dismiss': 'R',
+      'GET /api/send-records/:recordId': 'S',
+      'GET /api/send-records/:recordId/resolutions': 'S',
+      'POST /api/send-records/:recordId/resolutions': 'R',
+      'GET /api/system/audit-events': 'S',
+      'GET /api/system/migration-status': 'S',
       'GET /api/runs/:runId': 'S',
       'GET /api/runs/:runId/send-records': 'S',
       'GET /api/runs/:runId/events': 'S',
@@ -2987,12 +3005,12 @@ test('V42-RR-02 - exact bidirectional route map derived from Fastify registratio
     const logical = inventory.filter((r) => r.method !== 'HEAD');
     const classes = { P: 0, L: 0, S: 0, M: 0, R: 0 } as Record<string, number>;
     for (const route of logical) classes[route.authClass] += 1;
-    assert.equal(logical.length, 52);
+    assert.equal(logical.length, 63);
     assert.equal(classes.P, 1);
     assert.equal(classes.L, 1);
-    assert.equal(classes.S, 30);
+    assert.equal(classes.S, 36);
     assert.equal(classes.M, 17);
-    assert.equal(classes.R, 3);
+    assert.equal(classes.R, 8);
 
     // Registration-time rejection of an invalid truthy class (runtime config).
     const Fastify = (await import('fastify')).default;

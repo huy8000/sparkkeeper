@@ -1,12 +1,34 @@
 import type { Writable } from 'node:stream';
 
-import type { BusinessDate, RuntimeEventType } from '@sparkkeeper/shared';
+import {
+  TARGET_SEND_FAILURE_CODES,
+  ACCOUNT_LOGIN_FAILURE_CODES,
+  CONTACT_SYNC_FAILURE_CODES,
+  type BusinessDate,
+  type RuntimeEventType,
+} from '@sparkkeeper/shared';
 import pino, { type Logger } from 'pino';
 
 import type { LogLevel, ObservabilityConfig } from '../config/ObservabilityConfig.js';
 import { DailyRotatingFileStream, type RotationClock } from './DailyRotatingFileStream.js';
 
 export const PINO_REDACT_PATHS = [
+  'note',
+  'displayName',
+  'remarkName',
+  'identityValue',
+  'douyinSecUid',
+  'douyinUniqueId',
+  'douyinShortId',
+  '*.note',
+  '*.displayName',
+  '*.remarkName',
+  '*.identityValue',
+  '*.douyinSecUid',
+  '*.douyinUniqueId',
+  '*.douyinShortId',
+  'req.body',
+  'request.body',
   'cookie',
   'cookies',
   'setCookie',
@@ -103,6 +125,38 @@ const SAFE_EVENT_MESSAGES: Record<RuntimeEventType, string> = {
   OBSERVABILITY_ERROR: 'Observability operation failed',
 };
 
+const SAFE_ERROR_CODES = new Set<string>([
+  ...TARGET_SEND_FAILURE_CODES,
+  ...ACCOUNT_LOGIN_FAILURE_CODES,
+  ...CONTACT_SYNC_FAILURE_CODES,
+  'NETWORK_TRANSIENT',
+  'PAGE_LOAD_TIMEOUT',
+  'CONTACT_LIST_NOT_READY',
+  'BROWSER_TRANSIENT',
+  'CONTACT_NOT_FOUND',
+  'AMBIGUOUS_CONTACT',
+  'SELECTOR_FAILURE',
+  'SEND_ACTION_FAILED',
+  'VERIFY_FAILED',
+  'CONVERSATION_VERIFICATION_FAILED',
+  'MESSAGE_INPUT_FAILED',
+  'AUTH_UNKNOWN',
+  'TEMPLATE_INVALID',
+  'CONFIG_INVALID',
+  'PROCESS_INTERRUPTED_BEFORE_SEND',
+  'RETRY_WINDOW_EXPIRED',
+  'MAX_ATTEMPTS_EXHAUSTED',
+  'DELIVERY_UNKNOWN',
+  'OBSERVABILITY_PERSIST_FAILED',
+  'RETENTION_CLEANUP_FAILED',
+  'SCREENSHOT_CAPTURE_FAILED',
+  'TRACE_START_FAILED',
+  'TRACE_FINISH_FAILED',
+]);
+export function safeRuntimeErrorCode(value: string | null | undefined): string | null {
+  return value && SAFE_ERROR_CODES.has(value) ? value : null;
+}
+
 export class RuntimeLogWriter {
   constructor(protected readonly logger: Logger) {}
 
@@ -114,7 +168,7 @@ export class RuntimeLogWriter {
     const fields = {
       ...selectContext(event),
       eventType: event.eventType,
-      errorCode: event.errorCode,
+      errorCode: safeRuntimeErrorCode(event.errorCode),
       nextRetryAt: event.nextRetryAt?.toISOString(),
       successCount: event.successCount,
       failedCount: event.failedCount,

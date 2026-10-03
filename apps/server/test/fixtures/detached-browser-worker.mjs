@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { setInterval } from 'node:timers';
 
 let started = false;
 

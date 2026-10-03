@@ -292,6 +292,8 @@ function isConfigEntityType(value: unknown): value is ConfigEntityType {
     value === 'FRIEND' ||
     value === 'TEMPLATE' ||
     value === 'SCHEDULE' ||
-    value === 'NOTIFICATION'
+    value === 'NOTIFICATION' ||
+    value === 'MIGRATION' ||
+    value === 'DELIVERY_RESOLUTION'
   );
 }

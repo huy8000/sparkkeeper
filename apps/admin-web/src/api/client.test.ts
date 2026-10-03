@@ -95,7 +95,7 @@ describe('ApiClient', () => {
     });
 
     expect(fetcher).toHaveBeenCalledWith(
-      '/api/runs?accountId=test+account&businessDate=2026-01-02&status=FAILED&limit=100',
+      '/api/runs?accountId=test+account&businessDate=2026-01-02&status=FAILED&limit=100&source=LEGACY_V3',
       expect.objectContaining({ method: 'GET' }),
     );
   });

@@ -1,6 +1,6 @@
 # V4-8 Implementation Specification — SendTask / Scheduling
 
-> Status: IMPLEMENTED / SELF-REVIEWED / OFFLINE VERIFIED; PR delivery, not merged
+> Status: MERGED / ACCEPTED (PR #48; `develop@d606a098e19c362e924a581b120d9135c68bd566`)
 > Baseline: `develop@a41562b43e9a9d7882bd9139a2c1ce57d076ba8d` (V4-7 merged, PR #47)
 > Branch: `feature/v4-8-send-task-scheduling`
 > Authority: explicit Milestone Owner planning/implementation/self-review/offline verification/commit/push/PR; no merge, live Gates or deployment.
