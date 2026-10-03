@@ -72,3 +72,4 @@ export {
   type LegacyScheduleImportRow,
   type NewLegacyScheduleImportRow,
 } from './legacyScheduleImports.js';
+export { testSendIntents, type TestSendIntent } from './testSendIntents.js';

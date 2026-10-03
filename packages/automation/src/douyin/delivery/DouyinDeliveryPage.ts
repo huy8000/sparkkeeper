@@ -9,6 +9,7 @@ import {
 } from './types.js';
 
 interface Scope {
+  prepare(): void;
   ready(): void;
   boundary(remaining: number): void;
   invoke(remaining: number): void;
@@ -28,6 +29,7 @@ export class DouyinDeliveryPage implements DeliveryObservationPort {
   private constructor(
     private readonly handle: Page,
     private readonly local: boolean,
+    private readonly prepareInput = false,
   ) {}
   get page(): object {
     return this.handle;
@@ -40,6 +42,9 @@ export class DouyinDeliveryPage implements DeliveryObservationPort {
   }
   static forControlledLocalPage(page: Page): DouyinDeliveryPage {
     return new DouyinDeliveryPage(page, true);
+  }
+  static forControlledLocalTestSend(page: Page): DouyinDeliveryPage {
+    return new DouyinDeliveryPage(page, true, true);
   }
   private check(budget: DeliveryBudget): void {
     budget.assertActive();
@@ -306,6 +311,25 @@ export class DouyinDeliveryPage implements DeliveryObservationPort {
         for (const node of [header, self, directory, auth])
           identityObserver.observe(node, { subtree: true, childList: true, attributes: true });
         return {
+          prepare() {
+            tools.flush();
+            if (!input.prepareInput) return;
+            const composer = tools.unique(input.selectors.composer);
+            if (
+              !(composer instanceof HTMLTextAreaElement) ||
+              composer.disabled ||
+              composer.readOnly ||
+              composer.closest('form, [inert]') ||
+              composer.getAttribute('aria-disabled') === 'true' ||
+              composer.getAttribute('aria-readonly') === 'true' ||
+              composer.getAttribute('data-conversation-id') !== input.anchor ||
+              composer.value !== ''
+            )
+              throw new Error('PREPARED_INPUT_MISMATCH');
+            composer.value = input.knownText;
+            composer.dispatchEvent(new Event('input', { bubbles: true }));
+            tools.ready();
+          },
           ready() {
             tools.ready();
           },
@@ -339,6 +363,7 @@ export class DouyinDeliveryPage implements DeliveryObservationPort {
       },
       {
         knownText,
+        prepareInput: this.prepareInput,
         remaining: budget.remaining(),
         selectors: DELIVERY_LOCAL_V1,
         target: TARGET_RESOLVER_LOCAL_STATIC_V1,
@@ -357,7 +382,7 @@ export class DouyinDeliveryPage implements DeliveryObservationPort {
   }
   private async call(
     budget: DeliveryBudget,
-    operation: 'ready' | 'boundary' | 'invoke' | 'observe' | 'reconcile',
+    operation: 'prepare' | 'ready' | 'boundary' | 'invoke' | 'observe' | 'reconcile',
   ): Promise<DeliveryEvidence | undefined> {
     this.check(budget);
     if (!this.scope) stopDelivery('OBSERVATION_FAILED');
@@ -367,6 +392,9 @@ export class DouyinDeliveryPage implements DeliveryObservationPort {
           try {
             let value: DeliveryEvidence | undefined;
             switch (args.operation) {
+              case 'prepare':
+                scope.prepare();
+                break;
               case 'ready':
                 scope.ready();
                 break;
@@ -408,6 +436,9 @@ export class DouyinDeliveryPage implements DeliveryObservationPort {
   }
   async ready(budget: DeliveryBudget): Promise<void> {
     await this.call(budget, 'ready');
+  }
+  async prepare(budget: DeliveryBudget): Promise<void> {
+    await this.call(budget, 'prepare');
   }
   async beginBoundary(budget: DeliveryBudget): Promise<void> {
     await this.call(budget, 'boundary');

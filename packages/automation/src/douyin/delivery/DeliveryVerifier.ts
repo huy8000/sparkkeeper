@@ -85,6 +85,7 @@ export class DeliveryVerifier {
       const knownText = normalizeDeliveryText(message);
       await guard();
       await budget.run(() => this.port.arm(binding, knownText, budget));
+      if (this.port.prepare) await budget.run(() => this.port.prepare!(budget));
       await budget.run(() => this.port.ready(budget));
       await guard();
       await budget.run(() => this.port.ready(budget));

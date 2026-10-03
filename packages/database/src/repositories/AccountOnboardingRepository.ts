@@ -18,6 +18,7 @@ import {
   accounts,
   auditEvents,
   contactSyncRuns,
+  executionRuns,
   type AccountLoginSessionRow,
   type AccountRow,
   type NewAccountLoginSessionRow,
@@ -212,6 +213,12 @@ export class AccountOnboardingRepository {
                 .select({ id: contactSyncRuns.id })
                 .from(contactSyncRuns)
                 .where(inArray(contactSyncRuns.status, ['PENDING', 'RUNNING']))
+                .limit(1)
+                .get() ||
+              tx
+                .select({ id: executionRuns.id })
+                .from(executionRuns)
+                .where(inArray(executionRuns.status, ['PENDING', 'RUNNING']))
                 .limit(1)
                 .get()
             )

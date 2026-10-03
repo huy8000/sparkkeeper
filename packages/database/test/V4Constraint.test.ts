@@ -481,7 +481,7 @@ test('V4Constraint: legacy account post-migration updates enforce all 7 CHECK co
 
   // Run V4 migration (0008)
   const migrationResult = client.migrate();
-  assert.equal(migrationResult.appliedMigrationCount, 11);
+  assert.equal(migrationResult.appliedMigrationCount, 12);
 
   const sqlite = new BetterSqlite3(databasePath);
   try {

@@ -52,14 +52,14 @@ import {
   insertLegacyAccount,
 } from './testDatabase.js';
 
-test('fresh database migration creates all V4 tables and eleven journal entries', (context) => {
+test('fresh database migration creates all V4 tables and twelve journal entries', (context) => {
   const { client } = createTemporaryDatabase(context, { migrate: false });
 
   const result = client.migrate();
   const inspection = client.inspect();
 
   assert.deepEqual(result, {
-    appliedMigrationCount: 11,
+    appliedMigrationCount: 12,
     accountsSchemaVerified: true,
     dailyRunsSchemaVerified: true,
     friendsSchemaVerified: true,
@@ -109,8 +109,9 @@ test('fresh database migration creates all V4 tables and eleven journal entries'
     'send_tasks',
     'system_events',
     'target_send_records',
+    'test_send_intents',
   ]);
-  assert.equal(inspection.appliedMigrationCount, 11);
+  assert.equal(inspection.appliedMigrationCount, 12);
   assert.equal(inspection.accountsSchemaCompatible, true);
   assert.equal(inspection.dailyRunsSchemaCompatible, true);
   assert.equal(inspection.friendsSchemaCompatible, true);
@@ -142,8 +143,8 @@ test('running migrations twice is safe and does not duplicate the journal entry'
   client.migrate();
   const second = client.migrate();
 
-  assert.equal(second.appliedMigrationCount, 11);
-  assert.equal(client.inspect().appliedMigrationCount, 11);
+  assert.equal(second.appliedMigrationCount, 12);
+  assert.equal(client.inspect().appliedMigrationCount, 12);
 });
 
 test('migration state remains correct after close and reopen', (context) => {
@@ -155,7 +156,7 @@ test('migration state remains correct after close and reopen', (context) => {
   context.after(() => reopened.close());
   const result = reopened.migrate();
 
-  assert.equal(result.appliedMigrationCount, 11);
+  assert.equal(result.appliedMigrationCount, 12);
   assert.equal(reopened.inspect().accountsSchemaCompatible, true);
   assert.equal(reopened.inspect().dailyRunsSchemaCompatible, true);
   assert.equal(reopened.inspect().friendsSchemaCompatible, true);
@@ -198,7 +199,7 @@ test('0009 preserves V4 AccountLoginSession rows and adds durable idempotency di
   }
 
   const migrated = temporary.client.migrate();
-  assert.equal(migrated.appliedMigrationCount, 11);
+  assert.equal(migrated.appliedMigrationCount, 12);
 
   const inspection = new BetterSqlite3(temporary.databasePath);
   try {
@@ -503,8 +504,8 @@ test('existing V1-1 database upgrades through V4 without losing account data', (
     displayName: 'Upgrade Test User',
   });
 
-  assert.equal(migration.appliedMigrationCount, 11);
-  assert.equal(client.inspect().appliedMigrationCount, 11);
+  assert.equal(migration.appliedMigrationCount, 12);
+  assert.equal(client.inspect().appliedMigrationCount, 12);
   assert.equal(new AccountRepository(client).findById(account.id)?.name, 'Upgrade Test Account');
   assert.equal(friend.accountId, account.id);
 
@@ -513,7 +514,7 @@ test('existing V1-1 database upgrades through V4 without losing account data', (
   context.after(() => reopened.close());
   const repeated = reopened.migrate();
 
-  assert.equal(repeated.appliedMigrationCount, 11);
+  assert.equal(repeated.appliedMigrationCount, 12);
   assert.equal(new AccountRepository(reopened).findById(account.id)?.name, 'Upgrade Test Account');
   assert.equal(
     new FriendRepository(reopened).findById(friend.id)?.displayName,
@@ -547,8 +548,8 @@ test('existing V1-2 database upgrades through V4 and preserves Account/Friend da
     messages: ['Hello'],
   });
 
-  assert.equal(migration.appliedMigrationCount, 11);
-  assert.equal(client.inspect().appliedMigrationCount, 11);
+  assert.equal(migration.appliedMigrationCount, 12);
+  assert.equal(client.inspect().appliedMigrationCount, 12);
   assert.equal(new AccountRepository(client).findById(account.id)?.name, 'V1-2 Test Account');
   assert.equal(friendsRepository.findById(alice.id)?.displayName, 'Alice');
   assert.equal(friendsRepository.findById(bob.id)?.displayName, 'Bob');
@@ -559,7 +560,7 @@ test('existing V1-2 database upgrades through V4 and preserves Account/Friend da
   context.after(() => reopened.close());
   const repeated = reopened.migrate();
 
-  assert.equal(repeated.appliedMigrationCount, 11);
+  assert.equal(repeated.appliedMigrationCount, 12);
   assert.equal(new AccountRepository(reopened).findById(account.id)?.name, 'V1-2 Test Account');
   assert.equal(new FriendRepository(reopened).listByAccountId(account.id).length, 2);
   assert.equal(new MessageTemplateRepository(reopened).findById(template.id)?.messages[0], 'Hello');
@@ -607,8 +608,8 @@ test('existing V1-3 database upgrades through V4 and preserves Account/Friend/Te
     now,
   });
 
-  assert.equal(migration.appliedMigrationCount, 11);
-  assert.equal(client.inspect().appliedMigrationCount, 11);
+  assert.equal(migration.appliedMigrationCount, 12);
+  assert.equal(client.inspect().appliedMigrationCount, 12);
   assert.equal(new AccountRepository(client).findById(account.id)?.name, 'V1-3 Test Account');
   assert.equal(new FriendRepository(client).findById(friend.id)?.displayName, 'Alice');
   assert.equal(
@@ -622,7 +623,7 @@ test('existing V1-3 database upgrades through V4 and preserves Account/Friend/Te
   context.after(() => reopened.close());
   const repeated = reopened.migrate();
 
-  assert.equal(repeated.appliedMigrationCount, 11);
+  assert.equal(repeated.appliedMigrationCount, 12);
   assert.equal(new AccountRepository(reopened).findById(account.id)?.name, 'V1-3 Test Account');
   assert.equal(new FriendRepository(reopened).findById(friend.id)?.displayName, 'Alice');
   assert.equal(
@@ -686,7 +687,7 @@ test('existing V1-4 database upgrades through V4 and preserves all idempotency d
   assert.equal(client.inspect().appliedMigrationCount, 4);
   assert.equal(client.inspect().schedulesSchemaCompatible, false);
 
-  assert.equal(client.migrate().appliedMigrationCount, 11);
+  assert.equal(client.migrate().appliedMigrationCount, 12);
   const schedule = new ScheduleRepository(client).create({
     accountId: account.id,
     startTime: '09:00',
@@ -703,7 +704,7 @@ test('existing V1-4 database upgrades through V4 and preserves all idempotency d
   client.close();
   const reopened = createDatabase({ databasePath: temporary.databasePath });
   context.after(() => reopened.close());
-  assert.equal(reopened.migrate().appliedMigrationCount, 11);
+  assert.equal(reopened.migrate().appliedMigrationCount, 12);
   assert.equal(new ScheduleRepository(reopened).findById(schedule.id)?.startTime, '09:00');
   assert.equal(new SendRecordRepository(reopened).findById(legacyRecordId)?.messageText, 'Hello');
   reopened.close();
@@ -778,7 +779,7 @@ test('existing V1-5 database upgrades all legacy SendRecord states with conserva
   assert.equal(client.inspect().sendRecordsSchemaCompatible, false);
   assert.equal(client.inspect().schedulesSchemaCompatible, false);
 
-  assert.equal(client.migrate().appliedMigrationCount, 11);
+  assert.equal(client.migrate().appliedMigrationCount, 12);
   const repository = new SendRecordRepository(client);
   const records = Array.from({ length: 5 }, (_, index) =>
     repository.findById(`record-v1-5-${index}`),
@@ -833,7 +834,7 @@ test('existing V1-5 database upgrades all legacy SendRecord states with conserva
     structure.close();
   }
 
-  assert.equal(client.migrate().appliedMigrationCount, 11);
+  assert.equal(client.migrate().appliedMigrationCount, 12);
   assert.equal(repository.findById('record-v1-5-4')?.messageText, 'Message A');
 });
 
@@ -895,7 +896,7 @@ test('existing V1-6 database upgrades to V4 and preserves all business states', 
 
   assert.equal(client.inspect().appliedMigrationCount, 6);
   assert.equal(client.inspect().systemEventsSchemaCompatible, false);
-  assert.equal(client.migrate().appliedMigrationCount, 11);
+  assert.equal(client.migrate().appliedMigrationCount, 12);
 
   const event = new SystemEventRepository(client).create({
     eventType: 'DELIVERY_UNKNOWN',
@@ -918,7 +919,7 @@ test('existing V1-6 database upgrades to V4 and preserves all business states', 
     ['SUCCESS', 'FAILED', 'RETRY_WAIT', 'DELIVERY_UNKNOWN'],
   );
   assert.equal(new SystemEventRepository(client).findById(event.id)?.runId, run.id);
-  assert.equal(client.migrate().appliedMigrationCount, 11);
+  assert.equal(client.migrate().appliedMigrationCount, 12);
   assert.equal(
     new SystemEventRepository(client).findById(event.id)?.message,
     'Delivery result is uncertain',
@@ -956,7 +957,7 @@ test('existing V1-8 (V3 base) database upgrades to V4 and backfills bridge recor
   assert.equal(before.legacyFriendBindingsSchemaCompatible, false);
 
   const migration = client.migrate();
-  assert.equal(migration.appliedMigrationCount, 11);
+  assert.equal(migration.appliedMigrationCount, 12);
   assert.equal(migration.legacyFriendBindingsSchemaVerified, true);
   assert.equal(migration.legacyScheduleImportsSchemaVerified, true);
 
@@ -1009,7 +1010,7 @@ test('existing V1-8 (V3 base) database upgrades to V4 and backfills bridge recor
 
   // Running migration again is idempotent
   const repeated = client.migrate();
-  assert.equal(repeated.appliedMigrationCount, 11);
+  assert.equal(repeated.appliedMigrationCount, 12);
 });
 
 test('existing V1-8 database fully populated with all 8 legacy domains preserves all fields and backfills correctly', (context) => {
@@ -1202,7 +1203,7 @@ test('existing V1-8 database fully populated with all 8 legacy domains preserves
 
   // Execute V4 migration (0008)
   const migrationResult = client.migrate();
-  assert.equal(migrationResult.appliedMigrationCount, 11);
+  assert.equal(migrationResult.appliedMigrationCount, 12);
 
   // Verify all 8 legacy domains preserved identically
   const sqliteAfter = new BetterSqlite3(temporary.databasePath, { readonly: true });
@@ -1336,7 +1337,7 @@ test('existing V1-8 database fully populated with all 8 legacy domains preserves
 
   // Idempotency: repeated migrate run
   const repeatMigrate = client.migrate();
-  assert.equal(repeatMigrate.appliedMigrationCount, 11);
+  assert.equal(repeatMigrate.appliedMigrationCount, 12);
 });
 
 test('migration failure includes explicit migration context', (context) => {

@@ -1,6 +1,6 @@
 # V4-6 Implementation Specification — Delivery Verification
 
-> Status: IMPLEMENTED / SELF-REVIEW AND OFFLINE VERIFICATION PASS
+> Status: MERGED / ACCEPTED (PR #46, `develop@c76cd1fdac8da6f5f1aaf0958fd01fb7c97b32fb`)
 > Owner / implementer / self-reviewer: Codex (explicit user authorization)
 > Baseline: `develop@d964fc4f8b3d8ead0f675a0d2c2477edb32eb5a5` (V4-5 merged by PR #45)
 > Branch: `feature/v4-6-delivery-verification`
