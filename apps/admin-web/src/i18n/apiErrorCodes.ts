@@ -7,6 +7,13 @@
  * its translation keys; unknown codes always fall back safely.
  */
 export const KNOWN_API_ERROR_CODES = [
+  'TARGET_NOT_ELIGIBLE',
+  'INTENT_NOT_FOUND',
+  'INTENT_EXPIRED',
+  'INTENT_CHANGED',
+  'INTENT_CONSUMED',
+  'INTENT_LIMIT',
+  'TEST_SEND_NOT_FOUND',
   'ACCOUNT_NOT_FOUND',
   'ACCOUNT_NOT_READY',
   'CONTACT_NOT_FOUND',
@@ -47,6 +54,13 @@ export const KNOWN_API_ERROR_CODES = [
 export type KnownApiErrorCode = (typeof KNOWN_API_ERROR_CODES)[number];
 
 const API_ERROR_TRANSLATION_KEYS: Record<KnownApiErrorCode, string> = {
+  TARGET_NOT_ELIGIBLE: 'errors.api.testSendIneligible',
+  INTENT_NOT_FOUND: 'errors.api.testSendIntentMissing',
+  INTENT_EXPIRED: 'errors.api.testSendIntentExpired',
+  INTENT_CHANGED: 'errors.api.testSendIntentChanged',
+  INTENT_CONSUMED: 'errors.api.testSendIntentConsumed',
+  INTENT_LIMIT: 'errors.api.testSendIntentLimit',
+  TEST_SEND_NOT_FOUND: 'errors.api.testSendMissing',
   ACCOUNT_NOT_FOUND: 'errors.api.accountNotFound',
   ACCOUNT_NOT_READY: 'errors.api.accountNotReady',
   CONTACT_NOT_FOUND: 'errors.api.contactNotFound',

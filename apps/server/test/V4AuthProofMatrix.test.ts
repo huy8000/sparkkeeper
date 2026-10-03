@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Writable } from 'node:stream';
 import { readdirSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -1910,11 +1910,20 @@ test('A22 - every registered M route rejects missing/bad CSRF with handler=0 (in
     }
 
     // Fixture bodies keyed by ACTUAL registered method + normalized path.
+    const originalPreview = ctx.app.testSend.preview.bind(ctx.app.testSend);
+    ctx.app.testSend.preview = (...args) => {
+      handlerCalls++;
+      return originalPreview(...args);
+    };
     // Routes registered with concrete parameter URLs; fixtures use the same
     // literal paths the inventory reports.
     const bodies: Record<string, unknown> = {
       'POST /api/auth/logout': {},
       'POST /api/accounts/:accountId/contact-syncs': {},
+      'POST /api/accounts/:accountId/test-send-intents': {
+        templateId: randomUUID(),
+        contactIds: [randomUUID()],
+      },
       'POST /api/account-login-sessions': { purpose: 'ADD_ACCOUNT' },
       'POST /api/account-login-sessions/:sessionId/cancel': {
         expectedUpdatedAt: '2030-01-01T00:00:00.000Z',
@@ -2865,6 +2874,9 @@ test('V42-RR-02 - exact bidirectional route map derived from Fastify registratio
       'GET /api/account-login-sessions/:sessionId/console/ws': 'S',
       'GET /api/accounts/:accountId': 'S',
       'POST /api/accounts/:accountId/contact-syncs': 'M',
+      'POST /api/accounts/:accountId/test-send-intents': 'M',
+      'POST /api/accounts/:accountId/test-sends': 'R',
+      'GET /api/test-sends/:runId': 'S',
       'GET /api/contact-syncs/:syncRunId': 'S',
       'GET /api/accounts/:accountId/contacts': 'S',
       'GET /api/contacts/:contactId': 'S',
@@ -2931,12 +2943,12 @@ test('V42-RR-02 - exact bidirectional route map derived from Fastify registratio
     const logical = inventory.filter((r) => r.method !== 'HEAD');
     const classes = { P: 0, L: 0, S: 0, M: 0, R: 0 } as Record<string, number>;
     for (const route of logical) classes[route.authClass] += 1;
-    assert.equal(logical.length, 41);
+    assert.equal(logical.length, 44);
     assert.equal(classes.P, 1);
     assert.equal(classes.L, 1);
-    assert.equal(classes.S, 26);
-    assert.equal(classes.M, 13);
-    assert.equal(classes.R, 0);
+    assert.equal(classes.S, 27);
+    assert.equal(classes.M, 14);
+    assert.equal(classes.R, 1);
 
     // Registration-time rejection of an invalid truthy class (runtime config).
     const Fastify = (await import('fastify')).default;
@@ -3824,9 +3836,18 @@ test('F19 - every M route: missing/duplicate/bad/cross-session CSRF with handler
     }
 
     // Fixture bodies keyed by the ACTUAL registered URL (registration-derived).
+    const originalPreview = ctx.app.testSend.preview.bind(ctx.app.testSend);
+    ctx.app.testSend.preview = (...args) => {
+      handlerCalls++;
+      return originalPreview(...args);
+    };
     const bodies: Record<string, unknown> = {
       'POST /api/auth/logout': {},
       'POST /api/accounts/:accountId/contact-syncs': {},
+      'POST /api/accounts/:accountId/test-send-intents': {
+        templateId: randomUUID(),
+        contactIds: [randomUUID()],
+      },
       'POST /api/account-login-sessions': { purpose: 'ADD_ACCOUNT' },
       'POST /api/account-login-sessions/:sessionId/cancel': {
         expectedUpdatedAt: '2030-01-01T00:00:00.000Z',
@@ -4747,6 +4768,10 @@ test('V42-RR-03: every actual M route executes missing and wrong media -> 400 VA
     const bodies: Record<string, unknown> = {
       'POST /api/auth/logout': {},
       'POST /api/accounts/:accountId/contact-syncs': {},
+      'POST /api/accounts/:accountId/test-send-intents': {
+        templateId: randomUUID(),
+        contactIds: [randomUUID()],
+      },
       'POST /api/account-login-sessions': { purpose: 'ADD_ACCOUNT' },
       'POST /api/account-login-sessions/:sessionId/cancel': {
         expectedUpdatedAt: '2030-01-01T00:00:00.000Z',
@@ -4788,6 +4813,11 @@ test('V42-RR-03: every actual M route executes missing and wrong media -> 400 VA
 
     // Handler=0 markers on the business services behind those routes.
     let businessHandlerCalls = 0;
+    const originalPreview = app.testSend.preview.bind(app.testSend);
+    app.testSend.preview = (...args) => {
+      businessHandlerCalls++;
+      return originalPreview(...args);
+    };
     const configuration = app.services.configuration as unknown as Record<string, unknown>;
     for (const method of [
       'updateAccount',

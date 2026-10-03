@@ -5,6 +5,8 @@ import AccountWorkspaceLayout from '../layouts/AccountWorkspaceLayout.vue';
 import AdminLayout from '../layouts/AdminLayout.vue';
 import AccountFriendsPage from '../pages/AccountFriendsPage.vue';
 import AccountContactsPage from '../pages/AccountContactsPage.vue';
+import AccountTestSendPage from '../pages/AccountTestSendPage.vue';
+import TestSendDetailPage from '../pages/TestSendDetailPage.vue';
 import AccountHistoryPage from '../pages/AccountHistoryPage.vue';
 import AccountManualRunPage from '../pages/AccountManualRunPage.vue';
 import AccountOverviewPage from '../pages/AccountOverviewPage.vue';
@@ -122,6 +124,11 @@ export function createAdminRouter(authController?: AuthController): Router {
                 meta: { title: 'contacts.title', section: 'accounts' },
               },
               {
+                path: 'test-send',
+                component: AccountTestSendPage,
+                meta: { title: 'testSend.title', section: 'accounts' },
+              },
+              {
                 path: 'schedule',
                 component: AccountSchedulePage,
                 meta: { title: 'pages.accountSchedule', section: 'accounts' },
@@ -151,6 +158,11 @@ export function createAdminRouter(authController?: AuthController): Router {
             meta: { title: 'nav.templates', section: 'templates' },
           },
           { path: 'runs', component: RunsPage, meta: { title: 'nav.runs', section: 'runs' } },
+          {
+            path: 'test-sends/:runId',
+            component: TestSendDetailPage,
+            meta: { title: 'testSend.detail', section: 'runs' },
+          },
           {
             path: 'runs/:runId',
             component: RunDetailPage,

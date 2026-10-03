@@ -1,4 +1,6 @@
 import {
+  TestSendRepository,
+  TargetResolverSnapshotRepository,
   AccountRepository,
   AccountOnboardingRepository,
   ContactDiscoveryRepository,
@@ -16,6 +18,8 @@ import {
   resolveDatabasePath,
 } from '@sparkkeeper/database';
 import path from 'node:path';
+import { TestSendManager, type TestSendRuntimeFactory } from '../test-send/TestSendManager.js';
+import { TargetResolutionService } from '../automation/TargetResolutionService.js';
 import {
   NodeWebhookTransport,
   NotificationService,
@@ -71,6 +75,7 @@ export type ServerEnvironment = HttpEnvironment &
   ManualRunEnvironment;
 
 export interface CreateApiApplicationOptions {
+  readonly testSendRuntime?: TestSendRuntimeFactory;
   readonly environment?: ServerEnvironment;
   readonly cwd?: string;
   readonly databasePath?: string;
@@ -92,6 +97,7 @@ export interface CreateApiApplicationOptions {
 }
 
 export interface ApiApplication {
+  readonly testSend: TestSendManager;
   readonly server: FastifyInstance;
   readonly authGuards: AdminAuthGuardRegistration;
   readonly database: DatabaseClient;
@@ -256,6 +262,18 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
     const onboardingSupervisor = options.onboardingSupervisor ?? new AccountLoginWorkerSupervisor();
     const browserCoordinator = new BrowserOperationCoordinator();
     const profiles = new AccountProfileStore(profileDataDirectory);
+    const testSend = new TestSendManager(new TestSendRepository(database), {
+      coordinator: browserCoordinator,
+      profiles,
+      targets: new TargetResolutionService(new TargetResolverSnapshotRepository(database)),
+      isolated: () =>
+        !schedulerConfig.enabled &&
+        !manualRunConfig.enabled &&
+        !schedulerConfig.allowRealSend &&
+        !coordinator.isBusy,
+      runtime: options.testSendRuntime,
+      clock: options.clock,
+    });
     const discoveryRepository = new ContactDiscoveryRepository(database);
     const browserGateOpen = () =>
       !schedulerConfig.enabled &&
@@ -352,6 +370,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
         } satisfies FastifyServerOptions['logger']),
       clock: options.clock,
       onboarding,
+      testSend,
       discovery: { manager: discovery, avatars },
       console: {
         config,
@@ -401,6 +420,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
     };
     const stopOnboarding = async (): Promise<void> => {
       if (onboardingStopped) return;
+      await testSend.stop();
       await discovery.stop();
       consoleConnections.closeAll();
       await onboarding.stop();
@@ -418,8 +438,10 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
       onboarding,
       discovery,
       avatars,
+      testSend,
       recoverOnboarding: () =>
         (recovery ??= (async () => {
+          await testSend.recover();
           await discovery.recover();
           await onboarding.recover();
         })()),

@@ -1,6 +1,22 @@
 import type { TranslationSchema } from './en-US';
 
 export const zhCN: TranslationSchema = {
+  testSend: {
+    title: '测试发送',
+    scope: '仅限单目标。真实发送尚未授权，当前保持关闭；预览不会打开浏览器。',
+    contact: '联系人',
+    template: '模板',
+    preview: '生成预览',
+    expires: '有效期至：',
+    confirmation: '我明确确认此账号、模板和唯一目标。',
+    confirm: '确认单目标测试发送',
+    error: '测试发送未完成。',
+    uncertain: '请求结果不确定，不自动重试。只能使用原 intent 和幂等键核对。',
+    reconcile: '核对原请求',
+    detail: '测试发送详情',
+    noRetry: 'UNKNOWN 是最终结果，不提供重试或强制补发。',
+    refresh: '刷新状态',
+  },
   contacts: {
     title: '联系人',
     scope: '只读发现当前账号的会话目录，不发送消息。',
@@ -891,6 +907,13 @@ export const zhCN: TranslationSchema = {
   },
   errors: {
     api: {
+      testSendIneligible: '账号、模板或稳定目标尚不满足测试发送条件。',
+      testSendIntentMissing: '未找到测试发送预览。',
+      testSendIntentExpired: '预览已过期，请重新生成并确认预览。',
+      testSendIntentChanged: '预览与当前数据不一致，请重新生成预览。',
+      testSendIntentConsumed: '此预览已消费，请核对既有 Run，不要重新发送。',
+      testSendIntentLimit: '尚未过期的预览过多，请等待过期。',
+      testSendMissing: '未找到测试发送。',
       accountNotReady: '账号尚未准备好进行联系人发现。',
       contactNotFound: '联系人不存在。',
       syncNotFound: '联系人同步记录不存在。',

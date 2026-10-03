@@ -1,4 +1,6 @@
 import fastifyCookie from '@fastify/cookie';
+import { registerTestSendRoutes } from './routes/testSendRoutes.js';
+import type { TestSendManager } from '../test-send/TestSendManager.js';
 import fastifyWebsocket from '@fastify/websocket';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 
@@ -32,6 +34,7 @@ import {
 } from '../onboarding/AuthenticatedConsoleGateway.js';
 
 export interface CreateServerOptions {
+  readonly testSend?: TestSendManager;
   readonly services: ApiServices;
   readonly config?: HttpConfig | undefined;
   readonly logger?: FastifyServerOptions['logger'] | undefined;
@@ -116,6 +119,7 @@ export function createServer(options: CreateServerOptions): CreatedServer {
   );
   registerStatusRoutes(server, options.services);
   registerAccountRoutes(server, options.services);
+  if (options.testSend) registerTestSendRoutes(server, options.testSend);
   if (options.discovery)
     registerContactRoutes(
       server,

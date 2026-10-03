@@ -1,4 +1,22 @@
 export const enUS = {
+  testSend: {
+    title: 'Test Send',
+    scope:
+      'One target only. Live sending is locked pending separate authorization. Preview does not open a browser.',
+    contact: 'Contact',
+    template: 'Template',
+    preview: 'Preview',
+    expires: 'Expires:',
+    confirmation: 'I confirm this account, template and exactly one target.',
+    confirm: 'Confirm one Test Send',
+    error: 'Test Send could not be completed.',
+    uncertain:
+      'Request outcome uncertain. No automatic retry. Check using the same intent and key only.',
+    reconcile: 'Check canonical request',
+    detail: 'Test Send detail',
+    noRetry: 'Unknown outcomes are final. No retry or force resend.',
+    refresh: 'Refresh status',
+  },
   contacts: {
     title: 'Contacts',
     scope: 'Read-only discovery of this account’s conversation directory; no sends.',
@@ -915,6 +933,14 @@ export const enUS = {
   },
   errors: {
     api: {
+      testSendIneligible: 'Account, template or stable target is not ready for Test Send.',
+      testSendIntentMissing: 'Test Send preview was not found.',
+      testSendIntentExpired: 'Preview expired. Generate and confirm a new preview.',
+      testSendIntentChanged: 'Preview no longer matches current data. Generate a new preview.',
+      testSendIntentConsumed:
+        'This preview has already been consumed. Check the existing run; do not resend.',
+      testSendIntentLimit: 'Too many unexpired previews. Wait for expiry.',
+      testSendMissing: 'Test Send was not found.',
       accountNotReady: 'The account is not ready for contact discovery.',
       contactNotFound: 'Contact not found.',
       syncNotFound: 'Contact sync not found.',

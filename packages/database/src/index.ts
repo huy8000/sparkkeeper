@@ -325,3 +325,9 @@ export type {
   TargetSendFailureCode,
   TargetSendMachineStatus,
 } from '@sparkkeeper/shared';
+export {
+  TestSendRepository,
+  TestSendError,
+  testSendIdentityDigest,
+} from './repositories/TestSendRepository.js';
+export { testSendIntents, type TestSendIntent } from './schema/testSendIntents.js';

@@ -16,6 +16,8 @@ export interface DeliveryObservationPort {
   readonly page: object;
   readonly context: object;
   arm(binding: ResolutionWitnessBinding, knownText: string, budget: DeliveryBudget): Promise<void>;
+  /** Narrow input-only preparation, after observer arm. Never invokes a send control. */
+  prepare?(budget: DeliveryBudget): Promise<void>;
   ready(budget: DeliveryBudget): Promise<void>;
   beginBoundary(budget: DeliveryBudget): Promise<void>;
   invokeOnce(budget: DeliveryBudget): Promise<void>;

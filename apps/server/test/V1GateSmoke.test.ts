@@ -25,11 +25,11 @@ test('V1 Gate smoke verifies release preparation entirely offline with safe outp
   assert.equal(output.includes('Hello'), false);
 });
 
-test('V1 Gate smoke migration inventory covers 0000–0010 (11 migrations)', () => {
+test('V1 Gate smoke migration inventory covers 0000–0011 (12 migrations)', () => {
   const directory = mkdtempSync(path.join(tmpdir(), 'sparkkeeper-v1-migration-'));
   const client = createDatabase({ databasePath: path.join(directory, 'test.db') });
   try {
-    assert.equal(client.migrate().appliedMigrationCount, 11);
+    assert.equal(client.migrate().appliedMigrationCount, 12);
   } finally {
     client.close();
     rmSync(directory, { recursive: true, force: true });

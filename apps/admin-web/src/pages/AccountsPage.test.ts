@@ -40,7 +40,7 @@ describe('Accounts and workspace shell', () => {
     expect(wrapper.get('.account-workspace__header').text()).toContain(accountFixture.name);
     expect(wrapper.get('.account-workspace__header').text()).toContain('Ready');
     expect(wrapper.get('.account-workspace__header').text()).toContain('Enabled');
-    expect(wrapper.get('.account-tabs').findAll('a')).toHaveLength(6);
+    expect(wrapper.get('.account-tabs').findAll('a')).toHaveLength(7);
     expect(wrapper.text()).not.toContain(ACCOUNT_ID);
     wrapper.unmount();
   });

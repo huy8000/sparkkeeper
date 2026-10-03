@@ -212,3 +212,4 @@ export {
   type DiscoveryStableKind,
   type ContactObservation,
 } from './Contact.js';
+export type { TestSendPreview, TestSendAccepted, TestSendDetail } from './TestSend.js';

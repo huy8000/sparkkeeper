@@ -140,7 +140,7 @@ Exit：all resolver fixtures PASS；no MessageSender invocation/composer action�
 
 Branch：`feature/v4-6-delivery-verification`
 
-Status：IMPLEMENTED / OFFLINE VERIFIED（Milestone Owner 自审）。Milestone authority 见 [V4-6 Spec](./specs/v4-6-implementation-spec.md)；只做内部 verifier，不新增生产发送入口、HTTP/UI、Test Send 或 Scheduler。Live action/evidence contract 仍 fail closed；未执行 Gate B 或真实发送。
+Status：MERGED / ACCEPTED（PR #46，`develop@c76cd1fdac8da6f5f1aaf0958fd01fb7c97b32fb`）。Milestone authority 见 [V4-6 Spec](./specs/v4-6-implementation-spec.md)；只做内部 verifier，不新增生产发送入口、HTTP/UI、Test Send 或 Scheduler。Live action/evidence contract 仍 fail closed；未执行 Gate B 或真实发送。
 
 交付：
 
@@ -157,6 +157,8 @@ Exit：controlled browser tests cover history/sticker/inbound/nonmatch/remount/c
 ### V4-7 — Test Send
 
 Branch：`feature/v4-7-test-send`
+
+当前状态：IMPLEMENTED / SELF-REVIEWED / OFFLINE VERIFIED，待 PR 合并。当前授权范围：仅单目标，不实现以下原 roadmap 中的 sequential batch。Authority 见 [V4-7 Spec](./specs/v4-7-implementation-spec.md)。交付 preview/确认、共同 coordinator、snapshot/boundary CAS、保守 recovery、API/最小 UI；生产 execute 保持 gate closed，离线验证不代表 live worker/DOM 已可用。批量能力延期，Scheduler 仍属 V4-8。
 
 交付：
 

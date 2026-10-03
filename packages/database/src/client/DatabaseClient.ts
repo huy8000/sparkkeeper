@@ -555,6 +555,28 @@ export class DatabaseClient {
     }
 
     const inspection = this.inspect();
+    const intentColumns = this.readTableColumns('test_send_intents');
+    const expectedIntentColumns: readonly DatabaseColumnState[] = [
+      ...[
+        'id',
+        'account_id',
+        'admin_id',
+        'contact_id',
+        'template_id',
+        'preview_key_digest',
+        'fingerprint',
+        'payload_digest',
+        'summary',
+      ].map((name) => ({ name, type: 'TEXT', notNull: true, primaryKey: name === 'id' })),
+      ...['created_at', 'expires_at'].map((name) => ({
+        name,
+        type: 'INTEGER',
+        notNull: true,
+        primaryKey: false,
+      })),
+      { name: 'consumed_run_id', type: 'TEXT', notNull: false, primaryKey: false },
+      { name: 'active_slot', type: 'INTEGER', notNull: false, primaryKey: false },
+    ];
     if (
       !inspection.accountsSchemaCompatible ||
       !inspection.dailyRunsSchemaCompatible ||
@@ -578,7 +600,8 @@ export class DatabaseClient {
       !inspection.deliveryResolutionsSchemaCompatible ||
       !inspection.auditEventsSchemaCompatible ||
       !inspection.legacyFriendBindingsSchemaCompatible ||
-      !inspection.legacyScheduleImportsSchemaCompatible
+      !inspection.legacyScheduleImportsSchemaCompatible ||
+      !columnsMatch(intentColumns, expectedIntentColumns)
     ) {
       throw new DatabaseSchemaError(
         'Database migrations completed, but the database tables are incompatible with the Drizzle schema.',

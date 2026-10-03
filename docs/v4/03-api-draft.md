@@ -135,6 +135,8 @@ V4.0 没有 Template DELETE；disable 已被 enabled Task 引用时返回影响�
 
 ## 7. Test Send
 
+V4-7 本轮用户授权的实现子集见 [V4-7 Spec](./specs/v4-7-implementation-spec.md)：`contactIds` 严格为 1 个；intent POST 为 M + Idempotency-Key，execute 为 R + explicit confirm/digest + Idempotency-Key（D 由 R guard 与 payload confirmation 实现）。新增 canonical `GET /test-sends/:runId`，不与 legacy `/runs/:id` 混用。无自动 retry，显式同键 canonical 核对不产生第二次动作；生产 runtime 不可用时 execute 在 consume 前 503 RELEASE_GATE_CLOSED，不通过环境 flag 开放 live。以下多目标/History 统一为未来产品 contract，不是本期能力。
+
 | Method / Path                                 | Guard | Request                                 | Response                                                                             | Side effects                                                                                      |
 | --------------------------------------------- | ----- | --------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
 | `POST /accounts/:accountId/test-send-intents` | M     | `{templateId,contactIds:[1..20]}`       | `{intentId,expiresAt,payloadDigest,account,templateSummary,orderedTargets,warnings}` | 只创建 preview intent；不打开 Browser、不生成最终 random message、不发送                          |
