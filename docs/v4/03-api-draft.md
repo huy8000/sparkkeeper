@@ -159,6 +159,8 @@ V4-7 本轮用户授权的实现子集见 [V4-7 Spec](./specs/v4-7-implementatio
 
 Task target 不用独立 public CRUD；修改通过 disabled Task PATCH 的完整 `contactIds` 集合，transaction diff，避免部分配置。
 
+V4-8 的 milestone authority 见 [V4-8 Spec](./specs/v4-8-implementation-spec.md)。本期 PATCH 原子替换完整 Task configuration + `expectedUpdatedAt`，仅 disabled/no active Run；enable/archive 由 R + schema 强制 confirmation/version 实现上述 D 语义。最小 list 使用 bounded `offset`/`limit`、accountId/enabled，返回 `{items,masterOpen,released}`；Task detail 附安全 `latestRun` 引用，不返回 message/identity。新增只读 `GET /scheduled-runs/:runId`（S）提供 managed Run/record status、attempt count、failure/boundary/retry timestamps，不提供 send/retry mutation。UI 为第一页面；更完整 pagination/next-window 展示和 unified History 留给后续 UI/observability milestone。production enable 返回 RELEASE_GATE_CLOSED；没有环境开关 bypass，也没有 Run Now。
+
 ## 9. Legacy Schedule Import
 
 | Method / Path                               | Guard | Request                                          | Response                               | Side effects                                                       |

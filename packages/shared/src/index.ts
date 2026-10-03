@@ -213,3 +213,4 @@ export {
   type ContactObservation,
 } from './Contact.js';
 export type { TestSendPreview, TestSendAccepted, TestSendDetail } from './TestSend.js';
+export * from './ScheduledTask.js';

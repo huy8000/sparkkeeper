@@ -1,4 +1,32 @@
 export const enUS = {
+  tasks: {
+    title: 'Tasks',
+    scope:
+      'Persistent daily-window tasks. Production execution is locked. No Run Now or uncertain-send retry.',
+    master: 'Master gate',
+    released: 'Execution authorized',
+    targets: 'Targets',
+    overlaps: 'Other enabled tasks sharing targets',
+    edit: 'Edit disabled task',
+    create: 'Create disabled task',
+    name: 'Name',
+    account: 'Account',
+    template: 'Template',
+    start: 'Start (inclusive)',
+    end: 'End (exclusive)',
+    timezone: 'IANA timezone',
+    attempts: 'Maximum attempts (pre-action recovery only)',
+    interval: 'Recovery retry interval (seconds)',
+    save: 'Save configuration',
+    enable: 'Enable',
+    disable: 'Disable',
+    archive: 'Archive',
+    confirm:
+      'I confirm the saved configuration and acknowledge overlapping tasks; archive is irreversible.',
+    error: 'Task operation failed. Refresh canonical state before another mutation.',
+    run: 'Scheduled run',
+    noRetry: 'Unknown results are terminal. No retry or force resend.',
+  },
   testSend: {
     title: 'Test Send',
     scope:
@@ -950,6 +978,8 @@ export const enUS = {
       scheduleNotFound: 'Schedule not found.',
       templateNotFound: 'Message template not found.',
       runNotFound: 'Run not found.',
+      taskNotFound: 'Task not found.',
+      taskConflict: 'Task state or version changed. Refresh before another mutation.',
       validationError: 'The submitted input is invalid. Please review it and try again.',
       conflict: 'The current state conflicts with this operation. Please refresh and try again.',
       runAlreadyInProgress: 'A run is already in progress today.',

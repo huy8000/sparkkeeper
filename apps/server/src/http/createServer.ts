@@ -1,4 +1,6 @@
 import fastifyCookie from '@fastify/cookie';
+import { registerTaskRoutes } from './routes/taskRoutes.js';
+import type { SendTaskScheduler } from '../scheduling/SendTaskScheduler.js';
 import { registerTestSendRoutes } from './routes/testSendRoutes.js';
 import type { TestSendManager } from '../test-send/TestSendManager.js';
 import fastifyWebsocket from '@fastify/websocket';
@@ -34,6 +36,7 @@ import {
 } from '../onboarding/AuthenticatedConsoleGateway.js';
 
 export interface CreateServerOptions {
+  readonly scheduling?: SendTaskScheduler;
   readonly testSend?: TestSendManager;
   readonly services: ApiServices;
   readonly config?: HttpConfig | undefined;
@@ -120,6 +123,7 @@ export function createServer(options: CreateServerOptions): CreatedServer {
   registerStatusRoutes(server, options.services);
   registerAccountRoutes(server, options.services);
   if (options.testSend) registerTestSendRoutes(server, options.testSend);
+  if (options.scheduling) registerTaskRoutes(server, options.scheduling);
   if (options.discovery)
     registerContactRoutes(
       server,

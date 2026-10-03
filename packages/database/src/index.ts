@@ -331,3 +331,12 @@ export {
   testSendIdentityDigest,
 } from './repositories/TestSendRepository.js';
 export { testSendIntents, type TestSendIntent } from './schema/testSendIntents.js';
+export {
+  TaskConfigurationRepository,
+  TaskError,
+} from './repositories/TaskConfigurationRepository.js';
+export {
+  ScheduledSendRepository,
+  type ScheduledSnapshot,
+} from './repositories/ScheduledSendRepository.js';
+export { scheduledRunSnapshots } from './schema/scheduledRunSnapshots.js';

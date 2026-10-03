@@ -26,7 +26,7 @@ export function runV1GateSmoke(): string {
     const databasePath = path.join(dataDirectory, 'sparkkeeper.db');
     const client = createDatabase({ databasePath });
     const migration = client.migrate();
-    if (migration.appliedMigrationCount !== 12) throw new Error('Gate smoke migration mismatch.');
+    if (migration.appliedMigrationCount !== 13) throw new Error('Gate smoke migration mismatch.');
 
     const account = executeMaintenanceCommand(client, [
       'account',

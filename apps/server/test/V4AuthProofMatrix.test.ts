@@ -1,4 +1,38 @@
 import assert from 'node:assert/strict';
+function taskMutationBodies() {
+  const cfg = {
+    name: 'Synthetic auth proof',
+    accountId: randomUUID(),
+    templateId: randomUUID(),
+    contactIds: [randomUUID()],
+    schedule: {
+      type: 'DAILY_WINDOW',
+      startTime: '09:00',
+      endTime: '12:00',
+      timezone: 'UTC',
+      maxAttempts: 1,
+      retryIntervalSeconds: 1,
+    },
+  };
+  return {
+    'POST /api/tasks': cfg,
+    'PATCH /api/tasks/:taskId': { ...cfg, expectedUpdatedAt: '2030-01-01T00:00:00.000Z' },
+    'POST /api/tasks/:taskId/disable': { expectedUpdatedAt: '2030-01-01T00:00:00.000Z' },
+  };
+}
+function markTaskMutations(app: ReturnType<typeof createApiApplication>, hit: () => void) {
+  const repo = app.scheduling.repository.tasks,
+    create = repo.create.bind(repo),
+    mutate = repo.mutate.bind(repo);
+  repo.create = (...args) => {
+    hit();
+    return create(...args);
+  };
+  repo.mutate = (...args) => {
+    hit();
+    return mutate(...args);
+  };
+}
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Writable } from 'node:stream';
 import { readdirSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
@@ -1915,10 +1949,12 @@ test('A22 - every registered M route rejects missing/bad CSRF with handler=0 (in
       handlerCalls++;
       return originalPreview(...args);
     };
+    markTaskMutations(ctx.app, () => handlerCalls++);
     // Routes registered with concrete parameter URLs; fixtures use the same
     // literal paths the inventory reports.
     const bodies: Record<string, unknown> = {
       'POST /api/auth/logout': {},
+      ...taskMutationBodies(),
       'POST /api/accounts/:accountId/contact-syncs': {},
       'POST /api/accounts/:accountId/test-send-intents': {
         templateId: randomUUID(),
@@ -2877,6 +2913,14 @@ test('V42-RR-02 - exact bidirectional route map derived from Fastify registratio
       'POST /api/accounts/:accountId/test-send-intents': 'M',
       'POST /api/accounts/:accountId/test-sends': 'R',
       'GET /api/test-sends/:runId': 'S',
+      'GET /api/tasks': 'S',
+      'GET /api/tasks/:taskId': 'S',
+      'GET /api/scheduled-runs/:runId': 'S',
+      'POST /api/tasks': 'M',
+      'PATCH /api/tasks/:taskId': 'M',
+      'POST /api/tasks/:taskId/disable': 'M',
+      'POST /api/tasks/:taskId/enable': 'R',
+      'POST /api/tasks/:taskId/archive': 'R',
       'GET /api/contact-syncs/:syncRunId': 'S',
       'GET /api/accounts/:accountId/contacts': 'S',
       'GET /api/contacts/:contactId': 'S',
@@ -2943,12 +2987,12 @@ test('V42-RR-02 - exact bidirectional route map derived from Fastify registratio
     const logical = inventory.filter((r) => r.method !== 'HEAD');
     const classes = { P: 0, L: 0, S: 0, M: 0, R: 0 } as Record<string, number>;
     for (const route of logical) classes[route.authClass] += 1;
-    assert.equal(logical.length, 44);
+    assert.equal(logical.length, 52);
     assert.equal(classes.P, 1);
     assert.equal(classes.L, 1);
-    assert.equal(classes.S, 27);
-    assert.equal(classes.M, 14);
-    assert.equal(classes.R, 1);
+    assert.equal(classes.S, 30);
+    assert.equal(classes.M, 17);
+    assert.equal(classes.R, 3);
 
     // Registration-time rejection of an invalid truthy class (runtime config).
     const Fastify = (await import('fastify')).default;
@@ -3841,8 +3885,10 @@ test('F19 - every M route: missing/duplicate/bad/cross-session CSRF with handler
       handlerCalls++;
       return originalPreview(...args);
     };
+    markTaskMutations(ctx.app, () => handlerCalls++);
     const bodies: Record<string, unknown> = {
       'POST /api/auth/logout': {},
+      ...taskMutationBodies(),
       'POST /api/accounts/:accountId/contact-syncs': {},
       'POST /api/accounts/:accountId/test-send-intents': {
         templateId: randomUUID(),
@@ -4767,6 +4813,7 @@ test('V42-RR-03: every actual M route executes missing and wrong media -> 400 VA
     // Route-specific valid body fixture table; coverage-checked BOTH ways.
     const bodies: Record<string, unknown> = {
       'POST /api/auth/logout': {},
+      ...taskMutationBodies(),
       'POST /api/accounts/:accountId/contact-syncs': {},
       'POST /api/accounts/:accountId/test-send-intents': {
         templateId: randomUUID(),
@@ -4818,6 +4865,7 @@ test('V42-RR-03: every actual M route executes missing and wrong media -> 400 VA
       businessHandlerCalls++;
       return originalPreview(...args);
     };
+    markTaskMutations(app, () => businessHandlerCalls++);
     const configuration = app.services.configuration as unknown as Record<string, unknown>;
     for (const method of [
       'updateAccount',

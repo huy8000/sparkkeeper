@@ -32,11 +32,11 @@ test('0011 upgrades populated 0010 and preserves pre-existing TEST_SEND/schedule
       idempotencyKey: `historical-${n}`,
     }),
   );
-  assert.equal(f.client.migrate().appliedMigrationCount, 12);
-  assert.equal(f.client.migrate().appliedMigrationCount, 12);
+  assert.equal(f.client.migrate().appliedMigrationCount, 13);
+  assert.equal(f.client.migrate().appliedMigrationCount, 13);
   const reopened = createDatabase({ databasePath: f.databasePath });
   t.after(() => reopened.close());
-  assert.equal(reopened.migrate().appliedMigrationCount, 12);
+  assert.equal(reopened.migrate().appliedMigrationCount, 13);
   for (const r of old) assert.deepEqual(new ExecutionRunRepository(reopened).findById(r.id), r);
   const sql = new BetterSqlite3(f.databasePath);
   t.after(() => sql.close());
