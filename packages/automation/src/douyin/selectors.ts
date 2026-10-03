@@ -5,6 +5,15 @@ export interface AuthCssSignal {
 
 export const DOUYIN_CHAT_URL = 'https://www.douyin.com/chat';
 
+/** Controlled-local delivery contract only; no corresponding verified live action selectors. */
+export const DELIVERY_LOCAL_V1 = {
+  list: '[data-sk-delivery-list="static-v1"]',
+  row: 'div[data-sk-delivery-bubble]',
+  text: 'span[data-sk-delivery-text]',
+  composer: 'textarea[data-sk-delivery-composer]',
+  control: 'button[data-sk-delivery-control]',
+} as const;
+
 /** V4 resolver-only scopes. No fixture/testid, composer or message-body selectors. */
 export const TARGET_RESOLVER_DOM_V1 = {
   directory: '[data-e2e="chat-list"], [class~="conversationConversationListwrapper"]',

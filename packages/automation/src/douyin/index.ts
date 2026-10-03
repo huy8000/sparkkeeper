@@ -1,3 +1,5 @@
+export { DeliveryVerifier } from './delivery/DeliveryVerifier.js';
+export { DouyinDeliveryPage } from './delivery/DouyinDeliveryPage.js';
 export {
   StableTargetResolver,
   type CandidateWitness,

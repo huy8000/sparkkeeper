@@ -121,7 +121,7 @@ Exit：fixture contract PASS；真实 discovery 留给独立授权 Gate B；无�
 
 Branch：`feature/v4-5-stable-target-resolver`
 
-Status：IMPLEMENTED / OFFLINE VERIFIED（Milestone Owner 自审；Git delivery 已获授权）。基线为 `develop@2fd237f0405d3171c1606c27b9862763baabf950`；Gate B 未执行，生产 DOM 完整性仍保守 fail closed。
+Status：MERGED / ACCEPTED（PR #45，`develop@d964fc4f8b3d8ead0f675a0d2c2477edb32eb5a5`）；不重新打开。Gate B 未执行，生产 DOM 完整性仍保守 fail closed。
 
 交付：
 
@@ -139,6 +139,8 @@ Exit：all resolver fixtures PASS；no MessageSender invocation/composer action�
 ### V4-6 — Delivery Verification
 
 Branch：`feature/v4-6-delivery-verification`
+
+Status：IMPLEMENTED / OFFLINE VERIFIED（Milestone Owner 自审）。Milestone authority 见 [V4-6 Spec](./specs/v4-6-implementation-spec.md)；只做内部 verifier，不新增生产发送入口、HTTP/UI、Test Send 或 Scheduler。Live action/evidence contract 仍 fail closed；未执行 Gate B 或真实发送。
 
 交付：
 

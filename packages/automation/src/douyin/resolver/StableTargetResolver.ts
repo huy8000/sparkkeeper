@@ -188,38 +188,48 @@ export class StableTargetResolver {
         stopResolution('IDENTITY_CHANGED');
       if (selectedState.directoryEpoch !== invocation.epoch) stopResolution('DIRECTORY_CHANGED');
       const frozenRequest = invocation.request;
-      const witness = issueResolutionWitness(this.brand, async () => {
-        try {
-          await this.guard(invocation);
-          const state = await budget.run(() => this.port.pageState(budget));
-          if (state.selectionRevision !== selectedState.selectionRevision)
-            stopResolution('IDENTITY_CHANGED');
-          if (!(await budget.run(() => this.port.certifyCoverage(invocation.epoch, budget))))
-            stopResolution('DIRECTORY_CHANGED');
-          this.verifyCurrent(
-            invocation,
-            await budget.run(() => this.port.currentConversation(budget)),
-          );
-          await this.assertOwner(budget);
-          const after = await budget.run(() => this.port.pageState(budget));
-          if (
-            after.selectionRevision !== selectedState.selectionRevision ||
-            after.navigation !== selectedState.navigation ||
-            after.page !== selectedState.page ||
-            after.context !== selectedState.context
-          )
-            stopResolution('IDENTITY_CHANGED');
-          if (after.directoryEpoch !== invocation.epoch) stopResolution('DIRECTORY_CHANGED');
-          if (
-            this.owner.generation !== invocation.generation ||
-            pageOwners.get(invocation.state.page)?.token !== invocation.token
-          )
-            stopResolution('RUNTIME_OWNERSHIP_LOST');
-          return null;
-        } catch (error) {
-          return this.failure(error);
-        }
-      });
+      const witness = issueResolutionWitness(
+        this.brand,
+        async () => {
+          try {
+            await this.guard(invocation);
+            const state = await budget.run(() => this.port.pageState(budget));
+            if (state.selectionRevision !== selectedState.selectionRevision)
+              stopResolution('IDENTITY_CHANGED');
+            if (!(await budget.run(() => this.port.certifyCoverage(invocation.epoch, budget))))
+              stopResolution('DIRECTORY_CHANGED');
+            this.verifyCurrent(
+              invocation,
+              await budget.run(() => this.port.currentConversation(budget)),
+            );
+            await this.assertOwner(budget);
+            const after = await budget.run(() => this.port.pageState(budget));
+            if (
+              after.selectionRevision !== selectedState.selectionRevision ||
+              after.navigation !== selectedState.navigation ||
+              after.page !== selectedState.page ||
+              after.context !== selectedState.context
+            )
+              stopResolution('IDENTITY_CHANGED');
+            if (after.directoryEpoch !== invocation.epoch) stopResolution('DIRECTORY_CHANGED');
+            if (
+              this.owner.generation !== invocation.generation ||
+              pageOwners.get(invocation.state.page)?.token !== invocation.token
+            )
+              stopResolution('RUNTIME_OWNERSHIP_LOST');
+            return null;
+          } catch (error) {
+            return this.failure(error);
+          }
+        },
+        Object.freeze({
+          page: selectedState.page,
+          context: selectedState.context,
+          request: frozenRequest,
+          candidate: invocation.candidate,
+          self: Object.freeze({ ...this.binding }),
+        }),
+      );
       // The owner token remains as the current observation epoch; new resolution invalidates it.
       this.finish(invocation, false);
       if (!sameResolverRequest(frozenRequest, request)) {
