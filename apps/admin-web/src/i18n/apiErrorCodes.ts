@@ -8,6 +8,10 @@
  */
 export const KNOWN_API_ERROR_CODES = [
   'ACCOUNT_NOT_FOUND',
+  'ACCOUNT_NOT_READY',
+  'CONTACT_NOT_FOUND',
+  'CONTACT_SYNC_NOT_FOUND',
+  'AVATAR_NOT_FOUND',
   'FRIEND_NOT_FOUND',
   'SCHEDULE_NOT_FOUND',
   'TEMPLATE_NOT_FOUND',
@@ -44,6 +48,10 @@ export type KnownApiErrorCode = (typeof KNOWN_API_ERROR_CODES)[number];
 
 const API_ERROR_TRANSLATION_KEYS: Record<KnownApiErrorCode, string> = {
   ACCOUNT_NOT_FOUND: 'errors.api.accountNotFound',
+  ACCOUNT_NOT_READY: 'errors.api.accountNotReady',
+  CONTACT_NOT_FOUND: 'errors.api.contactNotFound',
+  CONTACT_SYNC_NOT_FOUND: 'errors.api.syncNotFound',
+  AVATAR_NOT_FOUND: 'errors.api.avatarNotFound',
   FRIEND_NOT_FOUND: 'errors.api.friendNotFound',
   SCHEDULE_NOT_FOUND: 'errors.api.scheduleNotFound',
   TEMPLATE_NOT_FOUND: 'errors.api.templateNotFound',

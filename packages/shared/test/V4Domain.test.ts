@@ -305,6 +305,8 @@ test('Contact domain enums, type guards, and validators', () => {
     'PARSER_CONTRACT_FAILURE',
     'BROWSER_FAILURE',
     'PERSISTENCE_FAILURE',
+    'DISCOVERY_STALLED',
+    'PROCESS_INTERRUPTED',
   ]);
   for (const code of CONTACT_SYNC_FAILURE_CODES) {
     assert.equal(isContactSyncFailureCode(code), true);

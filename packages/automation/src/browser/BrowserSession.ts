@@ -14,6 +14,7 @@ export interface BrowserSessionHandle {
 export interface BrowserProcessTrackingOptions {
   readonly launcherExecutablePath: string;
   readonly identityFilePath: string;
+  readonly discoveryProof?: { readonly path: string; readonly runId: string };
 }
 
 export interface BrowserSessionOptions {
@@ -110,6 +111,12 @@ export class BrowserSession {
               ...definedEnvironment(process.env),
               SPARKKEEPER_CHROMIUM_EXECUTABLE: chromium.executablePath(),
               SPARKKEEPER_CHROMIUM_IDENTITY_FILE: tracking.identityFilePath,
+              ...(tracking.discoveryProof === undefined
+                ? {}
+                : {
+                    SPARKKEEPER_DISCOVERY_PROOF_PATH: tracking.discoveryProof.path,
+                    SPARKKEEPER_DISCOVERY_RUN_ID: tracking.discoveryProof.runId,
+                  }),
             },
           };
     return chromium.launchPersistentContext(this.config.userDataDir, {
@@ -256,6 +263,8 @@ export class BrowserSession {
 
 function definedEnvironment(environment: NodeJS.ProcessEnv): Record<string, string> {
   return Object.fromEntries(
-    Object.entries(environment).filter((entry): entry is [string, string] => entry[1] !== undefined),
+    Object.entries(environment).filter(
+      (entry): entry is [string, string] => entry[1] !== undefined,
+    ),
   );
 }

@@ -158,8 +158,10 @@ test('V2 read-only API foundation', async (context) => {
       'createdAt',
       'enabled',
       'id',
+      'lifecycleStatus',
       'loginStatus',
       'name',
+      'profileState',
       'updatedAt',
     ]);
 
@@ -171,6 +173,8 @@ test('V2 read-only API foundation', async (context) => {
     assert.equal(detail.statusCode, 200);
     assert.equal(detail.json().data.id, fixture.account.id);
     assert.equal(detail.json().data.loginStatus, 'READY');
+    assert.equal(detail.json().data.profileState, fixture.account.profileState);
+    assert.equal(detail.json().data.lifecycleStatus, fixture.account.lifecycleStatus);
   });
 
   await context.test('accounts distinguish invalid ids and missing entities', async () => {

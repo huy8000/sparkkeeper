@@ -1,6 +1,6 @@
 # V4-3 Implementation Specification — Douyin Account Onboarding
 
-> Status: FROZEN / READY FOR IMPLEMENTATION
+> Status: MERGED / ACCEPTED (PR #43; merge commit `e5a3e925c0a6b2436a68679d0ca44d804c2e5a2f`)
 > Spec owner / reviewer: Codex
 > Implementer: Development Agent
 > Starting branch: `develop`

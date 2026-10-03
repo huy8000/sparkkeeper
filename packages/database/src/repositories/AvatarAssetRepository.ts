@@ -220,13 +220,14 @@ export class AvatarAssetRepository {
     }
   }
 
-  touch(id: string, now?: Date): AvatarAsset | undefined {
+  touch(id: string, now?: Date, expiresAt?: Date): AvatarAsset | undefined {
     const timestamp = now ?? new Date();
     try {
       return this.client.orm
         .update(avatarAssets)
         .set({
           lastReferencedAt: timestamp,
+          ...(expiresAt === undefined ? {} : { expiresAt }),
           updatedAt: timestamp,
         })
         .where(eq(avatarAssets.id, id))

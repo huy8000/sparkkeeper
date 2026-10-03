@@ -61,3 +61,10 @@ export {
   type ResolvedContact,
   type TargetContactIdentity,
 } from './douyin/index.js';
+export {
+  DouyinContactDirectory,
+  collectContactDirectory,
+  type DirectoryResult,
+  type DirectorySource,
+  type DirectoryWindow,
+} from './douyin/DouyinContactDirectory.js';

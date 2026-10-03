@@ -17,6 +17,7 @@ import {
   accountLoginSessions,
   accounts,
   auditEvents,
+  contactSyncRuns,
   type AccountLoginSessionRow,
   type AccountRow,
   type NewAccountLoginSessionRow,
@@ -206,6 +207,15 @@ export class AccountOnboardingRepository {
               .where(inArray(accountLoginSessions.status, [...ACTIVE_LOGIN_SESSION_STATUSES]))
               .limit(1)
               .get();
+            if (
+              tx
+                .select({ id: contactSyncRuns.id })
+                .from(contactSyncRuns)
+                .where(inArray(contactSyncRuns.status, ['PENDING', 'RUNNING']))
+                .limit(1)
+                .get()
+            )
+              return { outcome: 'ACTIVE_CONFLICT' as const, ownedSession: null };
             if (active) {
               return {
                 outcome: 'ACTIVE_CONFLICT' as const,

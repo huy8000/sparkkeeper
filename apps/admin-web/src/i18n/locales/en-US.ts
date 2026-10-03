@@ -1,4 +1,34 @@
 export const enUS = {
+  contacts: {
+    title: 'Contacts',
+    scope: 'Read-only discovery of this account’s conversation directory; no sends.',
+    sync: 'Sync contacts',
+    reconcile: 'Check uncertain start',
+    uncertain:
+      'The start result is uncertain. An explicit retry reuses the same key; no automatic retry.',
+    busy: 'A browser flow is active.',
+    search: 'Search',
+    type: 'Type',
+    availability: 'Availability',
+    identity: 'Identity',
+    all: 'All',
+    empty: 'No discovered contacts. This is not proof of an empty directory.',
+    partial:
+      'Partial coverage: unseen contacts are unchanged. Limits: 120 seconds / 500 observations. Repeating starts at the top.',
+    name: 'Name',
+    streak: 'Streak',
+    next: 'Next page',
+    detail: 'Contact details',
+    notSendPermission: 'Identity readiness is not permission or verification to send.',
+    status: {
+      PENDING: 'Pending',
+      RUNNING: 'Discovering',
+      COMPLETE: 'Complete directory scan',
+      PARTIAL: 'Partial scan',
+      FAILED: 'Discovery failed / interrupted',
+      AUTH_EXPIRED: 'Account login expired',
+    },
+  },
   common: {
     retry: 'Retry',
     refresh: 'Refresh',
@@ -885,6 +915,10 @@ export const enUS = {
   },
   errors: {
     api: {
+      accountNotReady: 'The account is not ready for contact discovery.',
+      contactNotFound: 'Contact not found.',
+      syncNotFound: 'Contact sync not found.',
+      avatarNotFound: 'Cached avatar unavailable.',
       accountNotFound: 'Account not found.',
       friendNotFound: 'Friend not found.',
       scheduleNotFound: 'Schedule not found.',

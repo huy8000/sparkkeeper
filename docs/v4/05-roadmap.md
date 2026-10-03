@@ -82,7 +82,7 @@ Exit：未认证只能访问 minimal health/login；no default password/setup pa
 
 Branch：`feature/v4-3-account-onboarding`
 
-Status：SPEC FROZEN / READY FOR IMPLEMENTATION
+Status：MERGED / ACCEPTED（PR #43，`develop@e5a3e925c0a6b2436a68679d0ca44d804c2e5a2f`）；不重新打开。
 
 交付：
 
@@ -103,6 +103,8 @@ Exit：No-send Gate tests；真实 Account 验证留给单独 Gate B 授权。Mi
 
 Branch：`feature/v4-4-contact-discovery`
 
+Status：IMPLEMENTED / PENDING INDEPENDENT REVIEW（未提交）；真实 discovery Gate B 未授权、未执行。当前 production adapter 无已验证结束证据时只允许 PARTIAL/FAILED，不推进 unseen stale；可靠 avatar/streak 提取不可用时为 placeholder/null。
+
 交付：
 
 - normal `/chat` candidate parser；
@@ -113,7 +115,7 @@ Branch：`feature/v4-4-contact-discovery`
 - Contacts list/detail/search/filter/sync UI；
 - no-private-API/no-chat-body privacy tests。
 
-Exit：fixture contract PASS；真实 discovery 留给 Gate B；无发送 API。
+Exit：fixture contract PASS；真实 discovery 留给独立授权 Gate B；无发送 API。Milestone authority 见 [V4-4 Implementation Specification](./specs/v4-4-implementation-spec.md)。最小交付为手动 bounded sync、只读 Contact list/detail、身份风险显示与 opportunistic avatar cache；不实现 preferred-identity mutation、legacy binding 或 Target Resolver。分页完整性不能由 virtual-list index/scroll-bottom 推断，部分扫描不推进 stale policy。
 
 ### V4-5 — Stable Target Resolver
 

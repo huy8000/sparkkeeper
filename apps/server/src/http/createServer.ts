@@ -9,6 +9,9 @@ import {
   type AdminAuthGuardRegistration,
 } from './plugins/AdminAuthGuards.js';
 import { registerAccountRoutes } from './routes/accountRoutes.js';
+import { registerContactRoutes } from './routes/contactRoutes.js';
+import type { ContactDiscoveryManager } from '../contacts/ContactDiscoveryManager.js';
+import type { AvatarCacheStore } from '../contacts/AvatarCacheStore.js';
 import { registerAccountLoginSessionRoutes } from './routes/accountLoginSessionRoutes.js';
 import { registerAuthRoutes } from './routes/authRoutes.js';
 import { registerConfigurationRoutes } from './routes/configurationRoutes.js';
@@ -36,6 +39,7 @@ export interface CreateServerOptions {
   readonly realtime?: RealtimeRouteRegistrationOptions | undefined;
   readonly console?: ConsoleRouteOptions | undefined;
   readonly onboarding?: AccountOnboardingManager | undefined;
+  readonly discovery?: { manager: ContactDiscoveryManager; avatars: AvatarCacheStore };
 }
 
 export interface CreatedServer {
@@ -112,6 +116,13 @@ export function createServer(options: CreateServerOptions): CreatedServer {
   );
   registerStatusRoutes(server, options.services);
   registerAccountRoutes(server, options.services);
+  if (options.discovery)
+    registerContactRoutes(
+      server,
+      options.discovery.manager,
+      options.discovery.avatars,
+      options.clock,
+    );
   if (options.onboarding !== undefined) {
     registerAccountLoginSessionRoutes(server, options.onboarding);
   }

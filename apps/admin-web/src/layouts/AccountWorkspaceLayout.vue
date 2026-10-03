@@ -56,6 +56,7 @@ useRealtimeRefresh(
 const tabs = computed(() => [
   { labelKey: 'nav.overview', path: `/accounts/${accountId.value}/overview` },
   { labelKey: 'account.friendsTab', path: `/accounts/${accountId.value}/friends` },
+  { labelKey: 'contacts.title', path: `/accounts/${accountId.value}/contacts` },
   { labelKey: 'account.scheduleTab', path: `/accounts/${accountId.value}/schedule` },
   { labelKey: 'account.manualRunTab', path: `/accounts/${accountId.value}/manual-run` },
   { labelKey: 'account.historyTab', path: `/accounts/${accountId.value}/history` },

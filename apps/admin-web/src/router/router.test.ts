@@ -50,7 +50,7 @@ describe('admin routing', () => {
     installApiFetch();
     const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}/friends`);
     const tabs = wrapper.get('nav[aria-label="Account workspace"]');
-    expect(tabs.findAll('a')).toHaveLength(5);
+    expect(tabs.findAll('a')).toHaveLength(6);
     expect(tabs.get(`a[href="/accounts/${ACCOUNT_ID}/friends"]`).classes()).toContain(
       'account-tabs__link--active',
     );

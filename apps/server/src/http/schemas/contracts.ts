@@ -263,6 +263,11 @@ export const accountSchema = {
     name: { type: 'string' },
     enabled: { type: 'boolean' },
     loginStatus: { type: 'string', enum: [...LOGIN_STATUSES] },
+    profileState: {
+      type: 'string',
+      enum: ['PROVISIONING', 'READY', 'MIGRATION_REQUIRED', 'MISSING', 'QUARANTINED'],
+    },
+    lifecycleStatus: { type: 'string', enum: ['ACTIVE', 'UNBOUND'] },
     createdAt: isoTimestampSchema,
     updatedAt: isoTimestampSchema,
   },

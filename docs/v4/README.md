@@ -1,8 +1,8 @@
 # SparkKeeper V4 Planning & Implementation Index
 
-> 状态：V4-1 MERGED / V4-2 MERGED / V4-3 READY FOR IMPLEMENTATION
+> 状态：V4-1 / V4-2 / V4-3 MERGED；V4-4 IMPLEMENTED / PENDING INDEPENDENT REVIEW
 > 目标版本：V4.0.0
-> 当前基线：`develop@154156299be06ecb77ab643e459cda8d2e337c58`；V4 是第一个真实生产基线，V3 是未实际生产使用的开发原型
+> 当前基线：`develop@e5a3e925c0a6b2436a68679d0ca44d804c2e5a2f`；V4 是第一个真实生产基线，V3 是未实际生产使用的开发原型
 
 本目录是 V4 实现、验收和独立 Code Review 的规范入口。Development Agent 必须使用对应 Milestone 的 Implementation Specification；不得从摘要自行补做架构设计。
 
@@ -16,7 +16,8 @@
 | [Roadmap](./05-roadmap.md)                                               | FROZEN       | V4-1…V4-10 dependency order and release gates                 |
 | [V4-1 Implementation Specification](./specs/v4-1-implementation-spec.md) | MERGED       | 已接受的 V4 domain/data foundation 与后续实现基线             |
 | [V4-2 Implementation Specification](./specs/v4-2-implementation-spec.md) | MERGED       | 已接受的 Admin Authentication 与 public security baseline     |
-| [V4-3 Implementation Specification](./specs/v4-3-implementation-spec.md) | READY        | Douyin Account Onboarding 的 milestone authority              |
+| [V4-3 Implementation Specification](./specs/v4-3-implementation-spec.md) | MERGED       | 已接受的 Account-owned profile、onboarding 与 supervised runtime 基线 |
+| [V4-4 Implementation Specification](./specs/v4-4-implementation-spec.md) | IMPLEMENTED / REVIEW PENDING | Contact Discovery 的最小范围、同步完整性与身份落库 contract     |
 
 ## Change control
 
@@ -29,4 +30,4 @@
 
 ## Current phase boundary
 
-V4-1、V4-2 已合并并作为不可重新打开的实现基线；V4-3 Spec 已冻结，可进入另行授权的 Development Agent implementation。当前 planning 仍只修改文档；Runtime source、migration、dependency、production、Douyin、browser、send 与 Scheduler changes 均为 0。
+V4-1、V4-2、V4-3 已合并，不重新打开。V4-3 经 PR #43 合入上述基线；V4-4 已按单独 implementation 授权在 `feature/v4-4-contact-discovery` 实现，尚未独立 review、commit 或 push。验证使用 synthetic DB/parser/API/UI fixture 和断网 Linux 容器中的 detached Node 进程组，不运行真实 discovery、不访问 Douyin、不发送、不启用 Scheduler。离线验收不代表真实页面 discovery 已通过 Gate B；production DOM adapter 的结束证据仍保守 fail closed，avatar/streak 无可靠证据时降级为 placeholder/null。
