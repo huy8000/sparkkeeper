@@ -22,6 +22,8 @@ import {
 } from '@sparkkeeper/database';
 import path from 'node:path';
 import { V4SafeEventRelay } from '../observability/V4SafeEventRelay.js';
+import { AdminSecurityRepository } from '@sparkkeeper/database';
+import { AdminSecurityService } from '../security/AdminSecurityService.js';
 import { MigrationApiService } from './services/MigrationApiService.js';
 import { SendTaskScheduler } from '../scheduling/SendTaskScheduler.js';
 import { TestSendManager, type TestSendRuntimeFactory } from '../test-send/TestSendManager.js';
@@ -265,6 +267,13 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
     const rateLimiter = new LoginRateLimiter();
     const authService = new AdminAuthenticationService(authRepo, hasher, rateLimiter);
     const sessionService = new AdminSessionService(authRepo);
+    const securityService = new AdminSecurityService(
+      new AdminSecurityRepository(database),
+      authRepo,
+      hasher,
+      rateLimiter,
+      options.clock,
+    );
     const onboardingRepository = new AccountOnboardingRepository(database);
     const profileDataDirectory = path.dirname(
       resolveDatabasePath({
@@ -363,6 +372,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
       }),
       auth: authService,
       sessions: sessionService,
+      security: securityService,
       read: new ApiReadService({
         accounts,
         friends,

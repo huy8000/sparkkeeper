@@ -58,7 +58,7 @@ describe('V4-9 explicit offline migration UI', () => {
     await view.findAll('select')[0]!.setValue(ACCOUNT_ID);
     await flushPromises();
     expect(fetch.mock.calls.filter(([, i]) => i?.method === 'POST')).toHaveLength(0);
-    const bind = () => wrapper.findAll('button').find((b) => b.text() === '显式绑定')!;
+    const bind = () => wrapper.findAll('button').find((b) => b.text() === 'Explicitly bind')!;
     expect(bind().attributes('disabled')).toBeDefined();
     await view.findAll('select')[1]!.setValue([contactId]);
     expect(bind().attributes('disabled')).toBeDefined();
@@ -72,7 +72,7 @@ describe('V4-9 explicit offline migration UI', () => {
       expectedUpdatedAt: date,
       confirmationText: 'BIND',
     });
-    expect(wrapper.text()).toContain('不会自动重试');
+    expect(wrapper.text()).toContain('No automatic retry');
     expect(wrapper.find('input[name="profilePath"]').exists()).toBe(false);
     expect(fetch.mock.calls.some(([u]) => String(u).endsWith('/enable'))).toBe(false);
     wrapper.unmount();
@@ -113,13 +113,13 @@ describe('V4-9 explicit offline migration UI', () => {
     const wrapper = await mountAdmin(`/history/${RUN_ID}`);
     expect(wrapper.text()).toContain('V4 / TEST_SEND');
     expect(fetch.mock.calls.filter(([, i]) => i?.method === 'POST')).toHaveLength(0);
-    const action = wrapper.findAll('button').find((b) => b.text() === '追加人工 resolution')!;
+    const action = wrapper.findAll('button').find((b) => b.text() === 'Append human resolution')!;
     expect(action.attributes('disabled')).toBeDefined();
     await wrapper.get('input[type="checkbox"]').setValue(true);
     await action.trigger('click');
     await flushPromises();
     expect(fetch.mock.calls.filter(([, i]) => i?.method === 'POST')).toHaveLength(1);
-    expect(wrapper.text()).toContain('不会自动重试');
+    expect(wrapper.text()).toContain('No automatic retry');
     expect(fetch.mock.calls.some(([u]) => /test-sends|manual-runs|\/enable/.test(String(u)))).toBe(
       false,
     );

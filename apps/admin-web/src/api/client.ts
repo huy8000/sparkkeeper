@@ -227,7 +227,12 @@ export class ApiClient {
         effectiveRetryAfter,
       );
 
-      if (response.status === 401 && path !== '/auth/me') {
+      // A failed credential check does not invalidate the existing session.
+      // Actual session expiry/revocation still invokes the canonical barrier.
+      const credentialFailure =
+        failure.error.code === 'INVALID_CREDENTIALS' &&
+        (path === '/auth/reauth' || path === '/auth/change-password');
+      if (response.status === 401 && path !== '/auth/me' && !credentialFailure) {
         this.onUnauthenticated?.(apiError);
       }
 

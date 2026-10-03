@@ -15,7 +15,10 @@ after(async () => {
   await browser.close();
 });
 const known = 'Synthetic delivery text';
-const limits = { verificationTimeoutMs: 250, pollIntervalMs: 10 };
+// Multiple workspace/browser fixtures contend for CPU in Gate A. Keep a bounded
+// synthetic observation budget without turning a synchronous bubble into a
+// load-dependent UNKNOWN; the explicit timeout fixture below still uses 30 ms.
+const limits = { verificationTimeoutMs: 1500, pollIntervalMs: 10 };
 function html(
   action = 'appendFixture(3, "new", "OUTGOING", message)',
   options: { noIds?: boolean; message?: string; noSequence?: boolean; group?: boolean } = {},

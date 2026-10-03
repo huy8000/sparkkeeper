@@ -15,9 +15,10 @@ const request = http.get(
         process.exitCode =
           response.statusCode === 200 &&
           payload?.success === true &&
-          payload?.data?.status === 'READY' &&
-          payload?.data?.database?.status === 'READY' &&
-          payload?.data?.migration?.status === 'READY'
+          // Public health deliberately exposes no DB/migration details. READY
+          // is the service's conjunction of both probes, not an auth bypass.
+          payload?.data?.serviceName === 'SparkKeeper' &&
+          payload?.data?.status === 'READY'
             ? 0
             : 1;
       } catch {

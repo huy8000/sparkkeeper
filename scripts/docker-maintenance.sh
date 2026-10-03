@@ -8,13 +8,13 @@ action="${1:-}"
 password_file="${NOVNC_PASSWORD_FILE:-./.secrets/novnc-password}"
 
 require_docker() {
-  docker compose version >/dev/null
+  docker compose -f docker-compose.yml -f docker/compose.maintenance-local.yml version >/dev/null
   docker info >/dev/null
 }
 
 is_running() {
   local service="$1"
-  [[ -n "$(docker compose --profile maintenance ps --status running --services "${service}")" ]]
+  [[ -n "$(docker compose -f docker-compose.yml -f docker/compose.maintenance-local.yml --profile maintenance ps --status running --services "${service}")" ]]
 }
 
 wait_stopped() {
@@ -32,7 +32,7 @@ wait_healthy() {
   local container_id
   local health
   for _ in $(seq 1 120); do
-    container_id="$(docker compose --profile maintenance ps -a -q "${service}")"
+    container_id="$(docker compose -f docker-compose.yml -f docker/compose.maintenance-local.yml --profile maintenance ps -a -q "${service}")"
     if [[ -n "${container_id}" ]]; then
       health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${container_id}")"
       if [[ "${health}" == "healthy" ]]; then return 0; fi
@@ -48,7 +48,7 @@ wait_healthy() {
 }
 
 restart_normal() {
-  docker compose up -d app admin
+  docker compose -f docker-compose.yml -f docker/compose.maintenance-local.yml up -d app admin
   wait_healthy app
   wait_healthy admin
 }
@@ -64,14 +64,14 @@ case "${action}" in
       echo 'Maintenance is already running.'
       exit 0
     fi
-    docker compose stop app
+    docker compose -f docker-compose.yml -f docker/compose.maintenance-local.yml stop app
     wait_stopped app
-    if ! NOVNC_PASSWORD_FILE="${password_file}" docker compose --profile maintenance up -d maintenance; then
+    if ! NOVNC_PASSWORD_FILE="${password_file}" docker compose -f docker-compose.yml -f docker/compose.maintenance-local.yml --profile maintenance up -d maintenance; then
       restart_normal
       exit 1
     fi
     if ! wait_healthy maintenance; then
-      NOVNC_PASSWORD_FILE="${password_file}" docker compose --profile maintenance stop maintenance
+      NOVNC_PASSWORD_FILE="${password_file}" docker compose -f docker-compose.yml -f docker/compose.maintenance-local.yml --profile maintenance stop maintenance
       wait_stopped maintenance
       restart_normal
       exit 1
@@ -79,13 +79,13 @@ case "${action}" in
     ;;
   stop)
     require_docker
-    NOVNC_PASSWORD_FILE="${password_file}" docker compose --profile maintenance stop maintenance
+    NOVNC_PASSWORD_FILE="${password_file}" docker compose -f docker-compose.yml -f docker/compose.maintenance-local.yml --profile maintenance stop maintenance
     wait_stopped maintenance
     restart_normal
     ;;
   status)
     require_docker
-    docker compose --profile maintenance ps
+    docker compose -f docker-compose.yml -f docker/compose.maintenance-local.yml --profile maintenance ps
     ;;
   *)
     echo 'Usage: scripts/docker-maintenance.sh {start|stop|status}' >&2

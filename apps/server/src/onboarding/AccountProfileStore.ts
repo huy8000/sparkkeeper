@@ -1,12 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import {
-  chmodSync,
-  lstatSync,
-  mkdirSync,
-  readFileSync,
-  realpathSync,
-} from 'node:fs';
+import { chmodSync, lstatSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -27,11 +21,7 @@ export interface ProfileReconciliationState {
 
 export interface AtomicDirectoryRenamer {
   createOwned(source: string, marker: AccountProfileMarker): void;
-  renameNoReplace(
-    source: string,
-    destination: string,
-    marker: AccountProfileMarker,
-  ): void;
+  renameNoReplace(source: string, destination: string, marker: AccountProfileMarker): void;
   removeEmptyOwned(source: string, marker: AccountProfileMarker): boolean;
 }
 
@@ -531,11 +521,7 @@ export class NativeAtomicDirectoryRenamer implements AtomicDirectoryRenamer {
     ]);
   }
 
-  renameNoReplace(
-    source: string,
-    destination: string,
-    marker: AccountProfileMarker,
-  ): void {
+  renameNoReplace(source: string, destination: string, marker: AccountProfileMarker): void {
     this.execute('rename', [
       path.dirname(source),
       path.basename(source),

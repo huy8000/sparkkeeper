@@ -10,10 +10,7 @@ import {
   type AccountLoginWorkerStart,
   type LoopbackConsoleEndpoint,
 } from './AccountLoginWorkerProtocol.js';
-import {
-  readBrowserProcessIdentity,
-  removeBrowserIdentityFile,
-} from './BrowserProcessIdentity.js';
+import { readBrowserProcessIdentity, removeBrowserIdentityFile } from './BrowserProcessIdentity.js';
 
 const DEFAULT_STOP_GRACE_MS = 10_000;
 const FORCED_STOP_GRACE_MS = 2_000;
@@ -164,7 +161,9 @@ export class AccountLoginWorkerSupervisor {
         this.ownedProcessesRemain(record) &&
         !(await this.waitForOwnedProcessesExit(record, this.forcedStopGraceMs))
       ) {
-        throw new Error('Account login worker or Chromium process group survived bounded teardown.');
+        throw new Error(
+          'Account login worker or Chromium process group survived bounded teardown.',
+        );
       }
       this.releaseRuntimeResources(record);
       this.records.delete(record.start.sessionId);
@@ -289,8 +288,7 @@ export class AccountLoginWorkerSupervisor {
 
   private ownedProcessesRemain(record: WorkerRecord): boolean {
     this.refreshBrowserIdentity(record);
-    const browserAlive =
-      record.browserGroupId !== undefined && this.isBrowserGroupAlive(record);
+    const browserAlive = record.browserGroupId !== undefined && this.isBrowserGroupAlive(record);
     const browserIdentityUnresolved =
       record.browserIdentityUnresolved ||
       (record.browserLaunchExpected && record.browserGroupId === undefined);

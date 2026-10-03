@@ -141,8 +141,12 @@ export function createMigrationApi(options: ApiClientOptions = {}) {
         { expectedUpdatedAt: r.updatedAt, confirmationText: 'DISMISS' },
         ack,
       ),
-    runs: (offset = 0) =>
-      c.get(`/runs?limit=50${offset ? `&cursor=${btoa(`v1:${offset}`)}` : ''}`, array(run)),
+    runs: (offset = 0, accountId?: string, signal?: AbortSignal) =>
+      c.get(
+        `/runs?limit=50${accountId ? `&accountId=${encodeURIComponent(accountId)}` : ''}${offset ? `&cursor=${btoa(`v1:${offset}`)}` : ''}`,
+        array(run),
+        signal,
+      ),
     run: (id: string, signal?: AbortSignal) =>
       c.get(`/runs/${encodeURIComponent(id)}`, run, signal),
     records: (id: string, offset = 0, signal?: AbortSignal) =>

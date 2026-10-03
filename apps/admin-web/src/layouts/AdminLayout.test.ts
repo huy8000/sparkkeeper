@@ -121,7 +121,7 @@ describe('SSE status', () => {
     await wrapper.vm.$nextTick();
     expect(wrapper.find('.sse-status').text()).toBe('Reconnecting');
     // The Overview body keeps rendering; only the realtime badge changes.
-    expect(wrapper.text()).toContain('Today at a glance');
+    expect(wrapper.text()).toContain('V4 workspace');
     expect(wrapper.text()).not.toContain('Server Down');
     wrapper.unmount();
   });
@@ -130,7 +130,7 @@ describe('SSE status', () => {
     installApiFetch();
     const wrapper = await mountAdmin('/');
     expect(wrapper.find('.sse-status').text()).toBe('Offline');
-    expect(wrapper.text()).toContain('Today at a glance');
+    expect(wrapper.text()).toContain('V4 workspace');
     wrapper.unmount();
   });
 
@@ -177,7 +177,7 @@ describe('SSE status', () => {
 
     expect(getCount('/api/runtime/status')).toBe(beforeReconnect.runtime + 1);
     expect(getCount('/api/runs')).toBe(beforeReconnect.runs + 1);
-    expect(getCount('/api/accounts')).toBe(beforeReconnect.accounts + 1);
+    expect(getCount('/api/accounts')).toBe(beforeReconnect.accounts);
     expect(FakeEventSource.instances).toHaveLength(1);
     vi.useRealTimers();
     wrapper.unmount();

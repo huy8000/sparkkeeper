@@ -1,7 +1,8 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <script setup lang="ts">
-/* global document, HTMLElement, KeyboardEvent */
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
+/* global HTMLElement */
+import { ref, useId } from 'vue';
+import { useDialogFocus } from '../composables/useDialogFocus';
 
 import { useTranslation } from '../i18n';
 
@@ -14,36 +15,12 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>();
 const { t } = useTranslation();
 const dialog = ref<HTMLElement | null>(null);
-let previousFocus: HTMLElement | null = null;
-
-function handleKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape' && props.open) emit('close');
-}
-
-watch(
+const titleId = useId();
+useDialogFocus(
+  dialog,
   () => props.open,
-  (open) => {
-    if (open) {
-      previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      document.addEventListener('keydown', handleKeydown);
-      void nextTick(() =>
-        dialog.value
-          ?.querySelector<HTMLElement>('button, [href], input, select, textarea')
-          ?.focus(),
-      );
-    } else {
-      document.removeEventListener('keydown', handleKeydown);
-      previousFocus?.focus();
-      previousFocus = null;
-    }
-  },
-  { immediate: true },
+  () => emit('close'),
 );
-
-onBeforeUnmount(() => {
-  document.removeEventListener('keydown', handleKeydown);
-  previousFocus?.focus();
-});
 </script>
 
 <template>
@@ -51,14 +28,15 @@ onBeforeUnmount(() => {
     <div class="modal-backdrop" @click.self="$emit('close')">
       <div
         ref="dialog"
+        tabindex="-1"
         class="modal-card"
         :class="{ 'modal-card--compact': compact }"
         role="dialog"
         aria-modal="true"
-        :aria-labelledby="labelledBy ?? 'modal-title'"
+        :aria-labelledby="labelledBy ?? titleId"
       >
         <header class="modal-card__header">
-          <h3 :id="labelledBy ?? 'modal-title'">{{ title }}</h3>
+          <h3 :id="labelledBy ?? titleId">{{ title }}</h3>
           <button
             class="modal-card__dismiss"
             type="button"

@@ -195,7 +195,7 @@ Exit：master gate false 时 zero claims/sends；Gate F 前不启用生产 Sched
 
 Branch：`feature/v4-9-migration-observability`
 
-当前状态：IMPLEMENTED / VERIFIED（待 PR review/merge）。基线 `develop@d606a098e19c362e924a581b120d9135c68bd566`。Authority 见 [V4-9 Spec](./specs/v4-9-implementation-spec.md)，离线操作见 [Migration Runbook](./06-migration-operator-runbook.md)。0013 保留 legacy 数据，显式 binding/import/resolution 采用 CAS + 同事务 audit，导入 Task 永远 disabled；统一 read model 与安全事件不产生发送副作用。合成 V3 升级/全 root backup-restore、native ownership/crash recovery、受影响 workspace 与 Linux fixture 验证通过。production scheduler/send gate 仍关闭，未执行任何 live Gate 或生产迁移。
+当前状态：MERGED / ACCEPTED（PR #49，`develop@f91e7247c7b6f84ed94b2d2dc1cf614a315e3f25`）。基线 `develop@d606a098e19c362e924a581b120d9135c68bd566`。Authority 见 [V4-9 Spec](./specs/v4-9-implementation-spec.md)，离线操作见 [Migration Runbook](./06-migration-operator-runbook.md)。0013 保留 legacy 数据，显式 binding/import/resolution 采用 CAS + 同事务 audit，导入 Task 永远 disabled；统一 read model 与安全事件不产生发送副作用。合成 V3 升级/全 root backup-restore、native ownership/crash recovery、受影响 workspace 与 Linux fixture 验证通过。production scheduler/send gate 仍关闭，未执行任何 live Gate 或生产迁移。
 
 交付：
 
@@ -212,6 +212,8 @@ Exit：populated V3 fixture and release migration rehearsal PASS；zero automati
 ### V4-10 — UI, Public Deployment Security & E2E
 
 Branch：`feature/v4-10-ui-security-e2e`
+
+当前状态：IMPLEMENTED / VERIFIED（Gate A PASS；待 PR review/merge）。基线 `develop@f91e7247c7b6f84ed94b2d2dc1cf614a315e3f25`。Authority 见 [V4-10 Spec](./specs/v4-10-implementation-spec.md)，验证见 [Gate A evidence](./09-gate-a-evidence.md)。无新增 migration；production scheduling/send gate 仍 hard closed。未执行 Gates B–F、真实 Douyin、真实发送、release 或部署。
 
 交付：
 

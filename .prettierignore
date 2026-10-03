@@ -9,3 +9,5 @@ logs/
 screenshots/
 playwright-report/
 test-results/
+.gemini/
+.mimosa/

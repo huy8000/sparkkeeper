@@ -60,6 +60,8 @@ export const accountFixture: Account = {
   name: 'Demo Account',
   enabled: true,
   loginStatus: 'READY',
+  profileState: 'READY',
+  lifecycleStatus: 'ACTIVE',
   createdAt: CREATED_AT,
   updatedAt: CREATED_AT,
 };

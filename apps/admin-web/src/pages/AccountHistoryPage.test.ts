@@ -5,16 +5,14 @@ import { failure, installApiFetch, success } from '../test/http';
 import { mountAdmin } from '../test/mountAdmin';
 
 describe('Account History', () => {
-  it('renders bounded human-context history with Run navigation and duration', async () => {
+  it('renders bounded unified source/kind and safe Run navigation', async () => {
     const fetchMock = installApiFetch();
     const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}/history`);
-    expect(wrapper.text()).toContain('Demo Account run history');
+    expect(wrapper.text()).toContain('Run history — Legacy / V4');
     expect(wrapper.text()).toContain('2026-01-02');
-    expect(wrapper.text()).toContain('Success');
-    expect(wrapper.text()).toContain('1m');
-    expect(wrapper.get(`a[href="/runs/${RUN_ID}"]`).text()).toBe('2026-01-02');
+    expect(wrapper.text()).toContain('SUCCESS');
+    expect(wrapper.get(`a[href="/history/${RUN_ID}"]`).text()).toBe('View');
     expect(wrapper.text()).not.toContain(RUN_ID);
-    expect(wrapper.text()).not.toContain(ACCOUNT_ID);
     const call = fetchMock.mock.calls.find(([url]) => String(url).includes('/api/runs?'));
     expect(String(call?.[0])).toContain(`accountId=${encodeURIComponent(ACCOUNT_ID)}`);
     expect(String(call?.[0])).toContain('limit=50');
@@ -24,19 +22,20 @@ describe('Account History', () => {
   it('renders the History empty state distinctly from an API error', async () => {
     installApiFetch((url) => (url.pathname === '/api/runs' ? success([]) : undefined));
     const empty = await mountAdmin(`/accounts/${ACCOUNT_ID}/history`);
-    expect(empty.text()).toContain('No runs yet');
-    expect(empty.text()).toContain('Runs will appear after SparkKeeper executes this account.');
+    expect(empty.text()).toContain('No records yet.');
     expect(empty.find('[role="alert"]').exists()).toBe(false);
     empty.unmount();
 
     installApiFetch((url) =>
       url.pathname === '/api/runs'
-        ? failure('RUNS_UNAVAILABLE', 'Account history could not be loaded.', 503)
+        ? failure('RUNS_UNAVAILABLE', 'Unable to read data. Refresh before acting.', 503)
         : undefined,
     );
     const failed = await mountAdmin(`/accounts/${ACCOUNT_ID}/history`);
-    expect(failed.get('[role="alert"]').text()).toContain('Account history could not be loaded.');
-    expect(failed.text()).not.toContain('No runs yet');
+    expect(failed.get('[role="alert"]').text()).toContain(
+      'Unable to read data. Refresh before acting.',
+    );
+    expect(failed.text()).not.toContain('No records yet.');
     failed.unmount();
   });
 
@@ -47,9 +46,7 @@ describe('Account History', () => {
     const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}/history`);
     expect(wrapper.text()).toContain('Demo Account');
     expect(wrapper.find('.account-tabs').exists()).toBe(true);
-    expect(wrapper.get('.section-loading[role="status"]').text()).toContain(
-      'Loading account history',
-    );
+    expect(wrapper.get('.page-stack [role="status"]').text()).toContain('Loading…');
     wrapper.unmount();
   });
 });

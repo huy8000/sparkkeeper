@@ -16,14 +16,14 @@ const authSessionLike = {
 
 describe('admin routing', () => {
   it.each([
-    ['/', 'Today at a glance'],
+    ['/', 'V4 workspace'],
     ['/accounts', 'Configured accounts'],
-    [`/accounts/${ACCOUNT_ID}`, 'Account readiness'],
-    [`/accounts/${ACCOUNT_ID}/overview`, 'Account readiness'],
+    [`/accounts/${ACCOUNT_ID}`, 'Account-owned profile'],
+    [`/accounts/${ACCOUNT_ID}/overview`, 'Account-owned profile'],
     [`/accounts/${ACCOUNT_ID}/friends`, 'Configured friends'],
     [`/accounts/${ACCOUNT_ID}/schedule`, 'Automatic execution window'],
     [`/accounts/${ACCOUNT_ID}/manual-run`, 'Server-authorized execution'],
-    [`/accounts/${ACCOUNT_ID}/history`, 'Demo Account run history'],
+    [`/accounts/${ACCOUNT_ID}/history`, 'Run history — Legacy / V4'],
     ['/schedules', 'Account schedule windows'],
     ['/templates', 'Message templates'],
     ['/notifications', 'Configure webhook notifications'],
@@ -48,10 +48,10 @@ describe('admin routing', () => {
 
   it('uses semantic routed tabs and supports deep-link refresh', async () => {
     installApiFetch();
-    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}/friends`);
+    const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}/contacts`);
     const tabs = wrapper.get('nav[aria-label="Account workspace"]');
-    expect(tabs.findAll('a')).toHaveLength(8);
-    expect(tabs.get(`a[href="/accounts/${ACCOUNT_ID}/friends"]`).classes()).toContain(
+    expect(tabs.findAll('a')).toHaveLength(5);
+    expect(tabs.get(`a[href="/accounts/${ACCOUNT_ID}/contacts"]`).classes()).toContain(
       'account-tabs__link--active',
     );
     expect(wrapper.get(`a[href="/accounts/${ACCOUNT_ID}/overview"]`).text()).toBe('Overview');

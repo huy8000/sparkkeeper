@@ -20,6 +20,9 @@ x-app-environment: &app-environment
   SCHEDULER_ACCOUNT_ID: ${SCHEDULER_ACCOUNT_ID:-}
   SCHEDULER_MESSAGE_TEMPLATE_ID: ${SCHEDULER_MESSAGE_TEMPLATE_ID:-}
   MANUAL_RUN_ENABLED: ${MANUAL_RUN_ENABLED:-false}
+  SPARKKEEPER_ADMIN_SECURITY_MODE: production
+  SPARKKEEPER_ADMIN_CANONICAL_ORIGIN: https://${SPARKKEEPER_DOMAIN:-sparkkeeper.invalid}
+  SPARKKEEPER_ADMIN_TRUSTED_PROXY_CIDRS: 172.30.20.2/32
 
 x-data-volume: &data-volume
   type: bind
@@ -27,6 +30,35 @@ x-data-volume: &data-volume
   target: /app/data
 
 services:
+  edge:
+    image: sparkkeeper-edge:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.caddy
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      SPARKKEEPER_DOMAIN: ${SPARKKEEPER_DOMAIN:-sparkkeeper.invalid}
+      SPARKKEEPER_HSTS_MAX_AGE: ${SPARKKEEPER_HSTS_MAX_AGE:-0}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./docker/security.caddy:/etc/caddy/security.caddy:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      edge-public:
+      frontend:
+        ipv4_address: 172.30.10.2
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      admin:
+        condition: service_healthy
   app:
     image: sparkkeeper-app:local
     build:
@@ -39,6 +71,10 @@ services:
       - '8080'
     volumes:
       - *data-volume
+    networks:
+      backend:
+        ipv4_address: 172.30.20.3
+      app-egress:
     healthcheck:
       test: ['CMD', 'node', '/app/server/docker-healthcheck.mjs']
       interval: 15s
@@ -59,8 +95,12 @@ services:
     depends_on:
       app:
         condition: service_healthy
-    ports:
-      - '127.0.0.1:8080:8080'
+    expose: ['8080']
+    networks:
+      frontend:
+        ipv4_address: 172.30.10.3
+      backend:
+        ipv4_address: 172.30.20.2
     read_only: true
     tmpfs:
       - /tmp:size=16m,mode=1777
@@ -90,8 +130,7 @@ services:
       DISPLAY: :99
       NOVNC_SCREEN: ${NOVNC_SCREEN:-1440x900x24}
       NOVNC_PASSWORD_FILE: /run/secrets/novnc-password
-    ports:
-      - '127.0.0.1:6080:6080'
+    expose: ['6080']
     volumes:
       - *data-volume
       - type: bind
@@ -110,3 +149,18 @@ services:
     stop_grace_period: 40s
     security_opt:
       - no-new-privileges:true
+
+networks:
+  frontend:
+    internal: true
+    ipam:
+      config: [{ subnet: 172.30.10.0/24 }]
+  backend:
+    internal: true
+    ipam:
+      config: [{ subnet: 172.30.20.0/24 }]
+  edge-public:
+  app-egress:
+volumes:
+  caddy-data:
+  caddy-config:

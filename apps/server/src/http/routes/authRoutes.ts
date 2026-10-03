@@ -3,6 +3,7 @@ import type { HttpConfig } from '../config/HttpConfig.js';
 import { loginSchema, logoutSchema } from '../schemas/authContracts.js';
 import { success } from '../serializers/envelope.js';
 import type { ApiServices } from '../services/ApiServices.js';
+import { setClearingCookie } from '../plugins/AdminAuthGuards.js';
 
 export function registerAuthRoutes(
   server: FastifyInstance,
@@ -10,6 +11,99 @@ export function registerAuthRoutes(
   config: HttpConfig,
   onAdminSessionInvalidated?: () => void,
 ): void {
+  const security = services.security;
+  if (security) {
+    const password = { type: 'string', minLength: 14, maxLength: 1024 };
+    server.post<{ Body: { password: string } }>(
+      '/api/auth/reauth',
+      {
+        config: { auth: 'M' },
+        bodyLimit: 4096,
+        schema: {
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['password'],
+            properties: { password },
+          },
+        },
+      },
+      async (req, reply) => {
+        reply.header('Cache-Control', 'no-store');
+        return success(
+          await security.reauth(
+            req.authContext!.adminUserId,
+            req.authContext!.sessionId,
+            req.body.password,
+            req.ip,
+          ),
+        );
+      },
+    );
+    server.post<{ Body: { currentPassword: string; newPassword: string } }>(
+      '/api/auth/change-password',
+      {
+        config: { auth: 'R' },
+        bodyLimit: 8192,
+        schema: {
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['currentPassword', 'newPassword'],
+            properties: { currentPassword: password, newPassword: password },
+          },
+        },
+      },
+      async (req, reply) => {
+        await security.changePassword(
+          req.authContext!.adminUserId,
+          req.authContext!.sessionId,
+          req.body.currentPassword,
+          req.body.newPassword,
+          req.ip,
+        );
+        onAdminSessionInvalidated?.();
+        setClearingCookie(reply, config);
+        return reply.header('Cache-Control', 'no-store').code(204).send();
+      },
+    );
+    server.get('/api/auth/sessions', { config: { auth: 'S' } }, async (req, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      return success(security.sessions(req.authContext!.adminUserId, req.authContext!.sessionId));
+    });
+    server.post<{ Params: { sessionId: string }; Body: { expectedSessionVersion: number } }>(
+      '/api/auth/sessions/:sessionId/revoke',
+      {
+        config: { auth: 'R' },
+        bodyLimit: 1024,
+        schema: {
+          params: {
+            type: 'object',
+            required: ['sessionId'],
+            additionalProperties: false,
+            properties: { sessionId: { type: 'string', format: 'uuid' } },
+          },
+          body: {
+            type: 'object',
+            required: ['expectedSessionVersion'],
+            additionalProperties: false,
+            properties: { expectedSessionVersion: { type: 'integer', minimum: 1 } },
+          },
+        },
+      },
+      async (req, reply) => {
+        security.revoke(
+          req.authContext!.adminUserId,
+          req.authContext!.sessionId,
+          req.params.sessionId,
+          req.body.expectedSessionVersion,
+        );
+        onAdminSessionInvalidated?.();
+        if (req.params.sessionId === req.authContext!.sessionId) setClearingCookie(reply, config);
+        return reply.header('Cache-Control', 'no-store').code(204).send();
+      },
+    );
+  }
   // POST /api/auth/login (Class L)
   server.post(
     '/api/auth/login',

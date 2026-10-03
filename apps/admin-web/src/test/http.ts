@@ -60,6 +60,10 @@ export function installApiFetch(override?: TestHandler): ReturnType<typeof vi.fn
         return success(runtimeFixture);
       case 'GET /api/accounts':
         return success([accountFixture]);
+      case 'GET /api/tasks':
+        return success({ items: [], masterOpen: false, released: false });
+      case `GET /api/accounts/${ACCOUNT_ID}/contacts`:
+        return success({ items: [], nextCursor: null, latestSync: null });
       case 'GET /api/account-login-sessions/active':
         return success({ session: null });
       case `GET /api/accounts/${ACCOUNT_ID}`:
@@ -92,7 +96,11 @@ export function installApiFetch(override?: TestHandler): ReturnType<typeof vi.fn
       case `PATCH /api/templates/${TEMPLATE_ID}`:
         return success(templateDetailFixture);
       case 'GET /api/runs':
-        return success([runFixture]);
+        return success(
+          url.searchParams.get('source') === 'LEGACY_V3'
+            ? [runFixture]
+            : [{ ...runFixture, source: 'LEGACY_V3', kind: 'LEGACY_DAILY' }],
+        );
       case `GET /api/runs/${RUN_ID}`:
         return success(runFixture);
       case `GET /api/runs/${RUN_ID}/send-records`:
