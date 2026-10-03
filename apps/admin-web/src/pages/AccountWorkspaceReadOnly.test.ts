@@ -7,7 +7,7 @@ import { mountAdmin } from '../test/mountAdmin';
 describe('Account Workspace read-only navigation', () => {
   it('performs no mutation during ordinary loading across all five tabs', async () => {
     const fetchMock = installApiFetch();
-    for (const tab of ['overview', 'friends', 'schedule', 'manual-run', 'history']) {
+    for (const tab of ['overview', 'contacts', 'test-send', 'tasks', 'history']) {
       const wrapper = await mountAdmin(`/accounts/${ACCOUNT_ID}/${tab}`);
       wrapper.unmount();
     }

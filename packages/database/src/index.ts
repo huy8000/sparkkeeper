@@ -341,6 +341,11 @@ export {
 } from './repositories/ScheduledSendRepository.js';
 export { scheduledRunSnapshots } from './schema/scheduledRunSnapshots.js';
 export { MigrationRepository, MigrationError } from './repositories/MigrationRepository.js';
+export {
+  AdminSecurityRepository,
+  AdminSecurityError,
+  type CredentialProof,
+} from './repositories/AdminSecurityRepository.js';
 export { UnifiedRunRepository } from './repositories/UnifiedRunRepository.js';
 export { legacyProfileBindings, v4SystemEvents } from './schema/migrationObservability.js';
 export {

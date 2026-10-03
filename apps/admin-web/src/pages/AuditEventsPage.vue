@@ -2,6 +2,8 @@
 import { useAdminApp } from '../appContext';
 import { createMigrationApi } from '../api/migrationApi';
 import { useRequest } from '../composables/useRequest';
+import { useTranslation } from '../i18n';
+const { t } = useTranslation();
 const app = useAdminApp(),
   api = createMigrationApi({
     csrfTokenProvider: app.auth.getCsrfToken,
@@ -12,28 +14,30 @@ const app = useAdminApp(),
 <template>
   <div class="page-stack">
     <header class="page-heading">
-      <h2>Audit（最近50条）</h2>
-      <button @click="events.load()">刷新</button>
+      <h2>{{ t('v410.auditTitle') }}</h2>
+      <button @click="events.load()">{{ t('common.refresh') }}</button>
     </header>
-    <p v-if="events.error.value" role="alert">读取失败。</p>
-    <table>
-      <thead>
-        <tr>
-          <th>时间</th>
-          <th>动作</th>
-          <th>对象</th>
-          <th>结果</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="r in events.data.value?.items ?? []" :key="String(r.id)">
-          <td>{{ r.createdAt }}</td>
-          <td>{{ r.action }}</td>
-          <td>{{ r.entityType }} / {{ r.entityId }}</td>
-          <td>{{ r.outcome }}</td>
-        </tr>
-      </tbody>
-    </table>
-    <p>Audit/history/resolution 不自动删除。事件不含正文、身份值、profile 路径或凭据。</p>
+    <p v-if="events.error.value" role="alert">{{ t('v410.readError') }}</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ t('v410.time') }}</th>
+            <th>{{ t('v410.action') }}</th>
+            <th>{{ t('v410.entity') }}</th>
+            <th>{{ t('v410.outcome') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="r in events.data.value?.items ?? []" :key="String(r.id)">
+            <td>{{ r.createdAt }}</td>
+            <td>{{ r.action }}</td>
+            <td>{{ r.entityType }} / {{ r.entityId }}</td>
+            <td>{{ r.outcome }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>{{ t('v410.auditNote') }}</p>
   </div>
 </template>

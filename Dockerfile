@@ -39,7 +39,7 @@ RUN chmod 0555 /usr/local/bin/sparkkeeper-app
 USER pwuser
 ENTRYPOINT ["/usr/local/bin/sparkkeeper-app"]
 
-FROM nginxinc/nginx-unprivileged:1.29.1-alpine AS admin-runtime
+FROM nginxinc/nginx-unprivileged:1.30.5-alpine@sha256:ed04ec1ff34502c339ee5c3ae3f855442398edc1d05591e2b98981dcbbd20b1e AS admin-runtime
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /workspace/apps/admin-web/dist /usr/share/nginx/html
 

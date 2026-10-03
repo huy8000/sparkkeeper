@@ -1,0 +1,22 @@
+{
+  admin off
+  log default {
+    format filter {
+      wrap json
+      fields {
+        request delete
+        resp_headers delete
+      }
+    }
+  }
+  servers {
+    protocols h1 h2
+  }
+}
+import /etc/caddy/security.caddy
+{$SPARKKEEPER_DOMAIN:sparkkeeper.invalid} {
+  tls {
+    protocols tls1.2 tls1.3
+  }
+  import sparkkeeper-security
+}

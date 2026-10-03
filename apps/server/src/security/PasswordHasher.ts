@@ -174,7 +174,15 @@ export const DUMMY_PHC =
  * through HTTP, routes, or service interfaces.
  */
 export interface ArgonAdapter {
-  hash(password: string, options: typeof ARGON2_CONFIG & { salt: Buffer }): Promise<string>;
+  hash(
+    password: string,
+    options: Omit<typeof ARGON2_CONFIG, 'memoryCost' | 'timeCost' | 'parallelism'> & {
+      salt: Buffer;
+      memoryCost: number;
+      timeCost: number;
+      parallelism: number;
+    },
+  ): Promise<string>;
   verify(phc: string, password: string): Promise<boolean>;
 }
 
@@ -205,22 +213,27 @@ export class PasswordHasher {
    * The native PHC output is rewritten to the canonical m,t,p parameter order
    * before storage; segments keep node-argon2's canonical unpadded Base64.
    */
-  async hash(password: string): Promise<string> {
+  async hash(password: string, minimumStoredHash?: string): Promise<string> {
     try {
+      const minimum = minimumStoredHash ? parsePhcString(minimumStoredHash) : null;
+      if (minimumStoredHash && !minimum) throw new Error('Invalid stored minimum hash.');
+      const memoryCost = Math.max(ARGON2_CONFIG.memoryCost, minimum?.memoryCost ?? 0);
+      const timeCost = Math.max(ARGON2_CONFIG.timeCost, minimum?.timeCost ?? 0);
+      const parallelism = Math.max(ARGON2_CONFIG.parallelism, minimum?.parallelism ?? 0);
       const salt = randomBytes(16);
       const raw = await this.adapter.hash(password, {
         type: ARGON2_CONFIG.type,
         version: ARGON2_CONFIG.version,
-        memoryCost: ARGON2_CONFIG.memoryCost,
-        timeCost: ARGON2_CONFIG.timeCost,
-        parallelism: ARGON2_CONFIG.parallelism,
+        memoryCost,
+        timeCost,
+        parallelism,
         hashLength: ARGON2_CONFIG.hashLength,
         salt,
       });
       const parts = raw.split('$');
       if (parts.length === 6) {
         const [, algorithm, versionPart, , saltPart, hashPart] = parts;
-        return `$${algorithm}$${versionPart}$m=${ARGON2_CONFIG.memoryCost},t=${ARGON2_CONFIG.timeCost},p=${ARGON2_CONFIG.parallelism}$${saltPart}$${hashPart}`;
+        return `$${algorithm}$${versionPart}$m=${memoryCost},t=${timeCost},p=${parallelism}$${saltPart}$${hashPart}`;
       }
       return raw;
     } catch (error) {
@@ -255,7 +268,7 @@ export class PasswordHasher {
 
     if (isRehashNeeded(parsed)) {
       try {
-        const newHash = await this.hash(password);
+        const newHash = await this.hash(password, phc);
         return { outcome: 'MATCH_REHASH_NEEDED', newHash };
       } catch {
         return {

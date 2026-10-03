@@ -1,0 +1,20 @@
+# Disposable no-send fixture, never an operator production configuration.
+services:
+  edge:
+    ports: !override
+      - '127.0.0.1:18080:80'
+      - '127.0.0.1:18443:443'
+    environment:
+      SPARKKEEPER_DOMAIN: sparkkeeper.test
+    volumes:
+      - ./docker/Caddyfile.gate-a:/etc/caddy/Caddyfile:ro
+  app:
+    environment:
+      SPARKKEEPER_ADMIN_CANONICAL_ORIGIN: https://sparkkeeper.test:18443
+      SCHEDULER_ENABLED: 'false'
+      SCHEDULER_ALLOW_REAL_SEND: 'false'
+      MANUAL_RUN_ENABLED: 'false'
+    volumes: !override
+      - gate-a-data:/app/data
+volumes:
+  gate-a-data:

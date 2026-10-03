@@ -4,9 +4,11 @@ import { useRoute } from 'vue-router';
 import { useAdminApp } from '../appContext';
 import { createMigrationApi } from '../api/migrationApi';
 import { useRequest } from '../composables/useRequest';
+import { useTranslation } from '../i18n';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { invalidatesRunDetail } from '../api/realtimeInvalidation';
 import type { UnifiedSendRecord, ResolutionSummary } from '@sparkkeeper/shared';
+const { t } = useTranslation();
 const route = useRoute(),
   app = useAdminApp(),
   api = createMigrationApi({
@@ -56,7 +58,7 @@ async function resolve(r: UnifiedSendRecord) {
     await records.load();
     history.value = (await api.resolutions(r.id)).items;
   } catch {
-    error.value = '操作被拒绝或版本已变化。请刷新并重新登录后确认；不会自动重试。';
+    error.value = 'v410.mutationError';
   } finally {
     busy.value = false;
   }
@@ -65,7 +67,7 @@ async function show(r: UnifiedSendRecord) {
   try {
     history.value = (await api.resolutions(r.id)).items;
   } catch {
-    error.value = '人工记录读取失败。';
+    error.value = 'v410.readError';
   }
 }
 function page(delta: number) {
@@ -76,51 +78,48 @@ function page(delta: number) {
 <template>
   <div class="page-stack">
     <header class="page-heading">
-      <h2>统一 Run 详情</h2>
+      <h2>{{ t('v410.runDetail') }}</h2>
       <button
         @click="
           run.load();
           records.load();
         "
       >
-        刷新
+        {{ t('common.refresh') }}
       </button>
     </header>
     <p v-if="run.data.value">
       {{ run.data.value.source }} / {{ run.data.value.kind }} — {{ run.data.value.status }}
     </p>
-    <p v-if="run.error.value || records.error.value" role="alert">读取失败，请刷新。</p>
-    <p>机器结果不可修改。人工确认不会重发；UNKNOWN 不会自动 retry。</p>
+    <p v-if="run.error.value || records.error.value" role="alert">{{ t('v410.readError') }}</p>
+    <p>{{ t('v410.historyNote') }}</p>
     <label
-      >人工结论<select v-model="value">
-        <option value="INCONCLUSIVE">仍无法确定</option>
-        <option value="CONFIRMED_DELIVERED">人工确认已送达</option>
-        <option value="CONFIRMED_NOT_DELIVERED">人工确认未送达</option>
+      >{{ t('v410.conclusion')
+      }}<select v-model="value">
+        <option value="INCONCLUSIVE">{{ t('v410.inconclusive') }}</option>
+        <option value="CONFIRMED_DELIVERED">{{ t('v410.delivered') }}</option>
+        <option value="CONFIRMED_NOT_DELIVERED">{{ t('v410.notDelivered') }}</option>
       </select></label
+    ><label>{{ t('v410.note') }}<textarea v-model="note" maxlength="500" /></label
     ><label
-      >说明（最多500字；不要粘贴聊天、身份、cookie/token/密码）<textarea
-        v-model="note"
-        maxlength="500"
-      /></label
-    ><label
-      ><input
-        v-model="confirmed"
-        type="checkbox"
-        :disabled="busy"
-      />我已确认仅追加人工记录，不重发。</label
+      ><input v-model="confirmed" type="checkbox" :disabled="busy" />{{
+        t('v410.confirmResolution')
+      }}</label
     >
-    <p v-if="error" role="alert">{{ error }}</p>
+    <p v-if="error" role="alert">{{ t(error) }}</p>
     <div v-for="r in records.data.value ?? []" :key="r.id">
       <p>
         {{ r.friendId ?? r.contactId }} — {{ r.status }} — HUMAN:
-        {{ r.latestResolution?.resolution ?? '无' }}
+        {{ r.latestResolution?.resolution ?? t('v410.none') }}
       </p>
       <button :disabled="busy || !confirmed || r.status !== 'DELIVERY_UNKNOWN'" @click="resolve(r)">
-        追加人工 resolution</button
-      ><button @click="show(r)">人工记录</button>
+        {{ t('v410.append') }}</button
+      ><button @click="show(r)">{{ t('v410.humanHistory') }}</button>
     </div>
-    <button :disabled="offset === 0" @click="page(-50)">上一页</button
-    ><button :disabled="records.data.value?.length !== 50" @click="page(50)">下一页</button>
+    <button :disabled="offset === 0" @click="page(-50)">{{ t('v410.previous') }}</button
+    ><button :disabled="records.data.value?.length !== 50" @click="page(50)">
+      {{ t('v410.next') }}
+    </button>
     <ol>
       <li v-for="r in history" :key="r.id">
         {{ r.resolvedAt }} — {{ r.resolution }} — {{ r.note }}

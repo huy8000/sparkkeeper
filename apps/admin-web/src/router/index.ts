@@ -16,7 +16,7 @@ import AccountSchedulePage from '../pages/AccountSchedulePage.vue';
 import AccountsPage from '../pages/AccountsPage.vue';
 import LoginPage from '../pages/LoginPage.vue';
 import AccountLoginSessionPage from '../pages/AccountLoginSessionPage.vue';
-import OverviewPage from '../pages/OverviewPage.vue';
+import OverviewPage from '../pages/V4OverviewPage.vue';
 import NotFoundPage from '../pages/NotFoundPage.vue';
 import NotificationsPage from '../pages/NotificationsPage.vue';
 import RunDetailPage from '../pages/RunDetailPage.vue';
@@ -27,6 +27,7 @@ import MigrationPage from '../pages/MigrationPage.vue';
 import AuditEventsPage from '../pages/AuditEventsPage.vue';
 import SchedulesPage from '../pages/SchedulesPage.vue';
 import SystemStatusPage from '../pages/SystemStatusPage.vue';
+import SecurityPage from '../pages/SecurityPage.vue';
 import TemplatesPage from '../pages/TemplatesPage.vue';
 
 /** The single login-redirect target: keep the current path for post-login return. */
@@ -211,14 +212,19 @@ export function createAdminRouter(authController?: AuthController): Router {
             meta: { title: 'nav.system', section: 'operations/system' },
           },
           {
+            path: 'operations/security',
+            component: SecurityPage,
+            meta: { title: 'v410.security', section: 'operations/security' },
+          },
+          {
             path: 'operations/migration',
             component: MigrationPage,
-            meta: { title: 'nav.system', section: 'operations/migration' },
+            meta: { title: 'v410.migration', section: 'operations/migration' },
           },
           {
             path: 'operations/audit',
             component: AuditEventsPage,
-            meta: { title: 'nav.system', section: 'operations/audit' },
+            meta: { title: 'v410.audit', section: 'operations/audit' },
           },
           { path: ':pathMatch(.*)*', component: NotFoundPage, meta: { title: 'pages.notFound' } },
         ],

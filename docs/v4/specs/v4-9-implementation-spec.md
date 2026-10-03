@@ -1,6 +1,6 @@
 # V4-9 Migration Completion & Observability
 
-状态：IMPLEMENTED / VERIFIED（待 PR review/merge）。基线 `develop@d606a098e19c362e924a581b120d9135c68bd566`；V4-8 MERGED / ACCEPTED。
+状态：MERGED / ACCEPTED（PR #49，`develop@f91e7247c7b6f84ed94b2d2dc1cf614a315e3f25`）。实现基线 `develop@d606a098e19c362e924a581b120d9135c68bd566`；V4-8 MERGED / ACCEPTED。
 
 ## 冻结范围
 

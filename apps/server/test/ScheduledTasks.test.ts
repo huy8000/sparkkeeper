@@ -130,7 +130,9 @@ async function setup(t: TestContext, runtime = new FixtureRuntime(), recovered =
     master: () => master,
     released: () => true,
     clock: f.clock,
-    limits: { verificationTimeoutMs: 150, pollIntervalMs: 5 },
+    // Full-suite browser contention must not turn an immediate synthetic
+    // success into an intentional timeout. Production deadlines are unchanged.
+    limits: { verificationTimeoutMs: 1500, pollIntervalMs: 5 },
   };
   const scheduler = new SendTaskScheduler(f.repository, options);
   t.after(async () => {

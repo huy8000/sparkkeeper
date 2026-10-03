@@ -1,0 +1,17 @@
+(sparkkeeper-security) {
+  header {
+    -Server
+    Strict-Transport-Security "max-age={$SPARKKEEPER_HSTS_MAX_AGE:0}"
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    Referrer-Policy no-referrer
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  }
+  # No trusted_proxies: this is the Internet edge, not a CDN origin.
+  # Caddy overwrites untrusted forwarded values; never retry business POSTs.
+  reverse_proxy admin:8080 {
+    header_up -Forwarded
+    header_up -X-Real-IP
+    flush_interval -1
+  }
+}

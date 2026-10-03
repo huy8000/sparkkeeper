@@ -1,8 +1,8 @@
 # SparkKeeper V4 Planning & Implementation Index
 
-> 状态：V4-1…V4-8 MERGED / ACCEPTED；V4-9 IMPLEMENTED / VERIFIED（待 PR review/merge）
+> 状态：V4-1…V4-9 MERGED / ACCEPTED；V4-10 IMPLEMENTED / VERIFIED（Gate A PASS；待 PR review/merge）
 > 目标版本：V4.0.0
-> 当前基线：`develop@d606a098e19c362e924a581b120d9135c68bd566`；V4 是第一个真实生产基线，V3 是未实际生产使用的开发原型
+> 当前基线：`develop@f91e7247c7b6f84ed94b2d2dc1cf614a315e3f25`；V4 是第一个真实生产基线，V3 是未实际生产使用的开发原型
 
 本目录是 V4 实现、验收和独立 Code Review 的规范入口。Development Agent 必须使用对应 Milestone 的 Implementation Specification；不得从摘要自行补做架构设计。
 
@@ -22,8 +22,12 @@
 | [V4-6 Implementation Specification](./specs/v4-6-implementation-spec.md) | MERGED | 内部 witness-bound verifier、pre-action observer 与至多一次动作边界；无发送入口 |
 | [V4-7 Implementation Specification](./specs/v4-7-implementation-spec.md) | MERGED | 单目标 preview/confirm、不可变 snapshot、共同 coordinator、no-retry recovery、API/UI；live gate 关闭 |
 | [V4-8 Implementation Specification](./specs/v4-8-implementation-spec.md) | MERGED / ACCEPTED | Task 配置、不可变 scheduled snapshot、claim/action CAS、保守 recovery、API/UI；production scheduling gate 关闭 |
-| [V4-9 Implementation Specification](./specs/v4-9-implementation-spec.md) | IMPLEMENTED / VERIFIED | 显式 legacy migration、统一 Run 读取、安全观测与离线 rehearsal；待 PR review/merge |
+| [V4-9 Implementation Specification](./specs/v4-9-implementation-spec.md) | MERGED / ACCEPTED | 显式 legacy migration、统一 Run 读取、安全观测与离线 rehearsal；PR #49 |
+| [V4-10 Implementation Specification](./specs/v4-10-implementation-spec.md) | IMPLEMENTED / VERIFIED | 最终 IA/i18n/a11y、credential/session 管理、public security reference 与 no-send Gate A |
 | [Migration Operator Runbook](./06-migration-operator-runbook.md) | OFFLINE ONLY | preflight/audit、完整备份恢复、profile binding/relogin、安全边界 |
+| [Release / Public Security Runbook](./07-release-security-runbook.md) | REFERENCE ONLY | TLS/proxy/ports/auth/backup/rollback；非部署授权 |
+| [Gate Evidence Template](./08-gate-evidence-template.md) | TEMPLATE | 逐 Gate 独立授权与脱敏验收记录 |
+| [Gate A Evidence](./09-gate-a-evidence.md) | PASS / NO-SEND | 工程、安全、迁移与隔离 HTTPS E2E；不表示 live release ready |
 
 ## Change control
 
@@ -43,5 +47,7 @@ V4-7 按本轮用户明确指令收敛为单目标，不实现 roadmap 的 batch
 V4-8 增加 0012 managed scheduled snapshots、daily window/timezone Task 配置、串行 dispatcher、持久化 Run ownership/record claim/action CAS 与 bounded null-boundary recovery retry；复用共同 Resolver/Verifier 单次动作链路。UNKNOWN 永不 retry，AUTH/global failure 停止剩余 targets；显式 AUTH_EXPIRED 同事务更新 Account，Task 保持 enabled 但派生 BLOCKED。最小 Tasks/Scheduled Run API/UI 不接受 message/identity/profile path。生产 master/execution 不可由 environment 打开，默认服务不再 fall through 到 legacy Scheduler；controlled-local factory 只验证合成本地 DOM。没有访问真实 Douyin、真实发送或执行 Gates B–F；History/observability unification 仍属 V4-9。
 
 V4-9 增加 0013 profile migration intent/safe system events、离线 preflight/audit/profile binding 与全 root backup-restore rehearsal、显式 Friend/Schedule/HUMAN resolution、统一历史和 audit 最小视图。没有自动身份匹配、自动 Task enable、resend 或 production runtime bypass。安全事件只含固定文案/allowlisted code/内部 ID；历史、audit、resolution 不自动删除。完整最终 UI/i18n/security release Gate A 属 V4-10，真实 Gates B–F 仍需独立授权。
+
+V4-10 完成 frozen IA、中文默认/英文对等、account-scoped 统一历史、键盘 focus/响应式、现有 Auth draft 的 reauth/password/session 管理；Caddy 80/443 reference 与 exact trusted proxy、内部 runtime ports、TLS/CSP/cookie/privacy regression。Gate A 使用合成 disabled Account、私有 CA、专属临时 volumes；外部请求、业务 mutation、profile、login/discovery/run/action 均为零。无 schema migration 或 frozen send/identity/migration 语义变化；V4-7 单目标/preferred-only/live factory 未接入等限制仍有效。Gate A PASS 不是 release 授权，B–F未执行。
 
 V4-6 已按 Milestone Owner 授权实现、自审并完成受影响 workspace 离线 tests/typecheck/build；授权包括 feature branch commit/push/PR，不包括 merge/release/deploy。交付仅含内部 delivery verifier、私有 witness 绑定和至多一次 persistence/action boundary，不新增 migration/HTTP/UI/worker、Test Send 或 Scheduler，也不改 legacy sender。真实生产 message/tail/action DOM contract 未验证，production delivery adapter 在 callback/click 前 fail closed；只有受控 loopback fixture 可执行合成动作。未访问 Douyin、未真实发送、未执行 Gate B。Gate B 无发送；真实发送验证另须 Gates C/D/E 单独授权。

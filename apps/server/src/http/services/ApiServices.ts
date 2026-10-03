@@ -5,11 +5,13 @@ import type { ManualRunService } from './ManualRunService.js';
 import type { NotificationConfigurationService } from './NotificationConfigurationService.js';
 import type { AdminAuthenticationService } from '../../security/AdminAuthenticationService.js';
 import type { AdminSessionService } from '../../security/AdminSessionService.js';
+import type { AdminSecurityService } from '../../security/AdminSecurityService.js';
 
 export interface ApiServices {
   readonly status: Pick<StatusService, 'health' | 'runtime'>;
   readonly auth: AdminAuthenticationService;
   readonly sessions: AdminSessionService;
+  readonly security?: AdminSecurityService;
   readonly read: Pick<
     ApiReadService,
     | 'listAccounts'

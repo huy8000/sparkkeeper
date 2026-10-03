@@ -1,17 +1,29 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { useAdminApp } from '../appContext';
 import { createMigrationApi } from '../api/migrationApi';
 import { useRequest } from '../composables/useRequest';
+import { useTranslation } from '../i18n';
 import { useRealtimeRefresh } from '../composables/useRealtimeRefresh';
 import { invalidatesRunList } from '../api/realtimeInvalidation';
+const { t } = useTranslation();
+const props = defineProps<{ accountId?: string }>();
 const app = useAdminApp(),
   api = createMigrationApi({
     csrfTokenProvider: app.auth.getCsrfToken,
     onUnauthenticated: () => app.auth.handleSessionLoss(),
   });
 const offset = ref(0),
-  runs = useRequest(() => api.runs(offset.value));
+  runs = useRequest((signal) => api.runs(offset.value, props.accountId, signal));
+watch(
+  () => props.accountId,
+  () => {
+    offset.value = 0;
+    runs.reset();
+    void runs.load();
+  },
+);
+watch(app.refreshVersion, () => void runs.load());
 useRealtimeRefresh(app.realtime, invalidatesRunList, () => void runs.load());
 function page(delta: number) {
   offset.value = Math.max(0, offset.value + delta);
@@ -21,35 +33,42 @@ function page(delta: number) {
 <template>
   <div class="page-stack">
     <header class="page-heading">
-      <h2>Run 历史 — Legacy / V4</h2>
-      <button @click="runs.load()">刷新</button>
+      <h2>{{ t('v410.history') }}</h2>
+      <button @click="runs.load()">{{ t('common.refresh') }}</button>
     </header>
-    <p>保留原始机器结果。人工 resolution 仅追加说明，不会重发或更改 SUCCESS/DELIVERY_UNKNOWN。</p>
-    <p v-if="runs.error.value" role="alert">读取失败，请刷新。</p>
-    <table v-if="runs.data.value">
-      <thead>
-        <tr>
-          <th>来源 / kind</th>
-          <th>账号</th>
-          <th>日期</th>
-          <th>机器状态</th>
-          <th>详情</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="r in runs.data.value" :key="`${r.source}:${r.id}`">
-          <td>{{ r.source }} / {{ r.kind }}</td>
-          <td>{{ r.accountId }}</td>
-          <td>{{ r.businessDate ?? '单次 Test Send' }}</td>
-          <td>{{ r.status }}</td>
-          <td><RouterLink :to="`/history/${r.id}`">查看</RouterLink></td>
-        </tr>
-      </tbody>
-    </table>
+    <p>{{ t('v410.historyNote') }}</p>
+    <p v-if="runs.error.value" role="alert">{{ t('v410.readError') }}</p>
+    <p v-if="runs.loading.value" role="status">{{ t('v410.loading') }}</p>
+    <p v-if="runs.data.value?.length === 0">{{ t('v410.empty') }}</p>
+    <div class="table-wrap">
+      <table v-if="runs.data.value">
+        <thead>
+          <tr>
+            <th>{{ t('v410.source') }}</th>
+            <th>{{ t('v410.account') }}</th>
+            <th>{{ t('v410.date') }}</th>
+            <th>{{ t('v410.status') }}</th>
+            <th>{{ t('v410.detail') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="r in runs.data.value" :key="`${r.source}:${r.id}`">
+            <td>{{ r.source }} / {{ r.kind }}</td>
+            <td>{{ r.accountId }}</td>
+            <td>{{ r.businessDate ?? t('v410.single') }}</td>
+            <td>{{ r.status }}</td>
+            <td>
+              <RouterLink :to="`/history/${r.id}`">{{ t('v410.view') }}</RouterLink>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
     <div>
-      <button :disabled="offset === 0 || runs.loading.value" @click="page(-50)">上一页</button
+      <button :disabled="offset === 0 || runs.loading.value" @click="page(-50)">
+        {{ t('v410.previous') }}</button
       ><button :disabled="runs.data.value?.length !== 50 || runs.loading.value" @click="page(50)">
-        下一页
+        {{ t('v410.next') }}
       </button>
     </div>
   </div>

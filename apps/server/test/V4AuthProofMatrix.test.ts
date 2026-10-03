@@ -21,6 +21,12 @@ function taskMutationBodies() {
   };
 }
 function markTaskMutations(app: ReturnType<typeof createApiApplication>, hit: () => void) {
+  const security = app.services.security!;
+  const reauth = security.reauth.bind(security);
+  security.reauth = (...args) => {
+    hit();
+    return reauth(...args);
+  };
   const repo = app.scheduling.repository.tasks,
     create = repo.create.bind(repo),
     mutate = repo.mutate.bind(repo);
@@ -1959,6 +1965,7 @@ test('A22 - every registered M route rejects missing/bad CSRF with handler=0 (in
     // literal paths the inventory reports.
     const bodies: Record<string, unknown> = {
       'POST /api/auth/logout': {},
+      'POST /api/auth/reauth': { password: DEFAULT_TEST_PASSWORD },
       ...taskMutationBodies(),
       'POST /api/accounts/:accountId/contact-syncs': {},
       'POST /api/accounts/:accountId/test-send-intents': {
@@ -2901,7 +2908,7 @@ test('V42-RR-02 - exact bidirectional route map derived from Fastify registratio
     // Reviewed expected map: method + path -> expected auth class. This map is
     // the acceptance source; the actual side derives purely from onRoute
     // metadata. Both directions must match exactly.
-    const expectedMap: Record<string, 'P' | 'L' | 'S' | 'M'> = {
+    const expectedMap: Record<string, 'P' | 'L' | 'S' | 'M' | 'R'> = {
       'GET /api/health': 'P',
       'POST /api/auth/login': 'L',
       'GET /api/auth/me': 'S',
@@ -2958,6 +2965,10 @@ test('V42-RR-02 - exact bidirectional route map derived from Fastify registratio
       'POST /api/send-records/:recordId/resolutions': 'R',
       'GET /api/system/audit-events': 'S',
       'GET /api/system/migration-status': 'S',
+      'POST /api/auth/reauth': 'M',
+      'POST /api/auth/change-password': 'R',
+      'GET /api/auth/sessions': 'S',
+      'POST /api/auth/sessions/:sessionId/revoke': 'R',
       'GET /api/runs/:runId': 'S',
       'GET /api/runs/:runId/send-records': 'S',
       'GET /api/runs/:runId/events': 'S',
@@ -3005,12 +3016,12 @@ test('V42-RR-02 - exact bidirectional route map derived from Fastify registratio
     const logical = inventory.filter((r) => r.method !== 'HEAD');
     const classes = { P: 0, L: 0, S: 0, M: 0, R: 0 } as Record<string, number>;
     for (const route of logical) classes[route.authClass] += 1;
-    assert.equal(logical.length, 63);
+    assert.equal(logical.length, 67);
     assert.equal(classes.P, 1);
     assert.equal(classes.L, 1);
-    assert.equal(classes.S, 36);
-    assert.equal(classes.M, 17);
-    assert.equal(classes.R, 8);
+    assert.equal(classes.S, 37);
+    assert.equal(classes.M, 18);
+    assert.equal(classes.R, 10);
 
     // Registration-time rejection of an invalid truthy class (runtime config).
     const Fastify = (await import('fastify')).default;
@@ -3906,6 +3917,7 @@ test('F19 - every M route: missing/duplicate/bad/cross-session CSRF with handler
     markTaskMutations(ctx.app, () => handlerCalls++);
     const bodies: Record<string, unknown> = {
       'POST /api/auth/logout': {},
+      'POST /api/auth/reauth': { password: DEFAULT_TEST_PASSWORD },
       ...taskMutationBodies(),
       'POST /api/accounts/:accountId/contact-syncs': {},
       'POST /api/accounts/:accountId/test-send-intents': {
@@ -4831,6 +4843,7 @@ test('V42-RR-03: every actual M route executes missing and wrong media -> 400 VA
     // Route-specific valid body fixture table; coverage-checked BOTH ways.
     const bodies: Record<string, unknown> = {
       'POST /api/auth/logout': {},
+      'POST /api/auth/reauth': { password: DEFAULT_TEST_PASSWORD },
       ...taskMutationBodies(),
       'POST /api/accounts/:accountId/contact-syncs': {},
       'POST /api/accounts/:accountId/test-send-intents': {

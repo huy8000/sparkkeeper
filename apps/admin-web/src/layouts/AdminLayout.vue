@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* global Event, HTMLSelectElement */
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { useAdminApp } from '../appContext';
@@ -26,6 +26,13 @@ const pageTitle = computed(() => {
   return key === '' ? 'SparkKeeper' : t(key);
 });
 const activeSection = computed(() => String(route.meta.section ?? ''));
+watch(
+  pageTitle,
+  (title) => {
+    globalThis.document.title = `${title} · SparkKeeper`;
+  },
+  { immediate: true },
+);
 
 const runtimeIndicator = computed(() => {
   if (app.runtime.error.value) return 'UNAVAILABLE';
@@ -60,15 +67,13 @@ async function handleLogout(): Promise<void> {
 
 <template>
   <div class="app-shell" :class="{ 'app-shell--collapsed': sidebarCollapsed }">
+    <a class="skip-link" href="#main-content">{{ t('v410.skip') }}</a>
     <aside class="sidebar">
       <RouterLink class="brand" to="/" :aria-label="t('nav.brandAria')">
         <BrandMark />
         <span class="brand__name">SparkKeeper</span>
       </RouterLink>
       <nav class="navigation" :aria-label="t('nav.primaryNav')">
-        <RouterLink to="/tasks" :class="navigationClasses('tasks')">{{
-          t('tasks.title')
-        }}</RouterLink>
         <p class="navigation__label">{{ t('nav.workspace') }}</p>
         <RouterLink to="/" :class="navigationClasses('overview')">
           <span class="navigation__icon" aria-hidden="true">
@@ -96,7 +101,10 @@ async function handleLogout(): Promise<void> {
           </span>
           <span>{{ t('nav.templates') }}</span>
         </RouterLink>
-        <RouterLink to="/runs" :class="navigationClasses('runs')">
+        <RouterLink to="/tasks" :class="navigationClasses('tasks')">{{
+          t('tasks.title')
+        }}</RouterLink>
+        <RouterLink to="/history" :class="navigationClasses('runs')">
           <span class="navigation__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
               <path d="M20 12a8 8 0 1 1-2.3-5.7L20 8" />
@@ -118,12 +126,15 @@ async function handleLogout(): Promise<void> {
           </span>
           <span>{{ t('nav.notifications') }}</span>
         </RouterLink>
-        <RouterLink to="/operations/migration" :class="navigationClasses('operations/migration')"
-          >Legacy 迁移</RouterLink
-        >
-        <RouterLink to="/operations/audit" :class="navigationClasses('operations/audit')"
-          >Audit</RouterLink
-        >
+        <RouterLink to="/operations/migration" :class="navigationClasses('operations/migration')">{{
+          t('v410.migration')
+        }}</RouterLink>
+        <RouterLink to="/operations/audit" :class="navigationClasses('operations/audit')">{{
+          t('v410.audit')
+        }}</RouterLink>
+        <RouterLink to="/operations/security" :class="navigationClasses('operations/security')">{{
+          t('v410.security')
+        }}</RouterLink>
         <RouterLink to="/operations/system" :class="navigationClasses('operations/system')">
           <span class="navigation__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
@@ -213,7 +224,7 @@ async function handleLogout(): Promise<void> {
           </button>
         </div>
       </header>
-      <main id="main-content" class="content">
+      <main id="main-content" class="content" tabindex="-1">
         <RouterView />
       </main>
     </div>

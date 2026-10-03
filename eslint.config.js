@@ -6,6 +6,8 @@ import vue from 'eslint-plugin-vue';
 export default tseslint.config(
   {
     ignores: [
+      '.gemini/**',
+      '.mimosa/**',
       '**/dist/**',
       '**/node_modules/**',
       '**/coverage/**',

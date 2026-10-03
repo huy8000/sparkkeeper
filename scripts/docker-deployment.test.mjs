@@ -11,20 +11,28 @@ const files = Object.fromEntries(
       '.dockerignore',
       'docker/nginx.conf',
       'docker/docker-healthcheck.mjs',
+      'apps/server/src/http/services/StatusService.ts',
       'docker/app-entrypoint.sh',
       'docker/maintenance-entrypoint.sh',
       'docker/maintenance-browser.mjs',
       'scripts/docker-maintenance.sh',
       'scripts/docker-production-smoke.mjs',
+      'scripts/v4-gate-a.mjs',
+      'docker/security.caddy',
+      'docker/Caddyfile',
+      'docker/compose.maintenance-local.yml',
       'scripts/docker-maintenance-smoke.mjs',
     ].map(async (path) => [path, await readFile(new URL(`../${path}`, import.meta.url), 'utf8')]),
   ),
 );
 
-test('Compose exposes only loopback Admin and opt-in noVNC ports', () => {
+test('Public Compose exposes Caddy 80/443 only; maintenance needs an explicit loopback override', () => {
   const compose = files['docker-compose.yml'];
-  assert.match(compose, /127\.0\.0\.1:8080:8080/u);
-  assert.match(compose, /127\.0\.0\.1:6080:6080/u);
+  assert.match(compose, /'80:80'/u);
+  assert.match(compose, /'443:443'/u);
+  assert.doesNotMatch(compose, /(?:8080:8080|6080:6080|5900:5900)/u);
+  assert.match(files['docker/compose.maintenance-local.yml'], /127\.0\.0\.1:6080:6080/u);
+  assert.match(compose, /172\.30\.20\.2\/32/u);
   assert.doesNotMatch(compose, /(?:^|\s)-?\s*["']?5900:/mu);
   assert.doesNotMatch(
     compose,
@@ -59,6 +67,7 @@ test('Dockerfile is multi-stage, version-aligned, frozen, and non-root at runtim
   assert.doesNotMatch(dockerfile, /deploy --prod --legacy/u);
   assert.match(dockerfile, /rm -rf .*\/src.*\/test.*\/scripts/u);
   assert.match(dockerfile, /AS admin-runtime/u);
+  assert.match(dockerfile, /nginx-unprivileged:1\.30\.5-alpine@sha256:[a-f0-9]{64}/u);
   assert.match(dockerfile, /AS maintenance-runtime/u);
   assert.match(dockerfile, /USER pwuser/u);
   const runtimeStages = dockerfile.slice(
@@ -80,8 +89,11 @@ test('Nginx serves SPA history and proxies API/SSE without buffering or CORS cha
 test('application healthcheck requires database and migration readiness', () => {
   const healthcheck = files['docker/docker-healthcheck.mjs'];
   assert.match(healthcheck, /data\?\.status === 'READY'/u);
-  assert.match(healthcheck, /database\?\.status === 'READY'/u);
-  assert.match(healthcheck, /migration\?\.status === 'READY'/u);
+  assert.match(healthcheck, /serviceName === 'SparkKeeper'/u);
+  assert.match(
+    files['apps/server/src/http/services/StatusService.ts'],
+    /const ready = databaseReady && migrationReady/u,
+  );
 });
 
 test('normal and maintenance runtimes share an exclusive profile lock', () => {
@@ -102,7 +114,10 @@ test('normal and maintenance runtimes share an exclusive profile lock', () => {
 
 test('maintenance wrapper stops normal runtime before start and releases it before restart', () => {
   const wrapper = files['scripts/docker-maintenance.sh'];
-  assert.match(wrapper, /docker compose stop app/u);
+  assert.match(
+    wrapper,
+    /docker compose -f docker-compose.yml -f docker\/compose.maintenance-local.yml stop app/u,
+  );
   assert.match(wrapper, /--profile maintenance up -d maintenance/u);
   assert.match(wrapper, /wait_healthy maintenance/u);
   assert.match(wrapper, /--profile maintenance stop maintenance/u);
@@ -133,9 +148,8 @@ test('Docker build context excludes private and runtime artifacts', () => {
 });
 
 test('Docker smoke gates use temporary fixtures and keep every side-effect gate off', () => {
-  const production = files['scripts/docker-production-smoke.mjs'];
-  const maintenance = files['scripts/docker-maintenance-smoke.mjs'];
-  for (const smoke of [production, maintenance]) {
+  const production = files['scripts/v4-gate-a.mjs'];
+  for (const smoke of [production]) {
     assert.match(smoke, /mkdtempSync/u);
     assert.match(smoke, /SCHEDULER_ENABLED: 'false'/u);
     assert.match(smoke, /SCHEDULER_ALLOW_REAL_SEND: 'false'/u);
@@ -143,7 +157,8 @@ test('Docker smoke gates use temporary fixtures and keep every side-effect gate 
     assert.doesNotMatch(smoke, /douyin|auth:smoke|contact:smoke|send:smoke/iu);
   }
   assert.match(production, /event: ready/u);
-  assert.match(production, /fresh database must apply migrations 0000 through 0007/u);
-  assert.match(maintenance, /expectedStatus: 73/u);
-  assert.match(maintenance, /headed Chromium/u);
+  assert.match(production, /proof.migrations, 14/u);
+  assert.match(production, /externalRequests,\s*0/u);
+  assert.match(files['scripts/docker-production-smoke.mjs'], /import\('.\/v4-gate-a.mjs'\)/u);
+  assert.match(files['scripts/docker-maintenance-smoke.mjs'], /import\('\.\/v4-gate-a.mjs'\)/u);
 });

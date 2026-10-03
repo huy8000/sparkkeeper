@@ -336,33 +336,30 @@ test(
   },
 );
 
-test(
-  'invalid persisted Chromium identity keeps ownership and blocks replacement launch',
-  async (context) => {
-    removeBrowserIdentityFile(START.sessionId);
-    const identityFile = prepareBrowserIdentityFile(START.sessionId);
-    writeFileSync(identityFile, 'invalid identity\n', { mode: 0o600 });
-    context.after(() => removeBrowserIdentityFile(START.sessionId));
-    const factory = new FakeFactory();
-    const supervisor = new AccountLoginWorkerSupervisor({
-      factory,
-      stopGraceMs: 1,
-      forcedStopGraceMs: 1,
-    });
+test('invalid persisted Chromium identity keeps ownership and blocks replacement launch', async (context) => {
+  removeBrowserIdentityFile(START.sessionId);
+  const identityFile = prepareBrowserIdentityFile(START.sessionId);
+  writeFileSync(identityFile, 'invalid identity\n', { mode: 0o600 });
+  context.after(() => removeBrowserIdentityFile(START.sessionId));
+  const factory = new FakeFactory();
+  const supervisor = new AccountLoginWorkerSupervisor({
+    factory,
+    stopGraceMs: 1,
+    forcedStopGraceMs: 1,
+  });
 
-    await supervisor.start(START, () => undefined);
+  await supervisor.start(START, () => undefined);
 
-    assert.equal(factory.spawnCount, 0);
-    assert.equal(supervisor.owns(START.sessionId), true);
-    assert.equal(existsSync(identityFile), true);
-    await assert.rejects(
-      supervisor.stop(START.sessionId),
-      /process group survived bounded teardown/u,
-    );
-    assert.equal(supervisor.owns(START.sessionId), true);
-    assert.equal(existsSync(identityFile), true);
-  },
-);
+  assert.equal(factory.spawnCount, 0);
+  assert.equal(supervisor.owns(START.sessionId), true);
+  assert.equal(existsSync(identityFile), true);
+  await assert.rejects(
+    supervisor.stop(START.sessionId),
+    /process group survived bounded teardown/u,
+  );
+  assert.equal(supervisor.owns(START.sessionId), true);
+  assert.equal(existsSync(identityFile), true);
+});
 
 function signalGroup(groupId: number, signal: NodeJS.Signals): boolean {
   try {
