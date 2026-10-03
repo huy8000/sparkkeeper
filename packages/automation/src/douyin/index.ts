@@ -1,3 +1,13 @@
+export {
+  StableTargetResolver,
+  type CandidateWitness,
+  type StableResolveResult,
+  type TargetResolutionResult,
+} from './resolver/StableTargetResolver.js';
+export { PersonResolver } from './resolver/PersonResolver.js';
+export { GroupResolver } from './resolver/GroupResolver.js';
+export { DouyinTargetResolverPage } from './resolver/DouyinTargetResolverPage.js';
+export type { ResolutionWitness } from './resolver/ResolutionWitness.js';
 export { AuthDetectionError, AuthDetector } from './AuthDetector.js';
 export {
   AccountIdentityExtractionError,

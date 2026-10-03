@@ -1,9 +1,10 @@
 # V4-4 Implementation Specification — Contact Discovery
 
-> Status: IMPLEMENTED / PENDING INDEPENDENT REVIEW (uncommitted)
+> Status: MERGED / ACCEPTED (PR #44); do not reopen
 > Spec owner / reviewer: Codex
 > Implementer: Codex, separately authorized implementation on the required branch
 > Baseline: `develop@e5a3e925c0a6b2436a68679d0ca44d804c2e5a2f`
+> Merged baseline: `develop@2fd237f0405d3171c1606c27b9862763baabf950`
 > Required implementation branch: `feature/v4-4-contact-discovery`
 > Accepted dependencies: V4-1 / V4-2 / V4-3; do not reopen them
 
@@ -285,4 +286,4 @@ Known limitations remain explicit:
 - Normal-page stable attributes/self-profile and end/empty/loading/coverage evidence are not live-site verified. The production conservative adapter cannot declare COMPLETE; absent a reviewed end contract it reports bounded PARTIAL/FAILED. Fixture COMPLETE does not grant live completeness or stale permission.
 - No reliably bounded loaded-image acquisition or current streak DOM contract is verified. Runtime capture is skipped, with placeholder/null; the immutable cache/read/retention capability is tested with synthetic bytes. No extra image request or response-body fallback is introduced.
 - Production discovery is Linux-only (`/proc` start ticks + boot proof); other platforms fail closed. Multi-instance runtime ownership remains unsupported.
-- Independent code review and separate no-send Gate B authorization are still required. No real Douyin access, discovery, onboarding, scan, send, Git delivery or deployment occurred.
+- Independent code review and offline final verification completed; implementation was delivered in PR #44 and merged into the baseline above. Separate no-send Gate B remains unexecuted. No real Douyin discovery/onboarding/scan/send or deployment was performed by this milestone. Sections 1–12 remain the original acceptance contract; this status update does not reopen it.

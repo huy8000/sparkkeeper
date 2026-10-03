@@ -1,4 +1,9 @@
 export {
+  TargetResolverSnapshotRepository,
+  type TargetResolverSnapshot,
+  type TargetResolverSnapshotSource,
+} from './repositories/TargetResolverSnapshotRepository.js';
+export {
   createDatabase,
   DatabaseClient,
   DATABASE_BUSY_TIMEOUT_MS,

@@ -1,4 +1,6 @@
 /** Login-state metadata shared by automation and persistence boundaries. */
+export * from './TargetResolution.js';
+
 export type LoginStatus = 'READY' | 'AUTH_EXPIRED' | 'UNKNOWN';
 
 /** Identity metadata that can be shared without database or browser dependencies. */

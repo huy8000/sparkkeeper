@@ -543,6 +543,8 @@ V4.0 runtime 没有 silent fallback。以下不属于 fallback：
 
 变更 preferred 之后，新的 resolver request 只用新的 preferred identity。DISPLAY_NAME/REMARK_NAME 可被人工设为 preferred，但 UI 必须标记 mutable/low-confidence；任何 0/multiple match 仍 STOP。系统永远不在一次发送中自动尝试下一个字段。
 
+V4-5 最小实现细化见 [V4-5 Spec](./specs/v4-5-implementation-spec.md)：沿用当前 repository 只允许 strong preferred 的已实现范围，不提前开放人工 name-preferred mutation；上述未来人工选项不删除。解析是内部两阶段接口，FOUND 仅为完成全目录唯一性后的私有 candidate witness；打开后还须精确核对当前聊天的同 kind/value 与稳定会话 anchor，且重新校验 Account/Contact/preferred snapshot，才返回 live VERIFIED。版本必须覆盖 preferred Identity 行而非只依赖 Contact.updatedAt。名称/位置不补足完整性或身份；无证据 fail closed。Witness 不持久化/经 HTTP/IPC 传递，也不授权后续发送。本期不新增浏览器 operation、route/UI 或 send integration。
+
 ## 8. Test Send 与共同发送协调器
 
 ### 8.1 两阶段确认

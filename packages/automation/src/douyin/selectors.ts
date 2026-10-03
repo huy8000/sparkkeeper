@@ -5,6 +5,21 @@ export interface AuthCssSignal {
 
 export const DOUYIN_CHAT_URL = 'https://www.douyin.com/chat';
 
+/** V4 resolver-only scopes. No fixture/testid, composer or message-body selectors. */
+export const TARGET_RESOLVER_DOM_V1 = {
+  directory: '[data-e2e="chat-list"], [class~="conversationConversationListwrapper"]',
+  row: '[data-e2e="conversation-item"]',
+  self: '[data-e2e="user-profile"]',
+  current: '[data-e2e="conversation-header"], [class~="RightPanelHeadertitle"]',
+} as const;
+/** Separate loopback-only static DOM contract; never accepted on a Douyin origin. */
+export const TARGET_RESOLVER_LOCAL_STATIC_V1 = {
+  directory: '[data-sk-resolver-directory="static-v1"]',
+  row: 'button[data-sk-resolver-conversation]',
+  self: '[data-sk-resolver-self]',
+  current: '[data-sk-resolver-current]',
+} as const;
+
 export const READY_CHAT_SHELL_SELECTORS: readonly AuthCssSignal[] = [
   { selector: '[aria-label*="会话列表"]', label: 'conversation list aria-label' },
   { selector: '[aria-label*="聊天列表"]', label: 'chat list aria-label' },

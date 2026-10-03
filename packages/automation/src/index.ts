@@ -1,4 +1,22 @@
 export {
+  StableTargetResolver,
+  type CandidateWitness,
+  type StableResolveResult,
+  type TargetResolutionResult,
+} from './douyin/resolver/StableTargetResolver.js';
+export { PersonResolver } from './douyin/resolver/PersonResolver.js';
+export { GroupResolver } from './douyin/resolver/GroupResolver.js';
+export { DouyinTargetResolverPage } from './douyin/resolver/DouyinTargetResolverPage.js';
+export type { ResolutionWitness } from './douyin/resolver/ResolutionWitness.js';
+export {
+  ResolverBudget,
+  type ResolverCandidate,
+  type ResolverDirectoryPort,
+  type ResolverDirectoryWindow,
+  type ResolverPageState,
+  type ResolverRuntimeOwner,
+} from './douyin/resolver/types.js';
+export {
   BrowserSession,
   BrowserSessionError,
   type BrowserSessionHandle,

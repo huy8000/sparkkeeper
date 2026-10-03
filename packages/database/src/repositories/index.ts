@@ -1,4 +1,9 @@
 export {
+  TargetResolverSnapshotRepository,
+  type TargetResolverSnapshot,
+  type TargetResolverSnapshotSource,
+} from './TargetResolverSnapshotRepository.js';
+export {
   AccountRepository,
   AccountRepositoryError,
   type Account,
