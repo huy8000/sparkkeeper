@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outputDirectory = path.join(serverRoot, 'dist', 'native');
 mkdirSync(outputDirectory, { recursive: true, mode: 0o700 });
-for (const name of ['rename-noreplace', 'chromium-launcher']) {
+for (const name of ['rename-noreplace', 'chromium-launcher', 'contact-files']) {
   const output = path.join(outputDirectory, name);
   const source = path.join(serverRoot, 'native', `${name}.c`);
   const compilation = spawnSync(

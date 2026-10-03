@@ -1,6 +1,7 @@
 import {
   AccountRepository,
   AccountOnboardingRepository,
+  ContactDiscoveryRepository,
   AdminAuthRepository,
   createDatabase,
   DailyRunRepository,
@@ -56,6 +57,13 @@ import { AccountProfileStore } from '../onboarding/AccountProfileStore.js';
 import { AccountConsoleConnections } from '../onboarding/AuthenticatedConsoleGateway.js';
 import { AccountLoginWorkerSupervisor } from '../onboarding/AccountLoginWorkerSupervisor.js';
 import { AccountOnboardingManager } from '../onboarding/AccountOnboardingManager.js';
+import { BrowserOperationCoordinator } from '../onboarding/BrowserOperationCoordinator.js';
+import { ContactDiscoveryManager } from '../contacts/ContactDiscoveryManager.js';
+import {
+  ContactDiscoveryWorkerSupervisor,
+  type DiscoverySupervisor,
+} from '../contacts/ContactDiscoveryWorkerSupervisor.js';
+import { AvatarCacheStore } from '../contacts/AvatarCacheStore.js';
 
 export type ServerEnvironment = HttpEnvironment &
   SchedulerEnvironment &
@@ -80,6 +88,7 @@ export interface CreateApiApplicationOptions {
   readonly notificationAddressPolicy?: Pick<PublicDestinationPolicy, 'resolve'>;
   readonly notificationProvider?: NotificationProvider;
   readonly onboardingSupervisor?: AccountLoginWorkerSupervisor;
+  readonly discoverySupervisor?: DiscoverySupervisor;
 }
 
 export interface ApiApplication {
@@ -92,6 +101,8 @@ export interface ApiApplication {
   readonly notifications: NotificationService;
   readonly services: ApiServices;
   readonly onboarding: AccountOnboardingManager;
+  readonly discovery: ContactDiscoveryManager;
+  readonly avatars: AvatarCacheStore;
   recoverOnboarding(): Promise<void>;
   stopOnboarding(): Promise<void>;
   closeHttp(): Promise<void>;
@@ -243,14 +254,40 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
       }),
     );
     const onboardingSupervisor = options.onboardingSupervisor ?? new AccountLoginWorkerSupervisor();
+    const browserCoordinator = new BrowserOperationCoordinator();
+    const profiles = new AccountProfileStore(profileDataDirectory);
+    const discoveryRepository = new ContactDiscoveryRepository(database);
+    const browserGateOpen = () =>
+      !schedulerConfig.enabled &&
+      !manualRunConfig.enabled &&
+      !schedulerConfig.allowRealSend &&
+      !coordinator.isBusy &&
+      !discoveryRepository.executionBusy();
+    const managedDataDirectory = path.dirname(profiles.root);
+    const runtimeRoot = path.join(managedDataDirectory, 'discovery-runtime');
+    const discoverySupervisor =
+      options.discoverySupervisor ??
+      new ContactDiscoveryWorkerSupervisor(runtimeRoot, {
+        isSyncId: (id) => discoveryRepository.find(id) !== undefined,
+      });
+    const avatars = new AvatarCacheStore(path.join(managedDataDirectory, 'avatars'), database);
+    const discovery = new ContactDiscoveryManager(discoveryRepository, {
+      coordinator: browserCoordinator,
+      profiles,
+      supervisor: discoverySupervisor,
+      runtimeRoot,
+      releaseGateOpen: browserGateOpen,
+      avatars,
+      ...(options.clock === undefined ? {} : { clock: options.clock }),
+    });
     const consoleConnections = new AccountConsoleConnections();
     const onboarding = new AccountOnboardingManager({
       repository: onboardingRepository,
-      profiles: new AccountProfileStore(profileDataDirectory),
+      profiles,
+      coordinator: browserCoordinator,
       supervisor: onboardingSupervisor,
       invalidateConsole: (sessionId) => consoleConnections.close(sessionId),
-      releaseGateOpen: () =>
-        !schedulerConfig.enabled && !manualRunConfig.enabled && !schedulerConfig.allowRealSend,
+      releaseGateOpen: browserGateOpen,
       ...(options.clock === undefined ? {} : { clock: options.clock }),
     });
 
@@ -315,6 +352,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
         } satisfies FastifyServerOptions['logger']),
       clock: options.clock,
       onboarding,
+      discovery: { manager: discovery, avatars },
       console: {
         config,
         sessions: sessionService,
@@ -340,6 +378,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
     let manualRunsStopped = false;
     let notificationsStopped = false;
     let onboardingStopped = false;
+    let recovery: Promise<void> | undefined;
     const closeHttp = async (): Promise<void> => {
       if (httpClosed) return;
       await server.close();
@@ -362,6 +401,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
     };
     const stopOnboarding = async (): Promise<void> => {
       if (onboardingStopped) return;
+      await discovery.stop();
       consoleConnections.closeAll();
       await onboarding.stop();
       onboardingStopped = true;
@@ -376,7 +416,13 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
       notifications,
       services,
       onboarding,
-      recoverOnboarding: () => onboarding.recover(),
+      discovery,
+      avatars,
+      recoverOnboarding: () =>
+        (recovery ??= (async () => {
+          await discovery.recover();
+          await onboarding.recover();
+        })()),
       stopOnboarding,
       closeHttp,
       stopManualRuns,
@@ -409,6 +455,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
 }
 
 export async function listenApiApplication(application: ApiApplication): Promise<string> {
+  await application.recoverOnboarding();
   return application.server.listen({
     host: application.config.host,
     port: application.config.port,

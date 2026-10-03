@@ -13,6 +13,12 @@ export {
   type DatabasePragmaState,
 } from './client/DatabaseClient.js';
 export {
+  ContactDiscoveryRepository,
+  ContactDiscoveryError,
+  type DiscoveryPublication,
+  type ContactListOptions,
+} from './repositories/ContactDiscoveryRepository.js';
+export {
   DatabaseClientError,
   DatabaseInitializationError,
   DatabaseMigrationError,

@@ -4,6 +4,7 @@ import type { AuthController } from '../auth/AuthController';
 import AccountWorkspaceLayout from '../layouts/AccountWorkspaceLayout.vue';
 import AdminLayout from '../layouts/AdminLayout.vue';
 import AccountFriendsPage from '../pages/AccountFriendsPage.vue';
+import AccountContactsPage from '../pages/AccountContactsPage.vue';
 import AccountHistoryPage from '../pages/AccountHistoryPage.vue';
 import AccountManualRunPage from '../pages/AccountManualRunPage.vue';
 import AccountOverviewPage from '../pages/AccountOverviewPage.vue';
@@ -114,6 +115,11 @@ export function createAdminRouter(authController?: AuthController): Router {
                 path: 'friends',
                 component: AccountFriendsPage,
                 meta: { title: 'pages.accountFriends', section: 'accounts' },
+              },
+              {
+                path: 'contacts',
+                component: AccountContactsPage,
+                meta: { title: 'contacts.title', section: 'accounts' },
               },
               {
                 path: 'schedule',

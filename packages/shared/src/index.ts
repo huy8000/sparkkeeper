@@ -202,3 +202,10 @@ export {
   type AuditEntityType,
   type AuditOutcome,
 } from './Audit.js';
+
+export {
+  DISCOVERY_STABLE_KINDS,
+  validateContactObservation,
+  type DiscoveryStableKind,
+  type ContactObservation,
+} from './Contact.js';

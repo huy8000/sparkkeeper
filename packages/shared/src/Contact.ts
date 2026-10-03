@@ -95,6 +95,8 @@ export const CONTACT_SYNC_FAILURE_CODES = [
   'PARSER_CONTRACT_FAILURE',
   'BROWSER_FAILURE',
   'PERSISTENCE_FAILURE',
+  'DISCOVERY_STALLED',
+  'PROCESS_INTERRUPTED',
 ] as const;
 export type ContactSyncFailureCode = (typeof CONTACT_SYNC_FAILURE_CODES)[number];
 
@@ -167,4 +169,112 @@ export function validateStreakDays(streakDays: number | null | undefined): numbe
     );
   }
   return streakDays;
+}
+
+export const DISCOVERY_STABLE_KINDS = [
+  'SEC_UID',
+  'UNIQUE_ID',
+  'SHORT_ID',
+  'CONVERSATION_ID',
+] as const;
+export type DiscoveryStableKind = (typeof DISCOVERY_STABLE_KINDS)[number];
+export interface ContactObservation {
+  readonly type: ContactType;
+  readonly displayName: string;
+  readonly remarkName: string | null;
+  readonly identities: Partial<Record<DiscoveryStableKind, string>>;
+  readonly avatarRemoteUrl: string | null;
+  readonly streakDays: number | null;
+  readonly observedAt: number;
+  readonly adapterVersion: string;
+}
+
+/** Private IPC/domain input only; never expose these values through API/logs. */
+export function validateContactObservation(input: unknown): ContactObservation {
+  if (typeof input !== 'object' || input === null || Array.isArray(input))
+    throw new Error('Invalid observation.');
+  const value = input as Record<string, unknown>;
+  if (
+    Object.keys(value).some(
+      (key) =>
+        ![
+          'type',
+          'displayName',
+          'remarkName',
+          'identities',
+          'avatarRemoteUrl',
+          'streakDays',
+          'observedAt',
+          'adapterVersion',
+        ].includes(key),
+    )
+  )
+    throw new Error('Invalid observation fields.');
+  const bounded = (text: unknown, max: number): string => {
+    if (
+      typeof text !== 'string' ||
+      text.trim().length === 0 ||
+      [...text].length > max ||
+      [...text].some(
+        (character) => character.charCodeAt(0) <= 31 || character.charCodeAt(0) === 127,
+      )
+    )
+      throw new Error('Invalid observation field.');
+    return text.trim();
+  };
+  if (
+    !isContactType(value.type) ||
+    !Number.isSafeInteger(value.observedAt) ||
+    (value.observedAt as number) < 0
+  )
+    throw new Error('Invalid observation.');
+  if (
+    typeof value.identities !== 'object' ||
+    value.identities === null ||
+    Array.isArray(value.identities)
+  )
+    throw new Error('Invalid identities.');
+  const identities: ContactObservation['identities'] = {};
+  for (const [kind, text] of Object.entries(value.identities)) {
+    if (!DISCOVERY_STABLE_KINDS.includes(kind as DiscoveryStableKind))
+      throw new Error('Invalid identity kind.');
+    identities[kind as DiscoveryStableKind] = bounded(text, 512);
+  }
+  if (
+    Object.keys(identities).length === 0 ||
+    (value.type === 'PERSON' &&
+      !identities.SEC_UID &&
+      !identities.UNIQUE_ID &&
+      !identities.SHORT_ID) ||
+    (['GROUP', 'SYSTEM'].includes(value.type) &&
+      (!identities.CONVERSATION_ID ||
+        identities.SEC_UID ||
+        identities.UNIQUE_ID ||
+        identities.SHORT_ID))
+  )
+    throw new Error('Stable identity unavailable.');
+  const avatarRemoteUrl =
+    value.avatarRemoteUrl === null ? null : bounded(value.avatarRemoteUrl, 2048);
+  if (avatarRemoteUrl !== null) {
+    const url = new URL(avatarRemoteUrl);
+    if (url.protocol !== 'https:' || url.username || url.password || url.hash)
+      throw new Error('Invalid avatar reference.');
+  }
+  if (
+    value.streakDays !== null &&
+    (typeof value.streakDays !== 'number' ||
+      !Number.isSafeInteger(value.streakDays) ||
+      value.streakDays < 0)
+  )
+    throw new Error('Invalid streak.');
+  return {
+    type: value.type,
+    displayName: bounded(value.displayName, 200),
+    remarkName: value.remarkName === null ? null : bounded(value.remarkName, 200),
+    identities,
+    avatarRemoteUrl,
+    streakDays: value.streakDays as number | null,
+    observedAt: value.observedAt as number,
+    adapterVersion: bounded(value.adapterVersion, 64),
+  };
 }

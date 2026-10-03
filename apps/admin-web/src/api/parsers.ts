@@ -322,6 +322,25 @@ export const parseAccount: Parser<Account> = (value) => {
   const loginStatus = oneOf(data?.loginStatus, LOGIN_STATUSES);
   const createdAt = string(data?.createdAt);
   const updatedAt = string(data?.updatedAt);
+  const profileState =
+    data?.profileState === undefined
+      ? undefined
+      : oneOf(data.profileState, [
+          'PROVISIONING',
+          'READY',
+          'MIGRATION_REQUIRED',
+          'MISSING',
+          'QUARANTINED',
+        ] as const);
+  const lifecycleStatus =
+    data?.lifecycleStatus === undefined
+      ? undefined
+      : oneOf(data.lifecycleStatus, ['ACTIVE', 'UNBOUND'] as const);
+  if (
+    (data?.profileState !== undefined && profileState === undefined) ||
+    (data?.lifecycleStatus !== undefined && lifecycleStatus === undefined)
+  )
+    return undefined;
   if ([id, name, enabled, loginStatus, createdAt, updatedAt].some((item) => item === undefined)) {
     return undefined;
   }
@@ -330,6 +349,8 @@ export const parseAccount: Parser<Account> = (value) => {
     name: name!,
     enabled: enabled!,
     loginStatus: loginStatus!,
+    ...(profileState === undefined ? {} : { profileState }),
+    ...(lifecycleStatus === undefined ? {} : { lifecycleStatus }),
     createdAt: createdAt!,
     updatedAt: updatedAt!,
   };

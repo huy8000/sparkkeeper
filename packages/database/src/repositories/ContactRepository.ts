@@ -214,6 +214,7 @@ export class ContactRepository {
       lastSeenAt,
       lastFullSyncId: normalizeOptionalIdentifier(input.lastFullSyncId),
       missedFullSyncCount,
+      firstMissingAt: missedFullSyncCount > 0 ? now : null,
       createdAt: now,
       updatedAt: now,
     };
@@ -291,6 +292,7 @@ export class ContactRepository {
           lastSeenAt: input.lastSeenAt ?? now,
           lastFullSyncId: normalizeOptionalIdentifier(input.lastFullSyncId),
           missedFullSyncCount: input.missedFullSyncCount ?? 0,
+          firstMissingAt: (input.missedFullSyncCount ?? 0) > 0 ? now : null,
           createdAt: now,
           updatedAt: now,
         };
@@ -524,6 +526,8 @@ export class ContactRepository {
             );
           }
           values.missedFullSyncCount = input.missedFullSyncCount;
+          values.firstMissingAt =
+            input.missedFullSyncCount > 0 ? (existing.firstMissingAt ?? now) : null;
           mutationCount += 1;
         }
 
@@ -577,6 +581,7 @@ export class ContactRepository {
         .update(contacts)
         .set({
           missedFullSyncCount: sql`${contacts.missedFullSyncCount} + 1`,
+          firstMissingAt: sql`coalesce(${contacts.firstMissingAt}, ${Date.now()})`,
         })
         .where(inArray(contacts.id, contactIds))
         .returning()
@@ -611,6 +616,7 @@ export class ContactRepository {
         .update(contacts)
         .set({
           missedFullSyncCount: 0,
+          firstMissingAt: null,
           lastFullSyncId: syncId,
           lastSeenAt: timestamp,
           updatedAt: timestamp,

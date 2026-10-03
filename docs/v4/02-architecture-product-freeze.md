@@ -444,6 +444,8 @@ POST ContactSync
 
 Limits：120 秒、最多 500 candidates；达到限制为 `PARTIAL`，partial/failed sync 不把未见 Contact 标 stale/unavailable。用户可显式再次同步。
 
+V4-4 最小实现细化：只使用有版本、fixture 支撑的目录 DOM adapter；缺失可靠 identity/完整目录末尾证据时 fail closed，不凭滚动到底认定完整。候选在 run 内有界收集，停止并确认 worker/Chromium 都退出后，以单一 transaction 原子发布 upsert、stale policy、run 终态、Account 时间与 Audit。重启不恢复页面 cursor、不自动重新访问 Douyin；回收旧进程后将未提交 run 标 FAILED，用户显式从顶部重新同步。login/relogin 与 sync 共用一个 coordinator，并在两个 repository 的 admission transaction 中互相检查 durable active operation。见 [V4-4 Spec](./specs/v4-4-implementation-spec.md)。
+
 ### 6.2 Candidate required/optional fields
 
 | Type    | Required to persist as resolvable                     | Optional                    |
@@ -471,6 +473,8 @@ Limits：120 秒、最多 500 candidates；达到限制为 `PARTIAL`，partial/f
 - partial/failed/auth-expired sync 不增加 miss count；
 - 再次可靠发现：恢复 AVAILABLE、miss count 归零；
 - 不 hard-delete Contact。
+
+首次连续缺失时间由 `firstMissingAt` 持久化；部分/失败扫描既不增加也不清零未见 Contact 的连续计数。可靠重新发现才清零。`lastContactSyncAt` 只在已发布 COMPLETE/PARTIAL 时更新，failed/auth-expired 不代表成功同步。
 
 ### 6.5 Avatar：hybrid 冻结
 

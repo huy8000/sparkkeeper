@@ -95,6 +95,9 @@ export interface Account {
   readonly name: string;
   readonly enabled: boolean;
   readonly loginStatus: LoginStatus;
+  readonly profileState?:
+    'PROVISIONING' | 'READY' | 'MIGRATION_REQUIRED' | 'MISSING' | 'QUARANTINED';
+  readonly lifecycleStatus?: 'ACTIVE' | 'UNBOUND';
   readonly createdAt: string;
   readonly updatedAt: string;
 }

@@ -96,6 +96,8 @@ V4-2 的 milestone authority 是 [V4-2 Implementation Specification](./specs/v4-
 
 Account 自动创建发生在 AccountLoginSession READY 后的 server-side completion state machine，不允许客户端提交 displayName/secUid/profile path。
 
+V4-4 的既有 Account read DTO 增加安全的 `profileState` / `lifecycleStatus`，仅用于 Contacts UI 的已知 eligibility 判断；不新增这些状态的 mutation 或 profile path 字段。
+
 V4-3 的 milestone authority 是 [V4-3 Implementation Specification](./specs/v4-3-implementation-spec.md)。V4-3 只实现上表的 AccountLoginSession start/active/status/cancel/console 与既有 Account read surface；`auth-checks` 和 `unbind` 保留为 future draft，不属于 V4-3。
 
 ## 5. Contacts / Sync / Identity / Legacy Binding
@@ -113,6 +115,8 @@ V4-3 的 milestone authority 是 [V4-3 Implementation Specification](./specs/v4-
 | `GET /avatar-assets/:assetId`                     | S     | conditional cache headers                           | image bytes or placeholder/404                                        | same-origin only；`private, no-store` 或短 private cache；无 remote redirect   |
 
 Sync mutation 遇到 AUTH_EXPIRED 停止并更新 Account；partial/failed sync 不标记 unseen Contact stale。
+
+V4-4 的 milestone authority 是 [V4-4 Implementation Specification](./specs/v4-4-implementation-spec.md)。只实现 Contact list/detail、sync start/status 和 cached avatar read；list envelope 附 safe `latestSync` 以支持刷新后恢复状态查询。Sync start 强制 `Idempotency-Key`（按 Admin + endpoint namespace 持久化 digest）。`preferred-identity`、legacy binding、Task references 与 sync cancel 不属于该 milestone；身份风险只读展示，不降低 D guard，也不新增 re-auth 实现。
 
 ## 6. Templates
 

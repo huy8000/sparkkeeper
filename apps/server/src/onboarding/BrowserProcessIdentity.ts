@@ -1,4 +1,12 @@
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -48,4 +56,17 @@ export function readBrowserProcessIdentity(sessionId: string): BrowserProcessIde
 
 export function removeBrowserIdentityFile(sessionId: string): void {
   rmSync(browserIdentityFile(sessionId), { force: true });
+}
+
+/** Discovery recovery uses known DB run IDs; login ownership stays with V4-3. */
+export function browserProcessIdentityIds(): string[] {
+  if (!existsSync(IDENTITY_ROOT)) return [];
+  const state = lstatSync(IDENTITY_ROOT);
+  if (state.isSymbolicLink() || !state.isDirectory())
+    throw new Error('Browser identity root unsafe.');
+  const names = readdirSync(IDENTITY_ROOT);
+  if (names.length > 4096) throw new Error('Browser identity inventory too large.');
+  return names.flatMap((name) =>
+    name.endsWith('.identity') && SESSION_ID.test(name.slice(0, -9)) ? [name.slice(0, -9)] : [],
+  );
 }

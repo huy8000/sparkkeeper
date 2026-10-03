@@ -6,6 +6,8 @@ export interface AccountDto {
   readonly name: string;
   readonly enabled: boolean;
   readonly loginStatus: LoginStatus;
+  readonly profileState: Account['profileState'];
+  readonly lifecycleStatus: Account['lifecycleStatus'];
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -43,6 +45,8 @@ export function toAccountDto(account: Account): AccountDto {
     name: account.name,
     enabled: account.enabled,
     loginStatus: account.loginStatus,
+    profileState: account.profileState,
+    lifecycleStatus: account.lifecycleStatus,
     createdAt: account.createdAt.toISOString(),
     updatedAt: account.updatedAt.toISOString(),
   };

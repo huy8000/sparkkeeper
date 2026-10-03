@@ -260,29 +260,21 @@ export class ContactSyncRunRepository {
       values.updatedCount = options.updatedCount;
     }
     if (options?.staleCount !== undefined) {
-      if (
-        !Number.isInteger(options.staleCount) ||
-        options.staleCount < 0 ||
-        options.staleCount > 500
-      ) {
+      if (!Number.isInteger(options.staleCount) || options.staleCount < 0) {
         throw new ContactSyncRunRepositoryError(
           'transition',
           'VALIDATION_ERROR',
-          'staleCount must be between 0 and 500.',
+          'staleCount must be non-negative.',
         );
       }
       values.staleCount = options.staleCount;
     }
     if (options?.unavailableCount !== undefined) {
-      if (
-        !Number.isInteger(options.unavailableCount) ||
-        options.unavailableCount < 0 ||
-        options.unavailableCount > 500
-      ) {
+      if (!Number.isInteger(options.unavailableCount) || options.unavailableCount < 0) {
         throw new ContactSyncRunRepositoryError(
           'transition',
           'VALIDATION_ERROR',
-          'unavailableCount must be between 0 and 500.',
+          'unavailableCount must be non-negative.',
         );
       }
       values.unavailableCount = options.unavailableCount;

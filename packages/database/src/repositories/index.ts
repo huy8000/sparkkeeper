@@ -6,6 +6,12 @@ export {
   type UpdateAccountInput,
 } from './AccountRepository.js';
 export {
+  ContactDiscoveryRepository,
+  ContactDiscoveryError,
+  type DiscoveryPublication,
+  type ContactListOptions,
+} from './ContactDiscoveryRepository.js';
+export {
   DEFAULT_DAILY_RUN_LIMIT,
   MAX_DAILY_RUN_LIMIT,
   DailyRunRepository,

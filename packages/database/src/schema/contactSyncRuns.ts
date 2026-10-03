@@ -1,6 +1,6 @@
 import type { ContactSyncFailureCode, ContactSyncRunStatus } from '@sparkkeeper/shared';
 import { sql } from 'drizzle-orm';
-import { check, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 import { accounts } from './accounts.js';
 import { adminUsers } from './adminUsers.js';
@@ -28,6 +28,7 @@ export const contactSyncRuns = sqliteTable(
     finishedAt: integer('finished_at', { mode: 'timestamp_ms' }),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+    idempotencyKeyDigest: text('idempotency_key_digest'),
   },
   (table) => [
     check(
@@ -36,7 +37,7 @@ export const contactSyncRuns = sqliteTable(
     ),
     check(
       'contact_sync_runs_failure_code_check',
-      sql`${table.failureCode} is null or ${table.failureCode} in ('PROFILE_UNAVAILABLE', 'PROFILE_BUSY', 'AUTH_EXPIRED', 'AUTH_UNKNOWN', 'CHAT_NOT_READY', 'DISCOVERY_TIMEOUT', 'CANDIDATE_LIMIT_REACHED', 'PARSER_CONTRACT_FAILURE', 'BROWSER_FAILURE', 'PERSISTENCE_FAILURE')`,
+      sql`${table.failureCode} is null or ${table.failureCode} in ('PROFILE_UNAVAILABLE', 'PROFILE_BUSY', 'AUTH_EXPIRED', 'AUTH_UNKNOWN', 'CHAT_NOT_READY', 'DISCOVERY_TIMEOUT', 'CANDIDATE_LIMIT_REACHED', 'PARSER_CONTRACT_FAILURE', 'BROWSER_FAILURE', 'PERSISTENCE_FAILURE', 'DISCOVERY_STALLED', 'PROCESS_INTERRUPTED')`,
     ),
     check(
       'contact_sync_runs_candidate_count_check',
@@ -50,14 +51,8 @@ export const contactSyncRuns = sqliteTable(
       'contact_sync_runs_updated_count_check',
       sql`${table.updatedCount} >= 0 and ${table.updatedCount} <= 500`,
     ),
-    check(
-      'contact_sync_runs_stale_count_check',
-      sql`${table.staleCount} >= 0 and ${table.staleCount} <= 500`,
-    ),
-    check(
-      'contact_sync_runs_unavailable_count_check',
-      sql`${table.unavailableCount} >= 0 and ${table.unavailableCount} <= 500`,
-    ),
+    check('contact_sync_runs_stale_count_check', sql`${table.staleCount} >= 0`),
+    check('contact_sync_runs_unavailable_count_check', sql`${table.unavailableCount} >= 0`),
     check(
       'contact_sync_runs_issue_count_check',
       sql`${table.issueCount} >= 0 and ${table.issueCount} <= 500`,
@@ -72,6 +67,16 @@ export const contactSyncRuns = sqliteTable(
     ),
     index('contact_sync_runs_account_created_idx').on(table.accountId, table.createdAt),
     index('contact_sync_runs_status_idx').on(table.status),
+    check(
+      'contact_sync_runs_digest_check',
+      sql`${table.idempotencyKeyDigest} is null or (length(${table.idempotencyKeyDigest}) = 64 and ${table.idempotencyKeyDigest} not glob '*[^0-9a-f]*')`,
+    ),
+    uniqueIndex('contact_sync_runs_admin_idempotency_idx')
+      .on(table.requestedByAdminUserId, table.idempotencyKeyDigest)
+      .where(sql`${table.idempotencyKeyDigest} is not null`),
+    uniqueIndex('contact_sync_runs_active_global_idx')
+      .on(sql`(1)`)
+      .where(sql`${table.status} in ('PENDING', 'RUNNING')`),
   ],
 );
 

@@ -42,6 +42,7 @@ export const contacts = sqliteTable(
     missedFullSyncCount: integer('missed_full_sync_count').notNull().default(0),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+    firstMissingAt: integer('first_missing_at', { mode: 'timestamp_ms' }),
   },
   (table) => [
     check('contacts_type_check', sql`${table.type} in ('PERSON', 'GROUP', 'SYSTEM', 'UNKNOWN')`),
@@ -71,6 +72,10 @@ export const contacts = sqliteTable(
       sql`(${table.streakDays} is null and ${table.streakUpdatedAt} is null) or (${table.streakDays} is not null and ${table.streakUpdatedAt} is not null)`,
     ),
     check('contacts_missed_full_sync_count_check', sql`${table.missedFullSyncCount} >= 0`),
+    check(
+      'contacts_missing_time_check',
+      sql`(${table.missedFullSyncCount} = 0 and ${table.firstMissingAt} is null) or (${table.missedFullSyncCount} > 0 and ${table.firstMissingAt} is not null)`,
+    ),
     check('contacts_timeline_check', sql`${table.lastSeenAt} >= ${table.discoveredAt}`),
     index('contacts_account_type_availability_idx').on(
       table.accountId,
@@ -78,6 +83,7 @@ export const contacts = sqliteTable(
       table.availabilityStatus,
     ),
     index('contacts_account_display_name_idx').on(table.accountId, table.displayName),
+    index('contacts_account_cursor_idx').on(table.accountId, table.createdAt, table.id),
   ],
 );
 

@@ -1,6 +1,35 @@
 import type { TranslationSchema } from './en-US';
 
 export const zhCN: TranslationSchema = {
+  contacts: {
+    title: '联系人',
+    scope: '只读发现当前账号的会话目录，不发送消息。',
+    sync: '同步联系人',
+    reconcile: '核对未确认的同步',
+    uncertain: '启动结果不确定；显式重试沿用原幂等键，不自动重试。',
+    busy: '已有浏览器流程正在运行。',
+    search: '搜索',
+    type: '类型',
+    availability: '可用性',
+    identity: '身份',
+    all: '全部',
+    empty: '尚无已发现联系人；不代表会话目录为空。',
+    partial:
+      '扫描仅覆盖部分目录，未见联系人保持原状。上限：120 秒 / 500 次观察；再次同步从顶部开始。',
+    name: '名称',
+    streak: '火花天数',
+    next: '下一页',
+    detail: '联系人详情',
+    notSendPermission: '身份就绪不等于发送授权或目标验证。',
+    status: {
+      PENDING: '等待启动',
+      RUNNING: '正在发现',
+      COMPLETE: '目录完整扫描',
+      PARTIAL: '部分扫描',
+      FAILED: '发现失败或已中断',
+      AUTH_EXPIRED: '账号登录已失效',
+    },
+  },
   common: {
     retry: '重试',
     refresh: '刷新',
@@ -862,6 +891,10 @@ export const zhCN: TranslationSchema = {
   },
   errors: {
     api: {
+      accountNotReady: '账号尚未准备好进行联系人发现。',
+      contactNotFound: '联系人不存在。',
+      syncNotFound: '联系人同步记录不存在。',
+      avatarNotFound: '缓存头像不可用。',
       accountNotFound: '未找到该账号。',
       friendNotFound: '未找到该好友。',
       scheduleNotFound: '未找到该计划。',

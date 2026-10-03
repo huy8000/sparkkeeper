@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import BetterSqlite3 from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { migrate as applyDrizzleMigrations } from 'drizzle-orm/better-sqlite3/migrator';
+import { readMigrationFiles } from 'drizzle-orm/migrator';
 
 import { resolveDatabasePath, type ResolveDatabasePathOptions } from '../config/databaseConfig.js';
 import * as schema from '../schema/index.js';
@@ -334,6 +334,7 @@ const EXPECTED_CONTACT_SYNC_RUN_COLUMNS: readonly DatabaseColumnState[] = [
   { name: 'finished_at', type: 'INTEGER', notNull: false, primaryKey: false },
   { name: 'created_at', type: 'INTEGER', notNull: true, primaryKey: false },
   { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'idempotency_key_digest', type: 'TEXT', notNull: false, primaryKey: false },
 ];
 
 const EXPECTED_CONTACT_COLUMNS: readonly DatabaseColumnState[] = [
@@ -354,6 +355,7 @@ const EXPECTED_CONTACT_COLUMNS: readonly DatabaseColumnState[] = [
   { name: 'missed_full_sync_count', type: 'INTEGER', notNull: true, primaryKey: false },
   { name: 'created_at', type: 'INTEGER', notNull: true, primaryKey: false },
   { name: 'updated_at', type: 'INTEGER', notNull: true, primaryKey: false },
+  { name: 'first_missing_at', type: 'INTEGER', notNull: false, primaryKey: false },
 ];
 
 const EXPECTED_CONTACT_IDENTITY_COLUMNS: readonly DatabaseColumnState[] = [
@@ -512,12 +514,44 @@ export class DatabaseClient {
     this.assertOpen();
 
     try {
-      applyDrizzleMigrations(this.orm, { migrationsFolder: this.migrationsDirectory });
+      // Drizzle's sync migrator issues its own BEGIN and cannot nest. Retain its
+      // journal/hash protocol, but validate parent-table rebuilds before COMMIT.
+      this.sqlite.pragma('foreign_keys = OFF');
+      this.sqlite
+        .transaction(() => {
+          const migrations = readMigrationFiles({ migrationsFolder: this.migrationsDirectory });
+          this.sqlite.exec(
+            'CREATE TABLE IF NOT EXISTS __drizzle_migrations (id SERIAL PRIMARY KEY, hash text NOT NULL, created_at numeric)',
+          );
+          const last = this.sqlite
+            .prepare('SELECT created_at FROM __drizzle_migrations ORDER BY created_at DESC LIMIT 1')
+            .get() as { created_at: number } | undefined;
+          const retainedObjects = this.sqlite
+            .prepare(
+              "SELECT name, sql FROM sqlite_master WHERE type IN ('trigger','index') AND sql IS NOT NULL AND tbl_name IN ('contacts','contact_sync_runs')",
+            )
+            .all() as { name: string; sql: string }[];
+          for (const migration of migrations)
+            if (!last || migration.folderMillis > last.created_at) {
+              for (const statement of migration.sql) this.sqlite.exec(statement);
+              this.sqlite
+                .prepare('INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)')
+                .run(migration.hash, migration.folderMillis);
+            }
+          for (const object of retainedObjects)
+            if (!this.sqlite.prepare('SELECT 1 FROM sqlite_master WHERE name=?').get(object.name))
+              this.sqlite.exec(object.sql);
+          if ((this.sqlite.pragma('foreign_key_check') as unknown[]).length !== 0)
+            throw new Error('Migration foreign-key integrity failure.');
+        })
+        .immediate();
     } catch (error) {
       throw new DatabaseMigrationError(
         `Failed to apply database migrations from "${this.migrationsDirectory}".`,
         error,
       );
+    } finally {
+      this.sqlite.pragma('foreign_keys = ON');
     }
 
     const inspection = this.inspect();
