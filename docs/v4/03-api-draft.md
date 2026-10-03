@@ -120,6 +120,8 @@ V4-4 的 milestone authority 是 [V4-4 Implementation Specification](./specs/v4-
 
 V4-5 的 milestone authority 是 [V4-5 Implementation Specification](./specs/v4-5-implementation-spec.md)。Stable Target Resolver 只提供内部接口，不新增 HTTP route/UI、durable resolver status 或生产浏览器入口。Contact GET/identity-ready 字段不触发 resolver，也不等于 live VERIFIED/send permission；不开放 preferred mutation、Test Send 或 name-only fallback。Resolver witness 不通过 HTTP/SSE 返回。
 
+V4-6 [Delivery Verification Spec](./specs/v4-6-implementation-spec.md) 仍为内部 building block，不新增 HTTP/UI/send route、Run status 或 mutation；现有 API inventory 不变。Verifier 的安全结果摘要不是新发送授权，witness/known message/页面 evidence 不经 HTTP/SSE/IPC 返回。Test Send 的 preview/confirm/共同 coordinator 留给 V4-7。
+
 ## 6. Templates
 
 | Method / Path                  | Guard | Request                                 | Response                            | Side effects                                                             |

@@ -636,6 +636,8 @@ action boundary 之后出现以下任一情况：timeout（默认 15 秒、最�
 - 只检查“最后一条”或当前总数变化是不合格实现；
 - timeout 结束前允许一次当前 DOM reconciliation，但不能滚动读取历史正文来寻找证据。
 
+V4-6 最小实现细化见 [V4-6 Spec](./specs/v4-6-implementation-spec.md)：内部 verifier 消费 genuine same-page ResolutionWitness，沿用当前 runtime/snapshot/lease 校验；不新增发送入口。新 outgoing exact-text bubble 必须有 post-action append 和可靠 ID/sequence/tail/fingerprint 证据，不依赖当前计数。Persistence callback 开始后即按可能跨越边界处理，任何不确定结果只为 DELIVERY_UNKNOWN、不重试。Controlled loopback adapter 的合成成功不授权 production adapter；未验证 live message/action contract 时在 callback/click 前 fail closed。V4-7 另行实现 durable boundary、composer preparation 与共同 coordinator；本期不接入 legacy sender。
+
 ## 10. Human Delivery Resolution
 
 API 只允许对 `DELIVERY_UNKNOWN` SendRecord 新增 resolution。每次提交要求 auth、CSRF、recent re-auth、`expectedLatestResolutionId`（避免并发覆盖语义）、resolution、可选 note。

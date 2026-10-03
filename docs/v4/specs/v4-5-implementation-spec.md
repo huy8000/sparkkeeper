@@ -1,8 +1,9 @@
 # V4-5 Implementation Specification — Stable Target Resolver
 
-> Status: IMPLEMENTED / SELF-REVIEW AND OFFLINE VERIFICATION PASS
+> Status: MERGED / ACCEPTED (PR #45); do not reopen
 > Spec owner / reviewer: Codex
 > Baseline: `develop@2fd237f0405d3171c1606c27b9862763baabf950` (V4-4 merged by PR #44)
+> Merged baseline: `develop@d964fc4f8b3d8ead0f675a0d2c2477edb32eb5a5`
 > Required implementation branch: `feature/v4-5-stable-target-resolver`
 > Accepted dependencies: V4-1 / V4-2 / V4-3 / V4-4; do not reopen them
 > Authority: this milestone spec under the V4 product/architecture freeze; user authorized Milestone Owner implementation, self-review, verification and feature-branch Git delivery (not merge/release/deploy)

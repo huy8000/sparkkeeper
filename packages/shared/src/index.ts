@@ -1,5 +1,6 @@
 /** Login-state metadata shared by automation and persistence boundaries. */
 export * from './TargetResolution.js';
+export * from './DeliveryVerification.js';
 
 export type LoginStatus = 'READY' | 'AUTH_EXPIRED' | 'UNKNOWN';
 

@@ -1,3 +1,13 @@
+export { DeliveryVerifier } from './douyin/delivery/DeliveryVerifier.js';
+export { DouyinDeliveryPage } from './douyin/delivery/DouyinDeliveryPage.js';
+export {
+  DeliveryBudget,
+  type DeliveryObservationPort,
+  type DeliveryActionBoundary,
+  type DeliveryTargetGuard,
+  type DeliveryVerifierOptions,
+  type DeliveryEvidence,
+} from './douyin/delivery/types.js';
 export {
   StableTargetResolver,
   type CandidateWitness,
