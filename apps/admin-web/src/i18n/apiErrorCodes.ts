@@ -7,6 +7,8 @@
  * its translation keys; unknown codes always fall back safely.
  */
 export const KNOWN_API_ERROR_CODES = [
+  'TASK_NOT_FOUND',
+  'TASK_CONFLICT',
   'TARGET_NOT_ELIGIBLE',
   'INTENT_NOT_FOUND',
   'INTENT_EXPIRED',
@@ -54,6 +56,8 @@ export const KNOWN_API_ERROR_CODES = [
 export type KnownApiErrorCode = (typeof KNOWN_API_ERROR_CODES)[number];
 
 const API_ERROR_TRANSLATION_KEYS: Record<KnownApiErrorCode, string> = {
+  TASK_NOT_FOUND: 'errors.api.taskNotFound',
+  TASK_CONFLICT: 'errors.api.taskConflict',
   TARGET_NOT_ELIGIBLE: 'errors.api.testSendIneligible',
   INTENT_NOT_FOUND: 'errors.api.testSendIntentMissing',
   INTENT_EXPIRED: 'errors.api.testSendIntentExpired',

@@ -46,11 +46,12 @@ export class SparkKeeperService {
     try {
       await application.recoverOnboarding();
       const address = await listenApiApplication(application);
-      const schedulerService =
-        this.scheduler ??
-        new SchedulerService(this.realtime, this.coordinator, application.notifications);
-      this.scheduler = schedulerService;
-      const scheduler = await schedulerService.start(environment);
+      // V4 never falls through to the legacy Schedule/Profile production sender.
+      const scheduler = this.schedulerOverride
+        ? await this.schedulerOverride.start(environment)
+        : environment.SCHEDULER_ENABLED?.trim().toLowerCase() === 'true'
+          ? 'BLOCKED'
+          : application.scheduling.start();
       return { address, scheduler };
     } catch (error) {
       await this.stop();

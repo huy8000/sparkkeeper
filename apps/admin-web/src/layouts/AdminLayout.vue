@@ -66,6 +66,9 @@ async function handleLogout(): Promise<void> {
         <span class="brand__name">SparkKeeper</span>
       </RouterLink>
       <nav class="navigation" :aria-label="t('nav.primaryNav')">
+        <RouterLink to="/tasks" :class="navigationClasses('tasks')">{{
+          t('tasks.title')
+        }}</RouterLink>
         <p class="navigation__label">{{ t('nav.workspace') }}</p>
         <RouterLink to="/" :class="navigationClasses('overview')">
           <span class="navigation__icon" aria-hidden="true">

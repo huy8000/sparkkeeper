@@ -77,6 +77,9 @@ export function createV4OnboardingDatabase(context: TestContext): TemporaryDatab
 export function createV4DiscoveryDatabase(context: TestContext): TemporaryDatabase {
   return createHistoricalDatabase(context, 'v4-discovery', 11);
 }
+export function createV4TestSendDatabase(context: TestContext): TemporaryDatabase {
+  return createHistoricalDatabase(context, 'v4-test-send', 12);
+}
 
 export function insertLegacyAccount(
   databasePath: string,

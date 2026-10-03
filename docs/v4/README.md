@@ -1,8 +1,8 @@
 # SparkKeeper V4 Planning & Implementation Index
 
-> 状态：V4-1…V4-6 MERGED；V4-7 IMPLEMENTED / SELF-REVIEWED / OFFLINE VERIFIED（待 PR 合并）
+> 状态：V4-1…V4-7 MERGED；V4-8 IMPLEMENTED / SELF-REVIEWED / OFFLINE VERIFIED（PR delivery，未合并）
 > 目标版本：V4.0.0
-> 当前基线：`develop@c76cd1fdac8da6f5f1aaf0958fd01fb7c97b32fb`；V4 是第一个真实生产基线，V3 是未实际生产使用的开发原型
+> 当前基线：`develop@a41562b43e9a9d7882bd9139a2c1ce57d076ba8d`；V4 是第一个真实生产基线，V3 是未实际生产使用的开发原型
 
 本目录是 V4 实现、验收和独立 Code Review 的规范入口。Development Agent 必须使用对应 Milestone 的 Implementation Specification；不得从摘要自行补做架构设计。
 
@@ -20,7 +20,8 @@
 | [V4-4 Implementation Specification](./specs/v4-4-implementation-spec.md) | MERGED       | 已接受的 Contact Discovery、完整扫描发布与 runtime ownership 基线 |
 | [V4-5 Implementation Specification](./specs/v4-5-implementation-spec.md) | MERGED | preferred-only 完整唯一性解析、稳定会话打开与当前身份复核；内部接口、零发送 |
 | [V4-6 Implementation Specification](./specs/v4-6-implementation-spec.md) | MERGED | 内部 witness-bound verifier、pre-action observer 与至多一次动作边界；无发送入口 |
-| [V4-7 Implementation Specification](./specs/v4-7-implementation-spec.md) | OFFLINE VERIFIED / PR DELIVERY | 单目标 preview/confirm、不可变 snapshot、共同 coordinator、no-retry recovery、API/UI；live gate 关闭 |
+| [V4-7 Implementation Specification](./specs/v4-7-implementation-spec.md) | MERGED | 单目标 preview/confirm、不可变 snapshot、共同 coordinator、no-retry recovery、API/UI；live gate 关闭 |
+| [V4-8 Implementation Specification](./specs/v4-8-implementation-spec.md) | OFFLINE VERIFIED / PR DELIVERY | Task 配置、不可变 scheduled snapshot、claim/action CAS、保守 recovery、API/UI；production scheduling gate 关闭 |
 
 ## Change control
 
@@ -33,8 +34,10 @@
 
 ## Current phase boundary
 
-V4-1…V4-6 已合并，不重新打开；V4-6 经 PR #46 合入当前基线。离线验收不代表真实 discovery/resolution/delivery 已验证；production DOM 证据仍保守 fail closed，avatar/streak 无可靠证据时降级为 placeholder/null。
+V4-1…V4-7 已合并，不重新打开；V4-7 经 PR #47 合入当前基线。离线验收不代表真实 discovery/resolution/delivery 已验证；production DOM 证据仍保守 fail closed，avatar/streak 无可靠证据时降级为 placeholder/null。
 
 V4-7 按本轮用户明确指令收敛为单目标，不实现 roadmap 的 batch。新增 0011 intents 与一次性 DB 边界，将 V4-5 Resolver/V4-6 Verifier 串入共同 coordinator；API/UI 提供 preview/confirm/detail。生产 factory 未接入，不提供 environment bypass；execute 在 consume 前返回 RELEASE_GATE_CLOSED。离线 factory 仅用于 intercepted loopback fixture，并要求共享 global/profile lease 与可证明 cleanup/recovery。现阶段不新增生产 worker/supervisor，不宣称已具备 live 发送能力；后续实际 DOM/受监管 worker 接入与真实发送分别需要授权。
+
+V4-8 增加 0012 managed scheduled snapshots、daily window/timezone Task 配置、串行 dispatcher、持久化 Run ownership/record claim/action CAS 与 bounded null-boundary recovery retry；复用共同 Resolver/Verifier 单次动作链路。UNKNOWN 永不 retry，AUTH/global failure 停止剩余 targets；显式 AUTH_EXPIRED 同事务更新 Account，Task 保持 enabled 但派生 BLOCKED。最小 Tasks/Scheduled Run API/UI 不接受 message/identity/profile path。生产 master/execution 不可由 environment 打开，默认服务不再 fall through 到 legacy Scheduler；controlled-local factory 只验证合成本地 DOM。没有访问真实 Douyin、真实发送或执行 Gates B–F；History/observability unification 仍属 V4-9。
 
 V4-6 已按 Milestone Owner 授权实现、自审并完成受影响 workspace 离线 tests/typecheck/build；授权包括 feature branch commit/push/PR，不包括 merge/release/deploy。交付仅含内部 delivery verifier、私有 witness 绑定和至多一次 persistence/action boundary，不新增 migration/HTTP/UI/worker、Test Send 或 Scheduler，也不改 legacy sender。真实生产 message/tail/action DOM contract 未验证，production delivery adapter 在 callback/click 前 fail closed；只有受控 loopback fixture 可执行合成动作。未访问 Douyin、未真实发送、未执行 Gate B。Gate B 无发送；真实发送验证另须 Gates C/D/E 单独授权。

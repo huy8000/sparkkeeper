@@ -5,7 +5,7 @@ import {
   type DeliveryActionBoundary,
   type DeliveryVerifierOptions,
 } from '@sparkkeeper/automation';
-import type { DeliveryVerificationResult } from '@sparkkeeper/shared';
+import type { DeliveryVerificationResult, TargetResolutionFailure } from '@sparkkeeper/shared';
 import type {
   ExistingTargetResolverRuntime,
   TargetResolutionService,
@@ -21,10 +21,15 @@ export class DeliveryVerificationService {
     readonly message: string;
     readonly boundary: DeliveryActionBoundary;
     readonly limits?: DeliveryVerifierOptions;
+    readonly onTargetFailure?: (failure: TargetResolutionFailure) => void;
   }): Promise<DeliveryVerificationResult> {
     const { witness, runtime, observation, message, boundary, limits } = options;
     return new DeliveryVerifier(observation, {
-      check: () => this.targets.revalidateCurrentChat(witness, runtime),
+      check: async () => {
+        const failure = await this.targets.revalidateCurrentChat(witness, runtime);
+        if (failure) options.onTargetFailure?.(failure);
+        return failure;
+      },
     }).verify(witness, message, boundary, limits);
   }
 }

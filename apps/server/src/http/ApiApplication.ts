@@ -1,4 +1,5 @@
 import {
+  ScheduledSendRepository,
   TestSendRepository,
   TargetResolverSnapshotRepository,
   AccountRepository,
@@ -18,6 +19,7 @@ import {
   resolveDatabasePath,
 } from '@sparkkeeper/database';
 import path from 'node:path';
+import { SendTaskScheduler } from '../scheduling/SendTaskScheduler.js';
 import { TestSendManager, type TestSendRuntimeFactory } from '../test-send/TestSendManager.js';
 import { TargetResolutionService } from '../automation/TargetResolutionService.js';
 import {
@@ -75,6 +77,11 @@ export type ServerEnvironment = HttpEnvironment &
   ManualRunEnvironment;
 
 export interface CreateApiApplicationOptions {
+  readonly scheduling?: {
+    runtime?: TestSendRuntimeFactory;
+    master?: () => boolean;
+    released?: () => boolean;
+  };
   readonly testSendRuntime?: TestSendRuntimeFactory;
   readonly environment?: ServerEnvironment;
   readonly cwd?: string;
@@ -97,6 +104,7 @@ export interface CreateApiApplicationOptions {
 }
 
 export interface ApiApplication {
+  readonly scheduling: SendTaskScheduler;
   readonly testSend: TestSendManager;
   readonly server: FastifyInstance;
   readonly authGuards: AdminAuthGuardRegistration;
@@ -262,6 +270,18 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
     const onboardingSupervisor = options.onboardingSupervisor ?? new AccountLoginWorkerSupervisor();
     const browserCoordinator = new BrowserOperationCoordinator();
     const profiles = new AccountProfileStore(profileDataDirectory);
+    const scheduling = new SendTaskScheduler(new ScheduledSendRepository(database, options.clock), {
+      coordinator: browserCoordinator,
+      profiles,
+      targets: new TargetResolutionService(new TargetResolverSnapshotRepository(database)),
+      isolated: () =>
+        !schedulerConfig.enabled &&
+        !manualRunConfig.enabled &&
+        !schedulerConfig.allowRealSend &&
+        !coordinator.isBusy,
+      ...options.scheduling,
+      clock: options.clock,
+    });
     const testSend = new TestSendManager(new TestSendRepository(database), {
       coordinator: browserCoordinator,
       profiles,
@@ -372,6 +392,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
       onboarding,
       testSend,
       discovery: { manager: discovery, avatars },
+      scheduling,
       console: {
         config,
         sessions: sessionService,
@@ -421,6 +442,7 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
     const stopOnboarding = async (): Promise<void> => {
       if (onboardingStopped) return;
       await testSend.stop();
+      await scheduling.stop();
       await discovery.stop();
       consoleConnections.closeAll();
       await onboarding.stop();
@@ -439,9 +461,11 @@ export function createApiApplication(options: CreateApiApplicationOptions = {}):
       discovery,
       avatars,
       testSend,
+      scheduling,
       recoverOnboarding: () =>
         (recovery ??= (async () => {
           await testSend.recover();
+          await scheduling.recover();
           await discovery.recover();
           await onboarding.recover();
         })()),

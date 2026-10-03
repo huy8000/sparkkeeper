@@ -21,6 +21,7 @@ import {
   contactSyncRuns,
   dailyRuns,
   executionRuns,
+  scheduledRunSnapshots,
   type ContactSyncRunRow,
 } from '../schema/index.js';
 import { ACTIVE_LOGIN_SESSION_STATUSES } from './AccountLoginSessionRepository.js';
@@ -148,6 +149,11 @@ export class ContactDiscoveryRepository {
   }
   executionBusy(tx: Tx | DatabaseClient['orm'] = this.client.orm): boolean {
     return (
+      !!tx
+        .select({ id: scheduledRunSnapshots.runId })
+        .from(scheduledRunSnapshots)
+        .where(eq(scheduledRunSnapshots.activeSlot, 1))
+        .get() ||
       !!tx
         .select({ id: executionRuns.id })
         .from(executionRuns)

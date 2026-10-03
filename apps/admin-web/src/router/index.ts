@@ -6,6 +6,8 @@ import AdminLayout from '../layouts/AdminLayout.vue';
 import AccountFriendsPage from '../pages/AccountFriendsPage.vue';
 import AccountContactsPage from '../pages/AccountContactsPage.vue';
 import AccountTestSendPage from '../pages/AccountTestSendPage.vue';
+import TasksPage from '../pages/TasksPage.vue';
+import ScheduledRunPage from '../pages/ScheduledRunPage.vue';
 import TestSendDetailPage from '../pages/TestSendDetailPage.vue';
 import AccountHistoryPage from '../pages/AccountHistoryPage.vue';
 import AccountManualRunPage from '../pages/AccountManualRunPage.vue';
@@ -129,6 +131,11 @@ export function createAdminRouter(authController?: AuthController): Router {
                 meta: { title: 'testSend.title', section: 'accounts' },
               },
               {
+                path: 'tasks',
+                component: TasksPage,
+                meta: { title: 'tasks.title', section: 'accounts' },
+              },
+              {
                 path: 'schedule',
                 component: AccountSchedulePage,
                 meta: { title: 'pages.accountSchedule', section: 'accounts' },
@@ -158,6 +165,12 @@ export function createAdminRouter(authController?: AuthController): Router {
             meta: { title: 'nav.templates', section: 'templates' },
           },
           { path: 'runs', component: RunsPage, meta: { title: 'nav.runs', section: 'runs' } },
+          { path: 'tasks', component: TasksPage, meta: { title: 'tasks.title', section: 'tasks' } },
+          {
+            path: 'scheduled-runs/:runId',
+            component: ScheduledRunPage,
+            meta: { title: 'tasks.run', section: 'tasks' },
+          },
           {
             path: 'test-sends/:runId',
             component: TestSendDetailPage,

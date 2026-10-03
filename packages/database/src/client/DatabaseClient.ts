@@ -601,7 +601,18 @@ export class DatabaseClient {
       !inspection.auditEventsSchemaCompatible ||
       !inspection.legacyFriendBindingsSchemaCompatible ||
       !inspection.legacyScheduleImportsSchemaCompatible ||
-      !columnsMatch(intentColumns, expectedIntentColumns)
+      !columnsMatch(intentColumns, expectedIntentColumns) ||
+      !columnsMatch(this.readTableColumns('scheduled_run_snapshots'), [
+        { name: 'run_id', type: 'TEXT', notNull: true, primaryKey: true },
+        ...['task_id', 'business_date', 'snapshot'].map((name) => ({
+          name,
+          type: 'TEXT',
+          notNull: true,
+          primaryKey: false,
+        })),
+        { name: 'active_slot', type: 'INTEGER', notNull: false, primaryKey: false },
+        { name: 'owner_token', type: 'TEXT', notNull: false, primaryKey: false },
+      ])
     ) {
       throw new DatabaseSchemaError(
         'Database migrations completed, but the database tables are incompatible with the Drizzle schema.',

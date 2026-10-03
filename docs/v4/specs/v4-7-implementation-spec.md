@@ -1,6 +1,6 @@
 # V4-7 Implementation Specification — Single-target Test Send
 
-> Status: IMPLEMENTED / SELF-REVIEWED / OFFLINE VERIFIED; PR delivery, not merged
+> Status: MERGED / ACCEPTED (PR #47, `develop@a41562b43e9a9d7882bd9139a2c1ce57d076ba8d`)
 > Baseline: `develop@c76cd1fdac8da6f5f1aaf0958fd01fb7c97b32fb` (V4-6 merged, PR #46)
 > Branch: `feature/v4-7-test-send`
 > Owner: Codex; explicit authorization for planning/implementation/self-review/fix/offline verification/commit/push/PR, not merge or live validation.

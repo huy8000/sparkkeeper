@@ -58,6 +58,7 @@ const tabs = computed(() => [
   { labelKey: 'account.friendsTab', path: `/accounts/${accountId.value}/friends` },
   { labelKey: 'contacts.title', path: `/accounts/${accountId.value}/contacts` },
   { labelKey: 'testSend.title', path: `/accounts/${accountId.value}/test-send` },
+  { labelKey: 'tasks.title', path: `/accounts/${accountId.value}/tasks` },
   { labelKey: 'account.scheduleTab', path: `/accounts/${accountId.value}/schedule` },
   { labelKey: 'account.manualRunTab', path: `/accounts/${accountId.value}/manual-run` },
   { labelKey: 'account.historyTab', path: `/accounts/${accountId.value}/history` },

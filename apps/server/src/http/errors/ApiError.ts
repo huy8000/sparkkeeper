@@ -1,4 +1,6 @@
 export type ApiErrorCode =
+  | 'TASK_NOT_FOUND'
+  | 'TASK_CONFLICT'
   | 'TARGET_NOT_ELIGIBLE'
   | 'INTENT_NOT_FOUND'
   | 'INTENT_EXPIRED'

@@ -158,7 +158,7 @@ Exit：controlled browser tests cover history/sticker/inbound/nonmatch/remount/c
 
 Branch：`feature/v4-7-test-send`
 
-当前状态：IMPLEMENTED / SELF-REVIEWED / OFFLINE VERIFIED，待 PR 合并。当前授权范围：仅单目标，不实现以下原 roadmap 中的 sequential batch。Authority 见 [V4-7 Spec](./specs/v4-7-implementation-spec.md)。交付 preview/确认、共同 coordinator、snapshot/boundary CAS、保守 recovery、API/最小 UI；生产 execute 保持 gate closed，离线验证不代表 live worker/DOM 已可用。批量能力延期，Scheduler 仍属 V4-8。
+当前状态：MERGED / ACCEPTED（PR #47，`develop@a41562b43e9a9d7882bd9139a2c1ce57d076ba8d`）。当前授权范围：仅单目标，不实现以下原 roadmap 中的 sequential batch。Authority 见 [V4-7 Spec](./specs/v4-7-implementation-spec.md)。交付 preview/确认、共同 coordinator、snapshot/boundary CAS、保守 recovery、API/最小 UI；生产 execute 保持 gate closed，离线验证不代表 live worker/DOM 已可用。批量能力延期，Scheduler 仍属 V4-8。
 
 交付：
 
@@ -175,6 +175,8 @@ Exit：all no-send tests PASS；真实 sends only separate Gates C/D/E。
 ### V4-8 — SendTask / Scheduling
 
 Branch：`feature/v4-8-send-task-scheduling`
+
+当前状态：IMPLEMENTED / SELF-REVIEWED / OFFLINE VERIFIED（PR delivery，未合并）。Authority 见 [V4-8 Spec](./specs/v4-8-implementation-spec.md)。完整 controlled-local scheduling 复用 V4-5/6/7，0012 加入不可变 managed snapshots、durable run owner、全局 admission 与 record/action CAS；生产 gate 继续 hard closed，默认服务禁止 legacy Scheduler fallthrough。未授权 live runtime/真实发送/Gates，未实现 V4-9 migration tooling 或 unified History。
 
 交付：
 

@@ -19,6 +19,7 @@ import {
   contactSyncRuns,
   adminUsers,
   dailyRuns,
+  scheduledRunSnapshots,
 } from '../schema/index.js';
 import { ACTIVE_LOGIN_SESSION_STATUSES } from './AccountLoginSessionRepository.js';
 import { TargetResolverSnapshotRepository } from './TargetResolverSnapshotRepository.js';
@@ -68,7 +69,8 @@ export class TestSendRepository {
     });
     return result!;
   }
-  private snapshot(accountId: string, contactId: string, templateId: string) {
+  /** Private coherent metadata/content snapshot shared by scheduled publication; never an API DTO. */
+  snapshot(accountId: string, contactId: string, templateId: string) {
     const target = new TargetResolverSnapshotRepository(this.client).load(accountId, contactId);
     if (target.status !== 'READY' && target.reason === 'PERSISTENCE_FAILURE')
       throw new Error('PERSISTENCE_FAILURE');
@@ -234,6 +236,11 @@ export class TestSendRepository {
       )
         throw new TestSendError('VALIDATION_ERROR');
       if (
+        tx
+          .select({ id: scheduledRunSnapshots.runId })
+          .from(scheduledRunSnapshots)
+          .where(eq(scheduledRunSnapshots.activeSlot, 1))
+          .get() ||
         tx
           .select({ id: executionRuns.id })
           .from(executionRuns)

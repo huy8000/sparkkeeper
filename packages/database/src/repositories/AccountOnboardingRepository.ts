@@ -19,6 +19,7 @@ import {
   auditEvents,
   contactSyncRuns,
   executionRuns,
+  scheduledRunSnapshots,
   type AccountLoginSessionRow,
   type AccountRow,
   type NewAccountLoginSessionRow,
@@ -209,6 +210,11 @@ export class AccountOnboardingRepository {
               .limit(1)
               .get();
             if (
+              tx
+                .select({ id: scheduledRunSnapshots.runId })
+                .from(scheduledRunSnapshots)
+                .where(eq(scheduledRunSnapshots.activeSlot, 1))
+                .get() ||
               tx
                 .select({ id: contactSyncRuns.id })
                 .from(contactSyncRuns)
