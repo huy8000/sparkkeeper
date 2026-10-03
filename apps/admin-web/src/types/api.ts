@@ -298,7 +298,14 @@ export type NotificationDeliveryResult =
 
 export type RealtimeConnectionState = 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED';
 
-export type ConfigEntityType = 'ACCOUNT' | 'FRIEND' | 'TEMPLATE' | 'SCHEDULE' | 'NOTIFICATION';
+export type ConfigEntityType =
+  | 'ACCOUNT'
+  | 'FRIEND'
+  | 'TEMPLATE'
+  | 'SCHEDULE'
+  | 'NOTIFICATION'
+  | 'MIGRATION'
+  | 'DELIVERY_RESOLUTION';
 
 export interface RealtimeReadyEvent {
   readonly id: string;

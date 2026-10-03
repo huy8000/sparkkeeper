@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
+#include <sys/file.h>
 #include <unistd.h>
 
 #if defined(__linux__)
@@ -341,7 +342,84 @@ static int remove_empty_profile(const char *parent, const char *name, const char
   return result;
 }
 
+/* Offline operator entry: shares the exact lock used by app/maintenance Docker
+ * entrypoints. The descriptor survives exec; it is never unlinked on failure. */
+static int offline_lock(const char *root, char **command) {
+  int root_fd = open_absolute_directory(root);
+  if (root_fd < 0) return RESULT_UNSAFE;
+  int lock_fd = openat(root_fd, "browser-profile.lock", O_RDWR | O_CREAT | O_NOFOLLOW, 0600);
+  close(root_fd);
+  struct stat state;
+  if (lock_fd < 0 || fstat(lock_fd, &state) != 0 || !S_ISREG(state.st_mode) ||
+      state.st_nlink != 1 || fchmod(lock_fd, 0600) != 0 || flock(lock_fd, LOCK_EX | LOCK_NB) != 0)
+    return RESULT_UNSAFE;
+  char descriptor[32];
+  snprintf(descriptor, sizeof(descriptor), "%d", lock_fd);
+  if (setenv("SPARKKEEPER_OFFLINE_LOCK_FD", descriptor, 1) != 0) return RESULT_ERROR;
+  execvp(command[0], command);
+  return RESULT_ERROR;
+}
+
+static int bind_legacy(const char *root, const char *account_id, const char *operation_id,
+                       const char *device, const char *inode, int verify_only) {
+  if (!valid_uuid(account_id) || !valid_uuid(operation_id) || !device[0] || !inode[0]) return RESULT_UNSAFE;
+  char *end_device, *end_inode;
+  unsigned long long expected_device = strtoull(device, &end_device, 10);
+  unsigned long long expected_inode = strtoull(inode, &end_inode, 10);
+  if (*end_device || *end_inode) return RESULT_UNSAFE;
+  int root_fd = open_absolute_directory(root);
+  if (root_fd < 0) return RESULT_UNSAFE;
+  if (!verify_only && mkdirat(root_fd, "browser-profiles", 0700) != 0 && errno != EEXIST) { close(root_fd); return RESULT_ERROR; }
+  int destination_parent = openat(root_fd, "browser-profiles", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+  if (destination_parent < 0 || fchmod(destination_parent, 0700) != 0) { close(root_fd); if(destination_parent>=0)close(destination_parent); return RESULT_UNSAFE; }
+  int source_fd = -1;
+  int result = 0;
+  struct stat source_state, entry;
+  if (!verify_only) {
+  source_fd = openat(root_fd, "browser-profile", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+  if (source_fd < 0 && errno == ENOENT) {
+    source_fd = open_owned_profile(destination_parent, account_id, account_id, operation_id, &source_state);
+    if (source_fd < 0) result = -source_fd;
+  } else if(source_fd < 0) result = RESULT_UNSAFE;
+  else {
+    if (fstat(source_fd, &source_state) != 0 || fchmod(source_fd, 0700) != 0) result=RESULT_UNSAFE;
+    if(result==0 && ((unsigned long long)source_state.st_dev!=expected_device || (unsigned long long)source_state.st_ino!=expected_inode)) result=RESULT_OWNERSHIP;
+    if(result==0 && (fstatat(source_fd,"SingletonLock",&entry,AT_SYMLINK_NOFOLLOW)==0 || errno!=ENOENT)) result=RESULT_UNSAFE;
+    if(result==0) {
+      char marker[256]; int length=expected_marker(marker,sizeof(marker),account_id,operation_id);
+      int marker_fd=openat(source_fd,MARKER_FILE,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);
+      if(marker_fd>=0) {
+        if(length<0 || write_all(marker_fd,marker,(size_t)length)!=0 || fsync(marker_fd)!=0)result=RESULT_ERROR;
+        close(marker_fd);
+      } else if(errno!=EEXIST) result=RESULT_UNSAFE;
+      if(result==0)result=validate_marker(source_fd,account_id,operation_id);
+      if(result==0 && fsync(source_fd)!=0)result=RESULT_ERROR;
+    }
+    if(result==0 && (fstatat(root_fd,"browser-profile",&entry,AT_SYMLINK_NOFOLLOW)!=0 || entry.st_dev!=source_state.st_dev || entry.st_ino!=source_state.st_ino))result=RESULT_UNSAFE;
+    if(result==0)result=rename_no_replace(root_fd,"browser-profile",destination_parent,account_id);
+    if(result==0 && (fsync(root_fd)!=0 || fsync(destination_parent)!=0))result=RESULT_ERROR;
+    if(result==0 && (fstatat(root_fd,"browser-profile",&entry,AT_SYMLINK_NOFOLLOW)==0 || errno!=ENOENT))result=RESULT_UNSAFE;
+  }
+  }
+  if(result==0) {
+    struct stat final_state;
+    int final_fd=open_owned_profile(destination_parent,account_id,account_id,operation_id,&final_state);
+    if(final_fd<0)result=-final_fd;
+    else {
+      if((unsigned long long)final_state.st_dev!=expected_device || (unsigned long long)final_state.st_ino!=expected_inode) result=RESULT_OWNERSHIP;
+      if(result==0 && (fstatat(destination_parent,account_id,&entry,AT_SYMLINK_NOFOLLOW)!=0 || entry.st_dev!=final_state.st_dev || entry.st_ino!=final_state.st_ino)) result=RESULT_UNSAFE;
+      if(result==0) result=validate_marker(final_fd,account_id,operation_id);
+      close(final_fd);
+    }
+  }
+  if(source_fd>=0)close(source_fd);
+  close(destination_parent);close(root_fd);return result;
+}
+
 int main(int argc, char **argv) {
+  if(argc>=5 && strcmp(argv[1],"offline-lock")==0) return offline_lock(argv[2],&argv[3]);
+  if(argc==7 && strcmp(argv[1],"bind-legacy")==0) return bind_legacy(argv[2],argv[3],argv[4],argv[5],argv[6],0);
+  if(argc==7 && strcmp(argv[1],"verify-legacy-binding")==0) return bind_legacy(argv[2],argv[3],argv[4],argv[5],argv[6],1);
   if (argc == 6 && strcmp(argv[1], "create") == 0) {
     return create_profile(argv[2], argv[3], argv[4], argv[5]);
   }

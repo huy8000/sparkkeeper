@@ -1,3 +1,4 @@
+import { safeEventMessage, safeRuntimeErrorCode } from '../observability/RuntimeLogger.js';
 import type {
   RealtimeConfigData,
   RealtimeEvent,
@@ -76,13 +77,15 @@ function projectRuntimeData(data: RealtimeRuntimeData): RealtimeRuntimeData {
   return Object.freeze({
     eventType: data.eventType,
     level: data.level,
-    message: data.message,
+    message: safeEventMessage(data.eventType),
     ...(data.runId === undefined ? {} : { runId: data.runId }),
     ...(data.accountId === undefined ? {} : { accountId: data.accountId }),
     ...(data.friendId === undefined ? {} : { friendId: data.friendId }),
     ...(data.businessDate === undefined ? {} : { businessDate: data.businessDate }),
     ...(data.attempt === undefined ? {} : { attempt: data.attempt }),
-    ...(data.errorCode === undefined ? {} : { errorCode: data.errorCode }),
+    ...(safeRuntimeErrorCode(data.errorCode) === null
+      ? {}
+      : { errorCode: safeRuntimeErrorCode(data.errorCode)! }),
     ...(data.nextRetryAt === undefined ? {} : { nextRetryAt: data.nextRetryAt }),
     ...(data.successCount === undefined ? {} : { successCount: data.successCount }),
     ...(data.failedCount === undefined ? {} : { failedCount: data.failedCount }),

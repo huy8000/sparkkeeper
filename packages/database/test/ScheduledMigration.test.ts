@@ -6,11 +6,11 @@ import { createV4TestSendDatabase } from './testDatabase.js';
 test('0012 upgrades populated 0011 without rewriting history; fresh/repeat/reopen/FKs and guards', (t) => {
   const f = createV4TestSendDatabase(t),
     row = new AccountRepository(f.client).create({ name: 'Synthetic prior Account' });
-  assert.equal(f.client.migrate().appliedMigrationCount, 13);
-  assert.equal(f.client.migrate().appliedMigrationCount, 13);
+  assert.equal(f.client.migrate().appliedMigrationCount, 14);
+  assert.equal(f.client.migrate().appliedMigrationCount, 14);
   const reopened = createDatabase({ databasePath: f.databasePath });
   t.after(() => reopened.close());
-  assert.equal(reopened.migrate().appliedMigrationCount, 13);
+  assert.equal(reopened.migrate().appliedMigrationCount, 14);
   assert.deepEqual(new AccountRepository(reopened).findById(row.id), row);
   const db = new BetterSqlite3(f.databasePath);
   t.after(() => db.close());

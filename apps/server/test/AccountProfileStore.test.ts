@@ -152,13 +152,12 @@ test('AccountProfileStore rejects a parent symlink swap between validation and r
   const directory = mkdtempSync(path.join(tmpdir(), 'sparkkeeper-profile-swap-race-test-'));
   context.after(() => rmSync(directory, { recursive: true, force: true }));
   const nativeRenamer = new NativeAtomicDirectoryRenamer();
-  let store!: AccountProfileStore;
   const sessionId = randomUUID();
   const accountId = randomUUID();
   const originalOnboarding = path.join(directory, 'original-onboarding');
   const external = path.join(directory, 'external-onboarding');
   const externalSession = path.join(external, sessionId);
-  store = new AccountProfileStore(directory, {
+  const store: AccountProfileStore = new AccountProfileStore(directory, {
     renamer: {
       createOwned(source, marker) {
         nativeRenamer.createOwned(source, marker);

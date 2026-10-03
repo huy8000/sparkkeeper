@@ -103,7 +103,9 @@ describe('Runs list', () => {
     await flushPromises();
 
     expect(
-      fetchMock.mock.calls.some(([input]) => String(input).endsWith('/api/runs?limit=50')),
+      fetchMock.mock.calls.some(([input]) =>
+        String(input).endsWith('/api/runs?limit=50&source=LEGACY_V3'),
+      ),
     ).toBe(true);
     const selects = wrapper.findAll('.filter-bar select');
     expect((selects[1]!.element as HTMLSelectElement).value).toBe('');

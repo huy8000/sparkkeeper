@@ -230,6 +230,7 @@ export function createSparkKeeperApi(
         query.set('businessDate', filters.businessDate);
       if (filters.status !== undefined) query.set('status', filters.status);
       if (filters.limit !== undefined) query.set('limit', String(filters.limit));
+      query.set('source', 'LEGACY_V3');
       const suffix = query.size > 0 ? `?${query.toString()}` : '';
       return client.get(`/runs${suffix}`, parseDailyRuns, signal);
     },

@@ -21,6 +21,10 @@ import NotFoundPage from '../pages/NotFoundPage.vue';
 import NotificationsPage from '../pages/NotificationsPage.vue';
 import RunDetailPage from '../pages/RunDetailPage.vue';
 import RunsPage from '../pages/RunsPage.vue';
+import UnifiedRunsPage from '../pages/UnifiedRunsPage.vue';
+import UnifiedRunDetailPage from '../pages/UnifiedRunDetailPage.vue';
+import MigrationPage from '../pages/MigrationPage.vue';
+import AuditEventsPage from '../pages/AuditEventsPage.vue';
 import SchedulesPage from '../pages/SchedulesPage.vue';
 import SystemStatusPage from '../pages/SystemStatusPage.vue';
 import TemplatesPage from '../pages/TemplatesPage.vue';
@@ -165,6 +169,16 @@ export function createAdminRouter(authController?: AuthController): Router {
             meta: { title: 'nav.templates', section: 'templates' },
           },
           { path: 'runs', component: RunsPage, meta: { title: 'nav.runs', section: 'runs' } },
+          {
+            path: 'history',
+            component: UnifiedRunsPage,
+            meta: { title: 'nav.runs', section: 'runs' },
+          },
+          {
+            path: 'history/:runId',
+            component: UnifiedRunDetailPage,
+            meta: { title: 'pages.runDetail', section: 'runs' },
+          },
           { path: 'tasks', component: TasksPage, meta: { title: 'tasks.title', section: 'tasks' } },
           {
             path: 'scheduled-runs/:runId',
@@ -195,6 +209,16 @@ export function createAdminRouter(authController?: AuthController): Router {
             path: 'operations/system',
             component: SystemStatusPage,
             meta: { title: 'nav.system', section: 'operations/system' },
+          },
+          {
+            path: 'operations/migration',
+            component: MigrationPage,
+            meta: { title: 'nav.system', section: 'operations/migration' },
+          },
+          {
+            path: 'operations/audit',
+            component: AuditEventsPage,
+            meta: { title: 'nav.system', section: 'operations/audit' },
           },
           { path: ':pathMatch(.*)*', component: NotFoundPage, meta: { title: 'pages.notFound' } },
         ],

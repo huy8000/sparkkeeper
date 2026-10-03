@@ -167,6 +167,7 @@ test('allowlist and Pino redaction prevent sensitive fields and raw Error data',
     err: new Error('unsafe stack detail'),
   } as RuntimeLogEvent;
   logger.emit('error', attempted);
+  logger.emit('error', { eventType: 'TASK_FAILED', errorCode: 'unsafe raw identity error' });
   await logger.close();
 
   const serialized = destination.chunks.join('');
@@ -179,6 +180,7 @@ test('allowlist and Pino redaction prevent sensitive fields and raw Error data',
     'private-webhook-secret',
     'Private Test User',
     'unsafe stack detail',
+    'unsafe raw identity error',
   ]) {
     assert.equal(serialized.includes(forbidden), false);
   }

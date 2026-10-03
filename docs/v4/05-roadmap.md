@@ -176,7 +176,7 @@ Exit：all no-send tests PASS；真实 sends only separate Gates C/D/E。
 
 Branch：`feature/v4-8-send-task-scheduling`
 
-当前状态：IMPLEMENTED / SELF-REVIEWED / OFFLINE VERIFIED（PR delivery，未合并）。Authority 见 [V4-8 Spec](./specs/v4-8-implementation-spec.md)。完整 controlled-local scheduling 复用 V4-5/6/7，0012 加入不可变 managed snapshots、durable run owner、全局 admission 与 record/action CAS；生产 gate 继续 hard closed，默认服务禁止 legacy Scheduler fallthrough。未授权 live runtime/真实发送/Gates，未实现 V4-9 migration tooling 或 unified History。
+当前状态：MERGED / ACCEPTED（PR #48，`develop@d606a098e19c362e924a581b120d9135c68bd566`）。Authority 见 [V4-8 Spec](./specs/v4-8-implementation-spec.md)。完整 controlled-local scheduling 复用 V4-5/6/7，0012 加入不可变 managed snapshots、durable run owner、全局 admission 与 record/action CAS；生产 gate 继续 hard closed，默认服务禁止 legacy Scheduler fallthrough。未授权 live runtime/真实发送/Gates，未实现 V4-9 migration tooling 或 unified History。
 
 交付：
 
@@ -194,6 +194,8 @@ Exit：master gate false 时 zero claims/sends；Gate F 前不启用生产 Sched
 ### V4-9 — Migration Completion & Observability
 
 Branch：`feature/v4-9-migration-observability`
+
+当前状态：IMPLEMENTED / VERIFIED（待 PR review/merge）。基线 `develop@d606a098e19c362e924a581b120d9135c68bd566`。Authority 见 [V4-9 Spec](./specs/v4-9-implementation-spec.md)，离线操作见 [Migration Runbook](./06-migration-operator-runbook.md)。0013 保留 legacy 数据，显式 binding/import/resolution 采用 CAS + 同事务 audit，导入 Task 永远 disabled；统一 read model 与安全事件不产生发送副作用。合成 V3 升级/全 root backup-restore、native ownership/crash recovery、受影响 workspace 与 Linux fixture 验证通过。production scheduler/send gate 仍关闭，未执行任何 live Gate 或生产迁移。
 
 交付：
 

@@ -340,3 +340,12 @@ export {
   type ScheduledSnapshot,
 } from './repositories/ScheduledSendRepository.js';
 export { scheduledRunSnapshots } from './schema/scheduledRunSnapshots.js';
+export { MigrationRepository, MigrationError } from './repositories/MigrationRepository.js';
+export { UnifiedRunRepository } from './repositories/UnifiedRunRepository.js';
+export { legacyProfileBindings, v4SystemEvents } from './schema/migrationObservability.js';
+export {
+  inspectMigration,
+  LEGACY_TABLE_COLUMNS,
+  migrationInventoryDigest,
+} from './readiness/MigrationInspection.js';
+export { SafeRuntimeEventRepository } from './repositories/SafeRuntimeEventRepository.js';
